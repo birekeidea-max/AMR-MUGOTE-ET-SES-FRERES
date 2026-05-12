@@ -1,0 +1,99 @@
+{
+  "entities": {
+    "Reservation": {
+      "title": "Reservation",
+      "description": "A passenger booking for a boat trip.",
+      "type": "object",
+      "properties": {
+        "fullName": { "type": "string", "description": "Nom" },
+        "lastName": { "type": "string", "description": "Post-nom" },
+        "phone": { "type": "string", "description": "Contact phone number" },
+        "email": { "type": "string", "description": "Contact email address" },
+        "itinerary": { "type": "string", "enum": ["Bukavu-Goma", "Goma-Bukavu"] },
+        "ship": { "type": "string", "enum": ["Mugote 1", "Mugote 2", "Mugote 3"] },
+        "travelDate": { "type": "string", "format": "date" },
+        "departureTime": { "type": "string" },
+        "travelClass": { "type": "string", "enum": ["1ère Classe", "2ème Classe", "VIP"] },
+        "passengersCount": { "type": "integer" },
+        "status": { "type": "string", "enum": ["PENDING", "VALIDATED", "REJECTED"], "description": "Reservation status" },
+        "paymentMethod": { "type": "string", "enum": ["Airtel Money", "Orange Money", "M-Pesa", "Cash"] },
+        "transactionId": { "type": "string" },
+        "amount": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "validatedAt": { "type": "string", "format": "date-time" },
+        "ticketId": { "type": "string" }
+      },
+      "required": ["fullName", "phone", "itinerary", "travelDate", "travelClass", "passengersCount", "status"]
+    },
+    "News": {
+      "title": "News",
+      "description": "Announcements and updates.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "content": { "type": "string" },
+        "imageUrl": { "type": "string" },
+        "videoUrl": { "type": "string" },
+        "publishedAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "User": {
+      "title": "User",
+      "description": "User profile.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string" },
+        "role": { "type": "string", "enum": ["CLIENT", "ADMIN"] },
+        "isVerified": { "type": "boolean" }
+      }
+    },
+    "Conversation": {
+      "title": "Conversation",
+      "description": "A chat session between a user and support/AI.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "userEmail": { "type": "string" },
+        "lastMessage": { "type": "string" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "status": { "type": "string", "enum": ["OPEN", "CLOSED"] },
+        "adminUnreadCount": { "type": "integer" }
+      }
+    },
+    "Message": {
+      "title": "Message",
+      "description": "A single message in a conversation.",
+      "type": "object",
+      "properties": {
+        "text": { "type": "string" },
+        "senderId": { "type": "string" },
+        "senderRole": { "type": "string", "enum": ["USER", "ADMIN", "AI"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      }
+    }
+  },
+  "firestore": {
+    "reservations": {
+      "schema": { "$ref": "#/entities/Reservation" },
+      "description": "Collection of all bookings."
+    },
+    "news": {
+      "schema": { "$ref": "#/entities/News" },
+      "description": "Collection of news and announcements."
+    },
+    "users": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "User profile data."
+    },
+    "conversations": {
+      "schema": { "$ref": "#/entities/Conversation" },
+      "description": "List of active support chats."
+    },
+    "conversations/{conversationId}/messages": {
+      "schema": { "$ref": "#/entities/Message" },
+      "description": "Messages within a specific chat."
+    }
+  }
+}

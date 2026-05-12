@@ -1,0 +1,63 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;700&family=Playfair+Display:ital,wght@0,700;1,700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Playfair Display", serif;
+  --font-mono: "JetBrains Mono", monospace;
+  
+  --color-maritime: #000c24;
+  --color-maritime-dark: #00040a;
+  --color-maritime-light: #001b44;
+  --color-gold: #FFC300;
+  --color-bg: #FFFFFF;
+  --color-lacustre: #003049;
+  --color-lake-shadow: #000814;
+}
+
+@layer base {
+  body {
+    @apply bg-bg text-black antialiased font-sans text-center;
+  }
+}
+
+@layer components {
+  .grid-pattern {
+    background-image: radial-gradient(#003566 0.5px, transparent 0.5px);
+    background-size: 32px 32px;
+  }
+
+  .nav-blur {
+    @apply bg-white/80 backdrop-blur-md;
+  }
+
+  .geometric-card {
+    @apply bg-white shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-100 rounded-xl overflow-hidden transition-all duration-300 hover:shadow-[0_8px_30px_rgb(0,0,0,0.08)];
+  }
+
+  .maritime-gradient {
+    @apply bg-gradient-to-br from-maritime to-maritime-light;
+  }
+
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .ticket-cut {
+    clip-path: polygon(
+      0% 0%, 100% 0%, 
+      100% calc(70% - 15px), 
+      calc(100% - 15px) 70%, 
+      100% calc(70% + 15px),
+      100% 100%, 0% 100%,
+      0% calc(70% + 15px),
+      15px 70%,
+      0% calc(70% - 15px)
+    );
+  }
+}
+

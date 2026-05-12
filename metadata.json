@@ -1,0 +1,8 @@
+{
+  "name": "AMR MUGOTE & FRÈRES",
+  "description": "Plateforme Numérique de Réservation et Gestion du Transport Lacustre Bukavu-Goma.",
+  "requestFramePermissions": [
+    "camera"
+  ],
+  "majorCapabilities": []
+}
