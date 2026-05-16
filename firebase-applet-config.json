@@ -1,10 +1,10 @@
 {
-  "projectId": "infosdocs",
-  "appId": "1:820870922200:web:1a3f04f25176e405d7fcad",
-  "apiKey": "AIzaSyCkMzWXY_L2WhaE7QLbMXYIcNwQzAkz1ro",
-  "authDomain": "infosdocs.firebaseapp.com",
+  "projectId": "mugote2",
+  "appId": "1:131875304989:web:e0a83c6073e2ace063b8f4",
+  "apiKey": "AIzaSyA4pBmVjx08ph7JdvJbmurOa_rMNYpy1MA",
+  "authDomain": "mugote2.firebaseapp.com",
   "firestoreDatabaseId": "ai-studio-020b031e-1447-4f1b-8ef0-ab4a23c0b6ab",
-  "storageBucket": "infosdocs.firebasestorage.app",
-  "messagingSenderId": "820870922200",
+  "storageBucket": "mugote2.firebasestorage.app",
+  "messagingSenderId": "131875304989",
   "measurementId": ""
 }

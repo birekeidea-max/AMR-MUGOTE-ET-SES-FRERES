@@ -1,8 +1,10 @@
 {
   "name": "AMR MUGOTE & FRÈRES",
-  "description": "Plateforme Numérique de Réservation et Gestion du Transport Lacustre Bukavu-Goma.",
+  "description": "Plateforme de transport lacustre Bukavu-Goma avec réservations, journal interactif (vues/commentaires) et assistance IA intelligente.",
   "requestFramePermissions": [
     "camera"
   ],
-  "majorCapabilities": []
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
 }

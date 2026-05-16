@@ -13,6 +13,7 @@ import {
   Mail,
   MapPin,
   Clock,
+  Eye,
   CheckCircle2,
   AlertCircle,
   FileText,
@@ -22,6 +23,7 @@ import {
   Upload,
   Trash2,
   ImagePlus,
+  Search,
   Settings,
   Printer,
   ChevronRightCircle,
@@ -92,26 +94,7 @@ const CLASS_COLORS: Record<TravelClass, { main: string, rgb: [number, number, nu
   'VIP': { main: '#F59E0B', rgb: [245, 158, 11], light: 'rgba(245, 158, 11, 0.1)' } // Amber
 };
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-const SYSTEM_PROMPT = `Tu es l'assistant IA officiel de ETS AMR MUGOTE ET SES FRERES, une compagnie de transport lacustre de premier plan sur le Lac Kivu (RDC).
-Ta mission est d'aider les passagers avec professionnalisme et courtoisie.
-
-INFOS CLÉS :
-- Flotte : Mugote 1, Mugote 2, et Mugote 3.
-- Itinéraires : Bukavu vers Goma et Goma vers Bukavu.
-- Classes et Tarifs : 1ère Classe / VIP (27$), 2ème Classe (17$), 3ème Classe (10$).
-- Heures de départ : Journée (07h20), Soir (18h00).
-- Paiement Mobile : +243 994 286 469 (Airtel, Orange, M-Pesa).
-- Politique de remboursement : 24h avant le départ, avec une réduction de 25%.
-- Contact Support : ${CONTACT_NUMBERS.join(', ')}.
-- Devise : Dollars Américains ($).
-- Slogan : "Voyager en toute sécurité".
-
-DIRECTIVES :
-- Réponds de manière concise et utile.
-- Encourage les réservations via notre plateforme.
-- Si tu ne connais pas une information spécifique, demande à l'utilisateur de patienter pour une réponse d'un administrateur.
-- Ne mentionne jamais que tu es un programme ou une IA sauf si on te le demande directement.`;
+const SYSTEM_PROMPT = `Tu es l'assistant IA officiel de ETS AMR MUGOTE ET SES FRERES...`; // Keep definition but we will use the server version
 
 // --- Shared PDF Generator ---
 const generateTicket = async (res: Reservation, siteSettings: { homeBg: string }) => {
@@ -272,7 +255,8 @@ export default function App() {
   const [currentReservation, setCurrentReservation] = useState<Reservation | null>(null);
   const [siteSettings, setSiteSettings] = useState({ 
     homeBg: 'https://images.unsplash.com/photo-1559139225-8216b8e8303e?q=80&w=2070&auto=format&fit=crop',
-    homeDetail: 'https://images.unsplash.com/photo-1544551763-46a013bb70d5?q=80&w=2070&auto=format&fit=crop'
+    homeDetail: 'https://images.unsplash.com/photo-1544551763-46a013bb70d5?q=80&w=2070&auto=format&fit=crop',
+    logo: '' // Fallback for the "baton" (mugote) image
   });
 
   useEffect(() => {
@@ -309,6 +293,15 @@ export default function App() {
             }, { merge: true });
           }
           
+          // Track user list for admin with last login
+          await setDoc(doc(db, 'users_list', u.uid), {
+            uid: u.uid,
+            email: u.email,
+            displayName: u.displayName || '',
+            lastLogin: serverTimestamp(),
+            emailVerified: u.emailVerified
+          }, { merge: true });
+
           // Auto-create user profile if it doesn't exist
           await setDoc(doc(db, 'users', u.uid), {
             uid: u.uid,
@@ -316,7 +309,7 @@ export default function App() {
             updatedAt: serverTimestamp()
           }, { merge: true });
         } catch (error) {
-          handleFirestoreError(error, OperationType.WRITE, 'users/admins');
+          console.warn("Background auth-sync failed safely:", error);
         }
       } else {
         setIsAdmin(false);
@@ -356,56 +349,66 @@ export default function App() {
       <div className="absolute inset-0 grid-pattern pointer-events-none opacity-[0.05]"></div>
       
       <header className="w-full bg-white z-[60] relative">
-        {/* Top Image Banner */}
-        <div className="w-full h-40 md:h-56 relative overflow-hidden">
+        <div className="w-full h-44 md:h-64 relative overflow-hidden">
           <img 
             src={siteSettings.homeBg} 
             className="w-full h-full object-cover" 
-            alt="Mugote Fleet" 
+            alt="Mugote Fleet Background"
+            onError={(e) => {
+              (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1559139225-8216b8e8303e?q=80&w=2070&auto=format&fit=crop';
+            }}
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-white via-transparent to-black/20"></div>
-          <div className="absolute bottom-6 left-1/2 -translate-x-1/2 w-full text-center">
-            <p className="text-white text-[10px] md:text-xs font-black uppercase tracking-[0.5em] drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)]">
+          <div className="absolute inset-0 bg-gradient-to-t from-white via-transparent to-black/40"></div>
+          <div className="absolute bottom-10 left-1/2 -translate-x-1/2 w-full text-center px-4">
+            <p className="text-white text-xs md:text-base font-black uppercase tracking-[0.6em] drop-shadow-[0_4px_8px_rgba(0,0,0,0.5)]">
               L'excellence du transport lacustre au Kivu
             </p>
           </div>
         </div>
 
-        {/* Brand Content */}
-        <div className="max-w-7xl mx-auto px-6 py-8 flex flex-col items-center justify-center relative -mt-10 bg-white rounded-t-[40px] shadow-[0_-15px_40px_-15px_rgba(0,0,0,0.1)]">
-          <div className="flex flex-col items-center gap-4 cursor-pointer group" onClick={() => setCurrentPage('home')}>
-            <div className="w-28 h-28 md:w-40 md:h-40 rounded-full border-[6px] border-white shadow-2xl overflow-hidden shadow-black/30 transition-all group-hover:scale-105 mb-4 relative ring-1 ring-slate-100 flex items-center justify-center bg-slate-50">
+        <div className="max-w-7xl mx-auto px-6 py-10 flex flex-col items-center justify-center relative -mt-16 bg-white rounded-t-[50px] shadow-[0_-20px_50px_-15px_rgba(0,0,0,0.15)]">
+          <div className="flex flex-col items-center gap-6 cursor-pointer group" onClick={() => setCurrentPage('home')}>
+            <div className="w-32 h-32 md:w-48 md:h-48 rounded-full border-[8px] border-white shadow-2xl overflow-hidden shadow-black/40 transition-all group-hover:scale-105 mb-2 relative ring-1 ring-slate-100 flex items-center justify-center bg-white">
               <img 
-                src={siteSettings.homeBg} 
+                src={siteSettings.logo || siteSettings.homeDetail || "https://images.unsplash.com/photo-1544551763-46a013bb70d5?q=80&w=2070&auto=format&fit=crop"} 
                 className="w-full h-full object-cover" 
-                alt="Logo AMR Mugote" 
+                alt="Logo Mugote"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1544551763-46a013bb70d5?q=80&w=2070&auto=format&fit=crop';
+                }}
               />
             </div>
-            <div className="text-center space-y-2">
-              <h1 className="text-xl md:text-3xl font-black tracking-tighter leading-none italic uppercase">
-                <span className="text-maritime">ETS AMR</span> <span className="text-gold">MUGOTE</span> <span className="text-maritime-dark italic">ET SES FRERES</span>
+            <div className="text-center space-y-3">
+              <h1 className="text-2xl md:text-4xl font-black tracking-tighter leading-none italic uppercase">
+                <span className="text-maritime">ETS AMR</span> <span className="text-gold">MUGOTE</span> <span className="text-maritime-dark">ET SES FRERES</span>
               </h1>
-              <div className="flex items-center justify-center gap-3">
-                <div className="h-[1px] w-8 md:w-16 bg-gold/40"></div>
-                <p className="text-[10px] md:text-xs font-black tracking-[0.25em] text-slate-800 uppercase italic">
+              <div className="flex items-center justify-center gap-4">
+                <div className="h-[2px] w-12 md:w-24 bg-gold/50"></div>
+                <p className="text-xs md:text-sm font-black tracking-[0.3em] text-slate-900 uppercase italic">
                   VOYAGER EN TOUTE SÉCURITÉ
                 </p>
-                <div className="h-[1px] w-8 md:w-16 bg-gold/40"></div>
+                <div className="h-[2px] w-12 md:w-24 bg-gold/50"></div>
               </div>
             </div>
           </div>
           
-          <div className="absolute right-6 top-8 flex items-center gap-3">
-             <button onClick={() => setIsMenuOpen(true)} className="md:hidden p-3 bg-[#001233] text-white rounded-xl shadow-lg hover:bg-black transition-all">
-                <Menu size={20} />
+          <div className="absolute right-8 top-10 flex items-center gap-4">
+             <button onClick={() => setIsMenuOpen(true)} className="md:hidden p-4 bg-maritime text-white rounded-2xl shadow-xl hover:bg-black transition-all">
+                <Menu size={24} />
              </button>
              {user ? (
-               <button onClick={logout} className="p-3 bg-slate-50 text-slate-400 hover:text-rose-600 rounded-xl transition-all border border-slate-100 hover:border-rose-100 shadow-sm">
-                 <LogOut size={16} />
-               </button>
+               <div className="flex items-center gap-3">
+                 <div className="hidden md:block text-right">
+                   <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Connecté</p>
+                   <p className="text-xs font-black text-maritime">{user.displayName}</p>
+                 </div>
+                 <button onClick={logout} className="p-4 bg-slate-50 text-slate-400 hover:text-rose-600 rounded-2xl transition-all border border-slate-100 hover:border-rose-100 shadow-md">
+                   <LogOut size={20} />
+                 </button>
+               </div>
             ) : (
-              <button onClick={login} className="px-6 py-2 bg-maritime text-white rounded-xl shadow-lg hover:bg-maritime-dark transition-all text-[10px] font-black uppercase tracking-widest flex items-center gap-2 border border-white/20">
-                <User size={14} /> Connexion
+              <button onClick={login} className="px-8 py-3 bg-maritime text-white rounded-2xl shadow-xl hover:bg-maritime-dark transition-all text-xs font-black uppercase tracking-widest flex items-center gap-3 border border-white/20">
+                <User size={18} /> Connexion
               </button>
             )}
           </div>
@@ -415,52 +418,52 @@ export default function App() {
         <div className="w-full h-2 bg-gradient-to-r from-transparent via-gold/20 to-transparent"></div>
       </header>
 
-      <nav className="sticky top-0 z-50 bg-[#001233] w-full border-b border-white/5 shadow-2xl">
-        <div className="max-w-7xl mx-auto px-4 py-3">
-          <div className="flex flex-wrap items-center justify-center gap-2 md:gap-3">
+      <nav className="sticky top-0 z-50 bg-[#001233] w-full border-b border-white/10 shadow-2xl">
+        <div className="max-w-7xl mx-auto px-4 py-4">
+          <div className="flex flex-wrap items-center justify-center gap-2 md:gap-4">
             {[
-              { id: 'home', label: 'Accueil' },
-              { id: 'booking', label: 'Réservation' },
-              { id: 'tickets', label: 'Mes Billets' },
-              { id: 'tarifs', label: 'Tarifs' },
-              { id: 'horaires', label: 'Horaires' },
-              { id: 'news', label: 'Journal' },
-              { id: 'gallery', label: 'Flotte' }
-            ].map(item => (
-              <button 
-                key={item.id}
-                onClick={() => {
-                  if (['tarifs', 'horaires', 'news', 'gallery'].includes(item.id)) {
-                    setCurrentPage('home');
-                    setTimeout(() => {
-                      const idMap: any = { tarifs: 'prices', horaires: 'routes', news: 'news-feed', gallery: 'fleet-gallery' };
-                      document.getElementById(idMap[item.id])?.scrollIntoView({ behavior: 'smooth' });
-                    }, 100);
-                  } else {
-                    setCurrentPage(item.id as Page); 
-                  }
-                }} 
-                className={cn(
-                  "px-4 py-2.5 rounded-xl text-[10px] md:text-xs font-black uppercase tracking-[0.15em] transition-all duration-300 relative overflow-hidden group border",
-                  currentPage === item.id 
-                    ? "bg-gold text-maritime border-gold shadow-lg shadow-gold/20" 
-                    : "bg-white/5 text-white/70 border-white/10 hover:bg-white/10 hover:text-white"
-                )}
-              >
-                <span className="relative z-10">{item.label}</span>
-              </button>
-            ))}
-            {isAdmin && (
-              <button 
-                onClick={() => setCurrentPage('dashboard')} 
-                className={cn(
-                  "px-4 py-2.5 rounded-xl text-[10px] md:text-xs font-black uppercase tracking-[0.1em] transition-all bg-emerald-600 text-white shadow-lg shadow-emerald-900/50",
-                  currentPage === 'dashboard' ? "ring-2 ring-emerald-300 ring-offset-2 ring-offset-[#001233]" : "opacity-80 hover:opacity-100"
-                )}
-              >
-                Admin
-              </button>
-            )}
+              { id: 'home', label: 'ACCUEIL' },
+              { id: 'booking', label: 'RÉSERVER' },
+              { id: 'tickets', label: 'BILLETS' },
+              { id: 'news', label: 'JOURNAL' },
+              { id: 'gallery', label: 'FLOTTE' },
+              { id: 'tarifs', label: 'TARIFS', anchor: 'prices' },
+              { id: 'horaires', label: 'HORAIRES', anchor: 'routes' },
+              { id: 'dashboard', label: 'ADMINISTRATION', adminOnly: true }
+            ].map(item => {
+              if (item.adminOnly && !isAdmin) return null;
+              
+              const isDashboard = item.id === 'dashboard';
+              
+              return (
+                <button 
+                  key={item.id}
+                  onClick={() => {
+                    if (item.anchor) {
+                      setCurrentPage('home');
+                      setTimeout(() => {
+                        document.getElementById(item.anchor!)?.scrollIntoView({ behavior: 'smooth' });
+                      }, 100);
+                    } else {
+                      setCurrentPage(item.id as Page); 
+                    }
+                  }} 
+                  className={cn(
+                    "rounded-xl font-black uppercase tracking-[0.2em] transition-all duration-300 border relative group",
+                    isDashboard ? "px-6 py-3.5 text-[11px] md:text-sm" : "px-4 py-3 text-[10px] md:text-xs",
+                    currentPage === item.id 
+                      ? isDashboard 
+                        ? "bg-emerald-600 text-white border-emerald-400 shadow-xl shadow-emerald-500/30 scale-105 ring-2 ring-emerald-500/50"
+                        : "bg-gold text-maritime border-gold shadow-xl shadow-gold/30 scale-105" 
+                      : isDashboard
+                        ? "bg-emerald-950/60 text-emerald-400 border-emerald-500/50 hover:bg-emerald-600 hover:text-white hover:scale-110 shadow-lg shadow-emerald-900/20"
+                        : "bg-white/5 text-white/50 border-white/5 hover:bg-white/10 hover:text-white"
+                  )}
+                >
+                  {item.label}
+                </button>
+              );
+            })}
           </div>
         </div>
       </nav>
@@ -476,8 +479,20 @@ export default function App() {
           >
             <div className="flex justify-between items-center mb-12">
               <div className="flex items-center gap-3">
-                <Ship className="text-gold" size={24} />
-                <span className="font-extrabold text-white tracking-tighter text-xl">NAVIGUER</span>
+                <div className="w-10 h-10 bg-white/10 rounded-xl overflow-hidden border border-white/20 flex items-center justify-center">
+                  {siteSettings.logo || siteSettings.homeDetail ? (
+                    <img 
+                      src={siteSettings.logo || siteSettings.homeDetail} 
+                      className="w-full h-full object-cover" 
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1559139225-8216b8e8303e?q=80&w=2070&auto=format&fit=crop";
+                      }}
+                    />
+                  ) : (
+                    <Ship className="text-gold" size={20} />
+                  )}
+                </div>
+                <span className="font-extrabold text-white tracking-tighter text-xl uppercase italic">AMR MUGOTE</span>
               </div>
               <button onClick={() => setIsMenuOpen(false)} className="p-3 bg-white/10 rounded-xl text-white hover:bg-white/20 transition-all">
                 <X size={24} />
@@ -486,38 +501,49 @@ export default function App() {
             
             <div className="flex-1 space-y-4 overflow-y-auto no-scrollbar">
               {[
-                { id: 'home', label: 'Accueil' },
-                { id: 'booking', label: 'Réservation' },
-                { id: 'tickets', label: 'Mes Billets' },
-                { id: 'tarifs', label: 'Tarifs' },
-                { id: 'horaires', label: 'Horaires' },
-                { id: 'news', label: 'Journal' },
-                { id: 'gallery', label: 'Flotte' }
-              ].map(item => (
-                <button 
-                  key={item.id}
-                  onClick={() => {
-                    setIsMenuOpen(false);
-                    if (['tarifs', 'horaires', 'news', 'gallery'].includes(item.id)) {
-                      setCurrentPage('home');
-                      setTimeout(() => {
-                        const idMap: any = { tarifs: 'prices', horaires: 'routes', news: 'news-feed', gallery: 'fleet-gallery' };
-                        document.getElementById(idMap[item.id])?.scrollIntoView({ behavior: 'smooth' });
-                      }, 100);
-                    } else {
-                      setCurrentPage(item.id as Page);
-                    }
-                  }}
-                  className={cn(
-                    "w-full px-8 py-5 rounded-2xl text-left text-xl font-black uppercase tracking-widest transition-all duration-300 relative overflow-hidden",
-                    currentPage === item.id 
-                      ? "bg-gold text-maritime shadow-2xl shadow-gold/20" 
-                      : "text-white/70 hover:text-white hover:bg-white/5"
-                  )}
-                >
-                  <span className="relative z-10">{item.label}</span>
-                </button>
-              ))}
+                { id: 'home', label: 'ACCUEIL' },
+                { id: 'booking', label: 'RÉSERVER' },
+                { id: 'tickets', label: 'MES BILLETS' },
+                { id: 'news', label: 'JOURNAL', anchor: 'news-feed' },
+                { id: 'gallery', label: 'FLOTTE', anchor: 'fleet-gallery' },
+                { id: 'tarifs', label: 'TARIFS', anchor: 'prices' },
+                { id: 'horaires', label: 'HORAIRES', anchor: 'routes' },
+                { id: 'dashboard', label: 'ADMINISTRATION', adminOnly: true }
+              ].map(item => {
+                if (item.adminOnly && !isAdmin) return null;
+                
+                const isDashboard = item.id === 'dashboard';
+
+                return (
+                  <button 
+                    key={item.id}
+                    onClick={() => {
+                      setIsMenuOpen(false);
+                      if (item.anchor) {
+                        setCurrentPage('home');
+                        setTimeout(() => {
+                          document.getElementById(item.anchor!)?.scrollIntoView({ behavior: 'smooth' });
+                        }, 100);
+                      } else {
+                        setCurrentPage(item.id as Page);
+                      }
+                    }}
+                    className={cn(
+                      "w-full px-8 rounded-2xl text-left font-black uppercase tracking-widest transition-all duration-300 relative overflow-hidden",
+                      isDashboard ? "py-6 text-2xl border-2 border-emerald-500/30" : "py-5 text-xl",
+                      currentPage === item.id 
+                        ? isDashboard
+                          ? "bg-emerald-600 text-white shadow-2xl shadow-emerald-500/40 scale-[1.02]"
+                          : "bg-gold text-maritime shadow-2xl shadow-gold/20" 
+                        : isDashboard
+                          ? "bg-emerald-950/50 text-emerald-400 border-emerald-500/20 shadow-lg shadow-emerald-900/10"
+                          : "text-white/70 hover:text-white hover:bg-white/5"
+                    )}
+                  >
+                    <span className="relative z-10">{item.label}</span>
+                  </button>
+                );
+              })}
             </div>
 
             <div className="pt-12 space-y-6">
@@ -787,16 +813,26 @@ function ChatWidget({ user }: { user: FirebaseUser | null }) {
         adminUnreadCount: increment(1)
       });
 
-      // 3. Trigger AI response using correct SDK pattern from skill
-      const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
-        contents: `CONTEXTURE: ${SYSTEM_PROMPT}\n\nUSER MESSAGE: ${text}`
+      // 3. Trigger AI response via server proxy
+      const conversationHistory = messages.slice(-5).map(m => ({
+        role: m.senderRole,
+        text: m.text
+      }));
+
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          message: text,
+          history: conversationHistory
+        })
       });
       
-      const responseText = response.text;
+      const data = await response.json();
+      const responseText = data.text || data.error || "Désolé, je rencontre un problème de connexion. Un administrateur va vous répondre bientôt.";
 
       await addDoc(collection(db, 'conversations', convId, 'messages'), {
-        text: responseText || "Désolé, je rencontre un problème technique. Un administrateur va vous répondre bientôt.",
+        text: responseText,
         senderId: 'ai',
         senderRole: 'AI',
         createdAt: serverTimestamp()
@@ -901,18 +937,36 @@ function Home({ onBook, onNavigate, siteSettings }: { onBook: () => void, onNavi
 
   const settings = siteSettings || { 
     homeBg: 'https://images.unsplash.com/photo-1559139225-8216b8e8303e?q=80&w=2070&auto=format&fit=crop',
-    homeDetail: 'https://images.unsplash.com/photo-1544551763-46a013bb70d5?q=80&w=2070&auto=format&fit=crop'
+    homeDetail: 'https://images.unsplash.com/photo-1544551763-46a013bb70d5?q=80&w=2070&auto=format&fit=crop',
+    logo: ''
   };
 
   useEffect(() => {
     const q = query(collection(db, 'news'), orderBy('publishedAt', 'desc'), limit(12));
     const unsub = onSnapshot(q, (snapshot) => {
-      setMedia(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id })));
+      setMedia(snapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          ...data,
+          id: doc.id,
+          // Extremely robust mapping to support all historical naming conventions
+          processedUrl: data.url || data.videoUrl || data.imageUrl || data.image || data.video || data.contentUrl || '',
+          processedType: (data.type || (data.videoUrl || data.video ? 'video' : (data.imageUrl || data.image ? 'image' : 'text'))).toLowerCase(),
+          processedDesc: data.desc || data.content || data.description || data.text || ''
+        };
+      }));
     }, (error) => handleFirestoreError(error, OperationType.GET, 'news'));
 
     const qGallery = query(collection(db, 'news'), where('type', '==', 'image'), orderBy('publishedAt', 'desc'), limit(8));
     const unsubGallery = onSnapshot(qGallery, (snapshot) => {
-      setGalleryImages(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id })));
+      setGalleryImages(snapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          ...data,
+          id: doc.id,
+          processedUrl: data.url || data.imageUrl
+        };
+      }));
     }, (error) => handleFirestoreError(error, OperationType.GET, 'news'));
 
     return () => {
@@ -1029,8 +1083,8 @@ function Home({ onBook, onNavigate, siteSettings }: { onBook: () => void, onNavi
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full max-w-2xl">
             {[
-              { from: "Bukavu", to: "Goma", time: "08:00 AM" },
-              { from: "Goma", to: "Bukavu", time: "08:00 AM" },
+              { from: "Bukavu", to: "Goma", time: "07:30 AM" },
+              { from: "Goma", to: "Bukavu", time: "07:30 AM" },
             ].map((it, i) => (
               <div key={i} className="flex flex-col items-center justify-center p-5 bg-black border border-white/10 rounded-2xl shadow-sm space-y-4 transition-transform hover:scale-[1.02]">
                 <div className="flex items-center gap-4">
@@ -1045,7 +1099,7 @@ function Home({ onBook, onNavigate, siteSettings }: { onBook: () => void, onNavi
                   </div>
                 </div>
                 <div className="pt-4 border-t border-white/10 w-full flex flex-col items-center gap-1">
-                  <p className="text-[8px] font-bold text-white/40 uppercase tracking-widest leading-none">Horaire Fixe</p>
+                  <p className="text-[8px] font-bold text-white/40 uppercase tracking-widest leading-none">Horaire Matinal</p>
                   <p className="text-lg font-mono font-bold text-gold flex items-center gap-2">
                      <Clock3 size={16} /> {it.time}
                   </p>
@@ -1069,13 +1123,13 @@ function Home({ onBook, onNavigate, siteSettings }: { onBook: () => void, onNavi
               <button onClick={() => onNavigate('news')} className="text-white text-[9px] font-bold uppercase tracking-widest flex items-center gap-2 hover:gap-3 transition-all">Détails <ChevronRight size={14} /></button>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-              {media.map((item, i) => (
+              {media.map((item: any, i) => (
                 <div key={i} className="group cursor-pointer">
                   <div className="aspect-[4/5] rounded-2xl overflow-hidden mb-4 relative">
-                    {item.type === 'video' ? (
+                    {item.processedType === 'video' ? (
                       <div className="w-full h-full relative">
                         <video 
-                          src={item.url || undefined} 
+                          src={item.processedUrl || undefined} 
                           className="w-full h-full object-cover" 
                           muted 
                           loop 
@@ -1087,21 +1141,21 @@ function Home({ onBook, onNavigate, siteSettings }: { onBook: () => void, onNavi
                         </div>
                         <div className="absolute top-4 right-4 bg-gold px-2 py-0.5 rounded text-[7px] font-black uppercase text-black">Vidéo</div>
                       </div>
-                    ) : item.type === 'image' ? (
-                      <img src={item.url || undefined} alt={item.title} className="w-full h-full object-cover transition-transform duration-[2s] group-hover:scale-110" />
+                    ) : item.processedType === 'image' ? (
+                      <img src={item.processedUrl || undefined} alt={item.title} className="w-full h-full object-cover transition-transform duration-[2s] group-hover:scale-110" />
                     ) : (
                       <div className="w-full h-full bg-slate-900 flex flex-col items-center justify-center p-6 text-center border border-white/5 relative">
                         <div className="absolute top-0 left-0 w-full h-1 bg-gold opacity-30" />
                         <FileText size={20} className="text-gold opacity-30 mb-4" />
                         <p className="text-white text-[10px] font-bold uppercase tracking-[0.2em] line-clamp-6 leading-relaxed">
-                          {item.desc}
+                          {item.processedDesc}
                         </p>
                       </div>
                     )}
                     <div className="absolute inset-0 bg-gradient-to-t from-maritime-dark/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                   </div>
                   <h5 className="text-white text-lg font-bold mb-1.5 group-hover:text-gold transition-colors uppercase tracking-tight">{item.title}</h5>
-                  <p className="text-white/40 text-xs line-clamp-2 leading-relaxed">{item.desc}</p>
+                  <p className="text-white/40 text-xs line-clamp-2 leading-relaxed">{item.processedDesc}</p>
                 </div>
               ))}
             </div>
@@ -1123,7 +1177,7 @@ function Home({ onBook, onNavigate, siteSettings }: { onBook: () => void, onNavi
             {galleryImages.length > 0 ? (
               galleryImages.slice(0, 4).map((img, i) => (
                 <div key={img.id} className="aspect-square rounded-xl overflow-hidden border border-slate-100 shadow-sm opacity-80 hover:opacity-100 transition-opacity cursor-pointer" onClick={() => onNavigate('gallery')}>
-                  <img src={img.url} className="w-full h-full object-cover" alt={img.title} />
+                  <img src={img.processedUrl} className="w-full h-full object-cover" alt={img.title} />
                 </div>
               ))
             ) : (
@@ -1217,7 +1271,7 @@ function Booking({ onReserved, user }: { onReserved: (res: Reservation) => void,
     itinerary: 'Bukavu-Goma' as Itinerary,
     ship: 'Mugote 1' as ShipName,
     travelDate: '',
-    departureTime: '07:20',
+    departureTime: '07:30',
     travelClass: '2ème Classe' as TravelClass,
     passengersCount: 1,
     paymentMethod: 'Airtel Money'
@@ -1232,6 +1286,29 @@ function Booking({ onReserved, user }: { onReserved: (res: Reservation) => void,
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Validations
+    if (!formData.fullName.trim() || formData.fullName.trim().length < 2) {
+      alert("Veuillez entrer un nom valide.");
+      return;
+    }
+    if (!formData.lastName.trim() || formData.lastName.trim().length < 2) {
+      alert("Veuillez entrer un post-nom valide.");
+      return;
+    }
+
+    const selectedDate = new Date(formData.travelDate);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    if (!formData.travelDate || selectedDate < today) {
+      alert("La date de voyage ne peut pas être passée.");
+      return;
+    }
+
+    if (formData.passengersCount < 1) {
+      alert("Le nombre de passagers doit être au moins 1.");
+      return;
+    }
 
     // Validation du numéro congolais (+243 suivi de 9 chiffres)
     // On retire les espaces pour la validation
@@ -1324,7 +1401,7 @@ function Booking({ onReserved, user }: { onReserved: (res: Reservation) => void,
                           type="text" 
                           value={formData.fullName}
                           onChange={e => setFormData({ ...formData, fullName: e.target.value })}
-                          className="w-full px-5 py-3 bg-white border border-slate-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-gold/10 focus:border-gold transition-all font-bold text-sm"
+                          className="w-full px-5 py-3 bg-slate-50 border-2 border-maritime/30 rounded-2xl focus:outline-none focus:ring-4 focus:ring-gold/10 focus:border-gold transition-all font-bold text-sm"
                           placeholder="NOM"
                         />
                         <input 
@@ -1332,7 +1409,7 @@ function Booking({ onReserved, user }: { onReserved: (res: Reservation) => void,
                           type="text" 
                           value={formData.lastName}
                           onChange={e => setFormData({ ...formData, lastName: e.target.value })}
-                          className="w-full px-5 py-3 bg-white border border-slate-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-gold/10 focus:border-gold transition-all font-bold text-sm"
+                          className="w-full px-5 py-3 bg-slate-50 border-2 border-maritime/30 rounded-2xl focus:outline-none focus:ring-4 focus:ring-gold/10 focus:border-gold transition-all font-bold text-sm"
                           placeholder="POST-NOM"
                         />
                       </div>
@@ -1355,7 +1432,7 @@ function Booking({ onReserved, user }: { onReserved: (res: Reservation) => void,
                         type="tel" 
                         value={formData.phone}
                         onChange={e => setFormData({ ...formData, phone: e.target.value })}
-                        className="w-full px-5 py-3 bg-white border border-slate-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-gold/10 focus:border-gold transition-all font-mono font-black text-sm text-maritime"
+                        className="w-full px-5 py-3 bg-slate-50 border-2 border-maritime/30 rounded-2xl focus:outline-none focus:ring-4 focus:ring-gold/10 focus:border-gold transition-all font-mono font-black text-sm text-maritime"
                         placeholder="+243 999 999 999"
                         title="Veuillez entrer un numéro congolais valide (+243 suivi de 9 chiffres)"
                       />
@@ -1376,7 +1453,7 @@ function Booking({ onReserved, user }: { onReserved: (res: Reservation) => void,
                       <select 
                         value={formData.itinerary}
                         onChange={e => setFormData({ ...formData, itinerary: e.target.value as Itinerary })}
-                        className="w-full px-6 py-4 bg-maritime text-white rounded-2xl focus:outline-none focus:ring-4 ring-gold/20 transition-all font-black uppercase tracking-widest text-[11px] appearance-none cursor-pointer"
+                        className="w-full px-6 py-4 bg-maritime border-4 border-gold/30 text-white rounded-2xl focus:outline-none focus:ring-4 ring-gold/20 transition-all font-black uppercase tracking-widest text-[11px] appearance-none cursor-pointer"
                       >
                         <option value="Bukavu-Goma">Bukavu (Sud) → Goma (Nord)</option>
                         <option value="Goma-Bukavu">Goma (Nord) → Bukavu (Sud)</option>
@@ -1409,7 +1486,7 @@ function Booking({ onReserved, user }: { onReserved: (res: Reservation) => void,
                           onChange={e => setFormData({ ...formData, departureTime: e.target.value })}
                           className="w-full px-5 py-4 bg-white border border-slate-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-gold/10 focus:border-gold transition-all font-mono font-black text-sm cursor-pointer"
                         >
-                          <option value="07:20">JOURNÉE (07:20)</option>
+                          <option value="07:30">MATIN (07:30)</option>
                           <option value="18:00">SOIR (18:00)</option>
                         </select>
                       </div>
@@ -1471,7 +1548,7 @@ function Booking({ onReserved, user }: { onReserved: (res: Reservation) => void,
                               type="button"
                               onClick={() => setFormData({ ...formData, travelClass: c })}
                               className={cn(
-                                "p-4 rounded-3xl border-2 transition-all text-center flex flex-col items-center justify-center group relative overflow-hidden",
+                                "p-4 rounded-3xl border-2 transition-all text-center flex flex-col items-center justify-center group relative overflow-hidden active:scale-95 hover:scale-105 hover:shadow-xl",
                                 isActive 
                                   ? "border-transparent text-white shadow-2xl scale-105" 
                                   : "border-slate-100 bg-slate-50 text-slate-500 hover:border-slate-200"
@@ -1744,10 +1821,16 @@ function Payment({ reservation, onComplete }: { reservation: Reservation | null,
                 </div>
 
                 <button 
+                  disabled={step === 'processing' || submitting}
                   onClick={startStkPush}
-                  className="w-full py-6 bg-maritime text-white font-black uppercase tracking-[0.3em] rounded-2xl shadow-xl shadow-maritime/30 hover:scale-[1.02] active:scale-95 transition-all text-xs"
+                  className="w-full py-6 bg-maritime text-white font-black uppercase tracking-[0.3em] rounded-2xl shadow-xl shadow-maritime/30 hover:scale-[1.02] active:scale-95 transition-all text-xs disabled:opacity-50"
                 >
-                  Lancer le paiement direct
+                  {step === 'processing' ? (
+                    <div className="flex items-center justify-center gap-2">
+                       <Ship size={16} className="animate-bounce" />
+                       Patientez...
+                    </div>
+                  ) : "Lancer le paiement direct"}
                 </button>
                 
                 <div className="relative py-4">
@@ -1868,14 +1951,19 @@ function Payment({ reservation, onComplete }: { reservation: Reservation | null,
 }
 
 function Dashboard({ siteSettings, onNavigate }: { siteSettings?: { homeBg: string, homeDetail: string }, onNavigate: (page: string) => void }) {
-  const [tab, setTab] = useState<'reservations' | 'media' | 'settings' | 'messages'>('reservations');
+  const [tab, setTab] = useState<'reservations' | 'users' | 'fleet' | 'media' | 'settings' | 'messages'>('reservations');
   const [reservations, setReservations] = useState<Reservation[]>([]);
+  const [usersList, setUsersList] = useState<any[]>([]);
+  const [fleetList, setFleetList] = useState<any[]>([]);
+  const [boatForm, setBoatForm] = useState({ id: '', name: '', capacity: 0, description: '', imageUrl: '' });
+  const [isAdminUnlocked, setIsAdminUnlocked] = useState(false);
+  const [adminCode, setAdminCode] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
   const [newsList, setNewsList] = useState<any[]>([]);
   const [conversations, setConversations] = useState<any[]>([]);
   const [selectedConv, setSelectedConv] = useState<any | null>(null);
-  const [adminReply, setAdminReply] = useState('');
   const [stats, setStats] = useState({ total: 0, pending: 0, validated: 0 });
-  const [newMedia, setNewMedia] = useState({ title: '', desc: '', url: '', type: 'image' as 'image' | 'video' | 'text' });
+  const [newMedia, setNewMedia] = useState({ title: '', desc: '', url: '', type: 'image' as 'image' | 'video' | 'text', media: [] as string[] });
   const [uploading, setUploading] = useState<string | null>(null);
   
   const bgInputRef = useRef<HTMLInputElement>(null);
@@ -1883,14 +1971,30 @@ function Dashboard({ siteSettings, onNavigate }: { siteSettings?: { homeBg: stri
   const mediaInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, target: 'media' | 'homeBg' | 'homeDetail') => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
 
+    if (target === 'media' && files.length > 1) {
+      setUploading('media_load');
+      const base64Promises = Array.from(files).map((file: File) => {
+        return new Promise<string>((resolve) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result as string);
+          reader.readAsDataURL(file);
+        });
+      });
+      const results = await Promise.all(base64Promises);
+      setNewMedia(prev => ({ ...prev, media: results, url: results[0] }));
+      setUploading(null);
+      return;
+    }
+
+    const file = files[0];
     const reader = new FileReader();
     reader.onloadend = async () => {
       const base64 = reader.result as string;
       if (target === 'media') {
-        setNewMedia(prev => ({ ...prev, url: base64 }));
+        setNewMedia(prev => ({ ...prev, url: base64, media: [base64] }));
       } else {
         setUploading(target);
         try {
@@ -1906,6 +2010,8 @@ function Dashboard({ siteSettings, onNavigate }: { siteSettings?: { homeBg: stri
   };
 
   useEffect(() => {
+    if (!isAdminUnlocked) return;
+
     // Reservations Listener
     const qRes = query(collection(db, 'reservations'), orderBy('createdAt', 'desc'));
     const unsubRes = onSnapshot(qRes, (snapshot) => {
@@ -1918,10 +2024,25 @@ function Dashboard({ siteSettings, onNavigate }: { siteSettings?: { homeBg: stri
       });
     });
 
+    // Users List Listener
+    const qUsers = query(collection(db, 'users_list'), orderBy('lastLogin', 'desc'));
+    const unsubUsers = onSnapshot(qUsers, (snapshot) => {
+      setUsersList(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id })));
+    });
+
     // News/Media Listener
     const qNews = query(collection(db, 'news'), orderBy('publishedAt', 'desc'));
     const unsubNews = onSnapshot(qNews, (snapshot) => {
-      setNewsList(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id })));
+      setNewsList(snapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          ...data,
+          id: doc.id,
+          processedUrl: data.url || data.videoUrl || data.imageUrl || data.image || data.video || data.contentUrl || '',
+          processedType: (data.type || (data.videoUrl || data.video ? 'video' : (data.imageUrl || data.image ? 'image' : 'text'))).toLowerCase(),
+          processedDesc: data.desc || data.content || data.description || data.text || ''
+        };
+      }));
     });
 
     // Conversations Listener
@@ -1930,8 +2051,62 @@ function Dashboard({ siteSettings, onNavigate }: { siteSettings?: { homeBg: stri
       setConversations(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id })));
     });
 
-    return () => { unsubRes(); unsubNews(); unsubConv(); };
-  }, []);
+    // Fleet Listener
+    const qFleet = query(collection(db, 'fleet'), orderBy('name', 'asc'));
+    const unsubFleet = onSnapshot(qFleet, (snapshot) => {
+      setFleetList(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id })));
+    });
+
+    return () => { unsubRes(); unsubUsers(); unsubNews(); unsubConv(); unsubFleet(); };
+  }, [isAdminUnlocked]);
+
+  const handleCodeSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (adminCode === 'b012000b') {
+      setIsAdminUnlocked(true);
+    } else {
+      alert("Code incorrect.");
+    }
+  };
+
+  const copyToClipboard = (type: 'reservations' | 'users') => {
+    let text = "";
+    if (type === 'users') {
+      text = "Email, Derniere Connexion\n";
+      usersList.forEach(u => {
+        text += `${u.email}, ${u.lastLogin ? new Date(u.lastLogin.seconds * 1000).toLocaleString() : 'N/A'}\n`;
+      });
+    } else {
+      text = "Client, Itinerance, Date, Status, Transaction\n";
+      reservations.forEach(r => {
+        text += `${r.fullName}, ${r.itinerary}, ${r.travelDate}, ${r.status}, ${r.transactionId || 'N/A'}\n`;
+      });
+    }
+    navigator.clipboard.writeText(text);
+    alert("Liste copiée dans le presse-papier !");
+  };
+
+  const exportCSV = (type: 'reservations' | 'users') => {
+    let csvContent = "data:text/csv;charset=utf-8,";
+    if (type === 'users') {
+      csvContent += "Email,DerniereConnexion\n";
+      usersList.forEach(u => {
+        csvContent += `${u.email},${u.lastLogin ? new Date(u.lastLogin.seconds * 1000).toISOString() : 'N/A'}\n`;
+      });
+    } else {
+      csvContent += "Client,Itinerance,Date,Status,Transaction\n";
+      reservations.forEach(r => {
+        csvContent += `${r.fullName},${r.itinerary},${r.travelDate},${r.status},${r.transactionId || 'N/A'}\n`;
+      });
+    }
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `mugote_export_${type}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   const handleAddMedia = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1996,9 +2171,60 @@ function Dashboard({ siteSettings, onNavigate }: { siteSettings?: { homeBg: stri
     }
   };
 
+  const handleBoatAction = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      if (!boatForm.name || boatForm.capacity < 0) {
+        alert("Nom et capacité positive requis.");
+        return;
+      }
+
+      const boatData = {
+        name: boatForm.name,
+        capacity: Number(boatForm.capacity),
+        description: boatForm.description,
+        imageUrl: boatForm.imageUrl,
+        updatedAt: serverTimestamp()
+      };
+
+      if (boatForm.id) {
+        await updateDoc(doc(db, 'fleet', boatForm.id), boatData);
+        alert("Bateau mis à jour !");
+      } else {
+        await addDoc(collection(db, 'fleet'), boatData);
+        alert("Bateau ajouté à la flotte !");
+      }
+      setBoatForm({ id: '', name: '', capacity: 0, description: '', imageUrl: '' });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, 'fleet');
+    }
+  };
+
+  const handleDeleteBoat = async (id: string) => {
+    if (window.confirm("Voulez-vous vraiment retirer ce bateau de la flotte ?")) {
+      try {
+        await deleteDoc(doc(db, 'fleet', id));
+      } catch (error) {
+        handleFirestoreError(error, OperationType.DELETE, 'fleet');
+      }
+    }
+  };
+
   const generatePDF = (res: Reservation) => {
     generateTicket(res, siteSettings || { homeBg: '' });
   };
+
+  const filteredReservations = reservations.filter(res => {
+    const search = searchTerm.toLowerCase();
+    return (
+      res.fullName?.toLowerCase().includes(search) ||
+      res.lastName?.toLowerCase().includes(search) ||
+      res.phone?.toLowerCase().includes(search) ||
+      res.transactionId?.toLowerCase().includes(search) ||
+      res.ticketId?.toLowerCase().includes(search) ||
+      res.id?.toLowerCase().includes(search)
+    );
+  });
 
   return (
     <motion.div 
@@ -2015,42 +2241,95 @@ function Dashboard({ siteSettings, onNavigate }: { siteSettings?: { homeBg: stri
       </button>
 
       <div className="flex flex-col items-center gap-10 border-b border-slate-200 pb-12 text-center">
-        <div className="space-y-4">
-          <h2 className="text-3xl font-extrabold tracking-tighter uppercase text-black leading-none">Administration</h2>
-          <div className="flex flex-wrap justify-center gap-2">
-            {[
-              { id: 'reservations', label: 'Réservations', icon: Ticket },
-              { id: 'messages', label: 'Discussions', icon: MessageSquare },
-              { id: 'media', label: 'Médias', icon: ImagePlus },
-              { id: 'settings', label: 'Paramètres', icon: Settings }
-            ].map(t => (
-              <button 
-                key={t.id}
-                onClick={() => setTab(t.id as any)}
-                className={cn(
-                  "flex items-center gap-2 px-6 py-2.5 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all",
-                  tab === t.id ? "bg-black text-white shadow-lg shadow-black/20" : "text-slate-400 hover:text-black hover:bg-slate-100"
-                )}
-              >
-                <t.icon size={14} /> {t.label}
+        {!isAdminUnlocked ? (
+          <div className="max-w-md w-full p-10 bg-white rounded-[32px] border border-slate-200 shadow-2xl">
+            <div className="w-20 h-20 bg-emerald-50 text-emerald-600 rounded-3xl flex items-center justify-center mx-auto mb-6">
+              <ShieldCheck size={40} />
+            </div>
+            <h3 className="text-xl font-extrabold uppercase tracking-tighter mb-6 italic">Accès Base de Données</h3>
+            <form onSubmit={handleCodeSubmit} className="space-y-4">
+              <input 
+                type="password"
+                placeholder="Entrez le code de sécurité"
+                value={adminCode}
+                onChange={e => setAdminCode(e.target.value)}
+                className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:border-emerald-500 font-mono text-center tracking-[0.5em] font-black"
+                autoFocus
+              />
+              <button className="w-full py-4 bg-emerald-600 text-white rounded-2xl font-black uppercase tracking-widest text-[10px] shadow-lg shadow-emerald-600/20 hover:scale-105 transition-all">
+                Déverrouiller
               </button>
-            ))}
+            </form>
+            <p className="mt-8 text-[9px] font-black text-slate-400 uppercase tracking-widest">Seul l'Administrateur peut accéder à cette section</p>
           </div>
-        </div>
-        
-        {tab === 'reservations' && (
-          <div className="space-y-6">
-            <div className="flex flex-wrap justify-center gap-4">
+        ) : (
+          <div className="space-y-4">
+            <h2 className="text-3xl font-extrabold tracking-tighter uppercase text-black leading-none">Administration</h2>
+            <div className="flex flex-wrap justify-center gap-2">
               {[
-                { label: "Total", val: stats.total, color: "bg-black text-white" },
-                { label: "Pending", val: stats.pending, color: "bg-amber-100 text-amber-700 border border-amber-200" },
-                { label: "Validés", val: stats.validated, color: "bg-emerald-100 text-emerald-700 border border-emerald-200" }
-              ].map((s, i) => (
-                <div key={i} className={cn("px-8 py-4 rounded-2xl text-center min-w-[140px]", s.color)}>
-                  <p className="text-[9px] font-extrabold uppercase tracking-widest opacity-60 mb-1">{s.label}</p>
-                  <p className="text-xl font-extrabold font-mono tracking-tighter leading-none">{s.val}</p>
-                </div>
+                { id: 'reservations', label: 'Réservations', icon: Ticket },
+                { id: 'users', label: 'Utilisateurs', icon: Users },
+                { id: 'fleet', label: 'Flotte', icon: Anchor },
+                { id: 'messages', label: 'Discussions', icon: MessageSquare },
+                { id: 'media', label: 'Médias', icon: ImagePlus },
+                { id: 'settings', label: 'Paramètres', icon: Settings }
+              ].map(t => (
+                <button 
+                  key={t.id}
+                  onClick={() => setTab(t.id as any)}
+                  className={cn(
+                    "flex items-center gap-2 px-6 py-2.5 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all",
+                    tab === t.id ? "bg-black text-white shadow-lg shadow-black/20" : "text-slate-400 hover:text-black hover:bg-slate-100"
+                  )}
+                >
+                  <t.icon size={14} /> {t.label}
+                </button>
               ))}
+            </div>
+          </div>
+        )}
+        
+        {isAdminUnlocked && tab === 'reservations' && (
+          <div className="space-y-6 w-full max-w-5xl mx-auto px-4">
+            <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
+              <div className="flex flex-wrap justify-center gap-4">
+                {[
+                  { label: "Total", val: stats.total, color: "bg-black text-white" },
+                  { label: "Pending", val: stats.pending, color: "bg-amber-100 text-amber-700 border border-amber-200" },
+                  { label: "Validés", val: stats.validated, color: "bg-emerald-100 text-emerald-700 border border-emerald-200" }
+                ].map((s, i) => (
+                  <div key={i} className={cn("px-8 py-4 rounded-2xl text-center min-w-[140px]", s.color)}>
+                    <p className="text-[9px] font-extrabold uppercase tracking-widest opacity-60 mb-1">{s.label}</p>
+                    <p className="text-xl font-extrabold font-mono tracking-tighter leading-none">{s.val}</p>
+                  </div>
+                ))}
+              </div>
+
+              <div className="flex gap-2">
+                <button 
+                  onClick={() => copyToClipboard('reservations')}
+                  className="px-4 py-2 bg-slate-100 text-slate-600 rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-slate-200 transition-all flex items-center gap-2"
+                >
+                   Copier Liste
+                </button>
+                <button 
+                  onClick={() => exportCSV('reservations')}
+                  className="px-4 py-2 bg-slate-100 text-slate-600 rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-slate-200 transition-all flex items-center gap-2"
+                >
+                   Exporter CSV
+                </button>
+              </div>
+              
+              <div className="relative w-full md:w-96">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                <input 
+                  type="text" 
+                  placeholder="Rechercher par nom, tel, ID..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-12 pr-4 py-4 bg-slate-100 border border-slate-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-black/5 focus:bg-white transition-all text-sm font-bold"
+                />
+              </div>
             </div>
 
             {/* Recent Media Quick Look */}
@@ -2094,14 +2373,14 @@ function Dashboard({ siteSettings, onNavigate }: { siteSettings?: { homeBg: stri
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-slate-50/50 border-b border-slate-100">
-                  <th className="px-10 py-6 text-[10px] font-extrabold uppercase tracking-[0.2em] text-slate-400">Passager</th>
+                  <th className="px-10 py-6 text-[10px] font-extrabold uppercase tracking-[0.2em] text-slate-400">Client (Nom Complet)</th>
                   <th className="px-10 py-6 text-[10px] font-extrabold uppercase tracking-[0.2em] text-slate-400">Détails Voyage</th>
                   <th className="px-10 py-6 text-[10px] font-extrabold uppercase tracking-[0.2em] text-slate-400 text-center">Paiement</th>
                   <th className="px-10 py-6 text-[10px] font-extrabold uppercase tracking-[0.2em] text-slate-400 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
-                {reservations.map(res => (
+                {filteredReservations.map(res => (
                   <tr key={res.id} className="hover:bg-slate-50/50 transition-colors">
                     <td className="px-10 py-8">
                       <div className="flex items-center gap-4">
@@ -2194,6 +2473,184 @@ function Dashboard({ siteSettings, onNavigate }: { siteSettings?: { homeBg: stri
             </table>
             {reservations.length === 0 && <div className="p-20 text-center text-slate-400 font-bold uppercase tracking-widest text-[10px]">Aucun passager enregistré.</div>}
           </div>
+        ) : tab === 'users' ? (
+          <div className="p-12 space-y-8">
+            <div className="flex justify-between items-center">
+              <div>
+                <h3 className="text-2xl font-black uppercase tracking-tighter italic">Liste des Utilisateurs</h3>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Utilisateurs enregistrés sur la plateforme</p>
+              </div>
+              <div className="flex gap-2">
+                <button 
+                  onClick={() => copyToClipboard('users')}
+                  className="px-6 py-3 bg-slate-100 text-slate-600 rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-slate-200 transition-all"
+                >
+                   Copier Liste
+                </button>
+                <button 
+                  onClick={() => exportCSV('users')}
+                  className="px-6 py-3 bg-slate-100 text-slate-600 rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-slate-200 transition-all"
+                >
+                   Exporter CSV
+                </button>
+              </div>
+            </div>
+
+            <div className="overflow-x-auto border border-slate-100 rounded-[24px]">
+              <table className="w-full text-left">
+                <thead>
+                  <tr className="bg-slate-50 border-b border-slate-100">
+                    <th className="px-8 py-5 text-[10px] font-black uppercase text-slate-400">Utilisateur</th>
+                    <th className="px-8 py-5 text-[10px] font-black uppercase text-slate-400">Email</th>
+                    <th className="px-8 py-5 text-[10px] font-black uppercase text-slate-400">Dernière Connexion</th>
+                    <th className="px-8 py-5 text-[10px] font-black uppercase text-slate-400">Vérifié</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50">
+                  {usersList.map((u, i) => (
+                    <tr key={u.id} className="hover:bg-slate-50/50 transition-colors">
+                      <td className="px-8 py-5">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-xl bg-maritime text-white flex items-center justify-center font-black text-[10px]">
+                            {u.displayName ? u.displayName[0].toUpperCase() : u.email[0].toUpperCase()}
+                          </div>
+                          <span className="text-sm font-bold text-black uppercase tracking-tight">{u.displayName || 'Utilisateur'}</span>
+                        </div>
+                      </td>
+                      <td className="px-8 py-5">
+                        <span className="text-xs font-mono text-slate-500">{u.email}</span>
+                      </td>
+                      <td className="px-8 py-5">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase">
+                          {u.lastLogin ? new Date(u.lastLogin.seconds * 1000).toLocaleString() : 'N/A'}
+                        </span>
+                      </td>
+                      <td className="px-8 py-5">
+                        {u.emailVerified ? (
+                          <span className="text-[8px] font-black uppercase px-2 py-1 bg-emerald-50 text-emerald-600 rounded-md border border-emerald-100">OUI</span>
+                        ) : (
+                          <span className="text-[8px] font-black uppercase px-2 py-1 bg-slate-50 text-slate-400 rounded-md border border-slate-200">NON</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {usersList.length === 0 && <div className="p-20 text-center text-slate-400 font-bold uppercase tracking-widest text-[10px]">Aucun utilisateur enregistré.</div>}
+            </div>
+          </div>
+        ) : tab === 'fleet' ? (
+          <div className="p-12 space-y-12">
+            <div className="bg-slate-50 p-10 rounded-[32px] border border-slate-100 max-w-4xl mx-auto">
+              <h3 className="text-xl font-black uppercase tracking-tighter mb-8 italic flex items-center gap-3">
+                <Anchor className="text-maritime" size={24} /> 
+                {boatForm.id ? 'Modifier le Bateau' : 'Ajouter un Nouveau Bateau'}
+              </h3>
+              <form onSubmit={handleBoatAction} className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-4">
+                  <div>
+                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 block">Nom du Bateau</label>
+                    <input 
+                      required
+                      value={boatForm.name}
+                      onChange={e => setBoatForm({...boatForm, name: e.target.value})}
+                      className="w-full px-6 py-3 border border-slate-200 rounded-xl focus:border-maritime outline-none text-sm font-bold"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 block">Capacité (PAX)</label>
+                    <input 
+                      type="number"
+                      required
+                      value={boatForm.capacity}
+                      onChange={e => setBoatForm({...boatForm, capacity: Number(e.target.value)})}
+                      className="w-full px-6 py-3 border border-slate-200 rounded-xl focus:border-maritime outline-none text-sm font-bold"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-4">
+                   <div>
+                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 block">URL Image (Optionnel)</label>
+                    <input 
+                      value={boatForm.imageUrl}
+                      onChange={e => setBoatForm({...boatForm, imageUrl: e.target.value})}
+                      className="w-full px-6 py-3 border border-slate-200 rounded-xl focus:border-maritime outline-none text-xs font-mono"
+                      placeholder="https://..."
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 block">Description</label>
+                    <textarea 
+                      value={boatForm.description}
+                      onChange={e => setBoatForm({...boatForm, description: e.target.value})}
+                      className="w-full px-6 py-3 border border-slate-200 rounded-xl focus:border-maritime outline-none text-xs font-bold h-[104px] resize-none"
+                    />
+                  </div>
+                </div>
+                <div className="md:col-span-2 flex gap-3">
+                  <button className="flex-1 py-4 bg-maritime text-white font-black uppercase tracking-widest text-[10px] rounded-2xl shadow-xl shadow-maritime/20 hover:scale-[1.02] transition-all">
+                    {boatForm.id ? 'Mettre à Jour' : 'Ajouter à la Flotte'}
+                  </button>
+                  {boatForm.id && (
+                    <button 
+                      type="button"
+                      onClick={() => setBoatForm({ id: '', name: '', capacity: 0, description: '', imageUrl: '' })}
+                      className="px-8 py-4 bg-slate-100 text-slate-400 font-black uppercase tracking-widest text-[10px] rounded-2xl hover:bg-slate-200"
+                    >
+                      Annuler
+                    </button>
+                  )}
+                </div>
+              </form>
+            </div>
+
+            <div className="space-y-6">
+              <h3 className="text-2xl font-black uppercase tracking-tighter italic">La Flotte Actuelle</h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {fleetList.map(boat => (
+                  <div key={boat.id} className="bg-white border border-slate-100 rounded-[32px] overflow-hidden shadow-xl shadow-slate-100 p-2">
+                    <div className="aspect-[4/3] rounded-[24px] bg-slate-50 overflow-hidden relative mb-4">
+                      {boat.imageUrl ? (
+                        <img src={boat.imageUrl} className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center bg-maritime/5 text-maritime/20">
+                          <Ship size={64} />
+                        </div>
+                      )}
+                      <div className="absolute top-4 right-4 bg-black/60 backdrop-blur-md text-white px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest">
+                        {boat.capacity} PAX
+                      </div>
+                    </div>
+                    <div className="px-6 pb-6">
+                      <h4 className="text-lg font-extrabold uppercase tracking-tighter italic mb-2">{boat.name}</h4>
+                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest line-clamp-2 mb-6 h-8">{boat.description || 'Navire de transport sécurisé.'}</p>
+                      
+                      <div className="flex gap-2">
+                        <button 
+                          onClick={() => setBoatForm(boat)}
+                          className="flex-1 py-3 bg-slate-50 text-slate-600 hover:bg-black hover:text-white rounded-xl text-[9px] font-black uppercase tracking-widest transition-all"
+                        >
+                          Modifier
+                        </button>
+                        <button 
+                          onClick={() => handleDeleteBoat(boat.id)}
+                          className="p-3 bg-slate-50 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {fleetList.length === 0 && (
+                <div className="py-20 text-center">
+                  <Anchor size={48} className="mx-auto text-slate-100 mb-4" />
+                  <p className="text-[10px] font-black text-slate-300 uppercase tracking-[0.3em]">Aucun navire dans la liste.</p>
+                </div>
+              )}
+            </div>
+          </div>
         ) : tab === 'media' ? (
           <div className="p-12 space-y-16">
             <div className="max-w-2xl">
@@ -2202,8 +2659,11 @@ function Dashboard({ siteSettings, onNavigate }: { siteSettings?: { homeBg: stri
                 e.preventDefault();
                 setUploading('media_publish');
                 try {
-                  await addDoc(collection(db, 'news'), { ...newMedia, publishedAt: Date.now() });
-                  setNewMedia({ title: '', desc: '', url: '', type: 'image' });
+                  await addDoc(collection(db, 'news'), { 
+                    ...newMedia, 
+                    publishedAt: Date.now() 
+                  });
+                  setNewMedia({ title: '', desc: '', url: '', type: 'image', media: [] });
                   alert("Publié !");
                 } catch (e) { handleFirestoreError(e, OperationType.CREATE, 'news'); }
                 finally { setUploading(null); }
@@ -2242,6 +2702,7 @@ function Dashboard({ siteSettings, onNavigate }: { siteSettings?: { homeBg: stri
                         onChange={e => handleFileUpload(e, 'media')}
                         className="hidden"
                         accept={newMedia.type === 'video' ? "video/*" : "image/*"}
+                        multiple={newMedia.type === 'image'}
                       />
                       <button 
                         type="button"
@@ -2249,12 +2710,12 @@ function Dashboard({ siteSettings, onNavigate }: { siteSettings?: { homeBg: stri
                         className="w-full py-3 border-2 border-dashed border-slate-200 rounded-xl text-[10px] font-bold text-slate-400 hover:border-maritime hover:text-maritime transition-all flex items-center justify-center gap-2 uppercase tracking-widest"
                       >
                         <ImagePlus size={16} /> 
-                        {newMedia.url ? "Fichier chargé ✓" : `Charger ${newMedia.type === 'video' ? 'la Vidéo' : 'la Photo'}`}
+                        {newMedia.media.length > 0 ? `${newMedia.media.length} fichier(s) chargé(s) ✓` : `Charger ${newMedia.type === 'video' ? 'la Vidéo' : 'la Photo'}`}
                       </button>
                     </div>
                   )}
                   <button 
-                    disabled={uploading === 'media_publish' || (newMedia.type !== 'text' && !newMedia.url)}
+                    disabled={uploading === 'media_publish' || uploading === 'media_load' || (newMedia.type !== 'text' && !newMedia.url && newMedia.media.length === 0)}
                     className="px-12 py-3 bg-maritime text-white rounded-xl text-[11px] font-bold uppercase tracking-widest shadow-xl shadow-maritime/20 hover:scale-105 transition-all disabled:opacity-50"
                   >
                     {uploading === 'media_publish' ? "Envoi..." : "Publier"}
@@ -2271,26 +2732,34 @@ function Dashboard({ siteSettings, onNavigate }: { siteSettings?: { homeBg: stri
                     <div className="absolute top-2 left-2 z-10">
                       <span className={cn(
                         "px-2 py-1 rounded-md text-[7px] font-black uppercase tracking-widest shadow-sm",
-                        m.type === 'video' ? "bg-emerald-500 text-white" : m.type === 'text' ? "bg-indigo-500 text-white" : "bg-white text-black"
+                        m.processedType === 'video' ? "bg-emerald-500 text-white" : m.processedType === 'text' ? "bg-indigo-500 text-white" : "bg-white text-black"
                       )}>
-                        {m.type}
+                        {m.processedType}
                       </span>
                     </div>
-                    {m.type === 'video' ? (
-                      <video src={m.url || undefined} className="w-full h-full object-cover" controls />
-                    ) : m.type === 'text' ? (
+                    {m.processedType === 'video' ? (
+                      <video src={m.processedUrl || undefined} className="w-full h-full object-cover" controls />
+                    ) : m.processedType === 'text' ? (
                       <div className="p-6 h-full flex flex-col justify-center text-center bg-white">
                         <FileText size={32} className="mx-auto text-maritime opacity-20 mb-3" />
                         <p className="text-[11px] font-extrabold uppercase leading-tight line-clamp-3">{m.title}</p>
                       </div>
                     ) : (
-                      <img src={m.url || undefined} className="w-full h-full object-cover" />
+                      <img src={m.processedUrl || undefined} className="w-full h-full object-cover" />
                     )}
-                    <div className="absolute inset-0 bg-maritime/80 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center p-6 text-center">
-                      <p className="text-[10px] font-bold text-white uppercase tracking-widest mb-4">{m.title}</p>
-                      <button onClick={() => handleDeleteMedia(m.id)} className="w-12 h-12 bg-white/20 backdrop-blur-md text-white rounded-full flex items-center justify-center hover:bg-rose-600 transition-all border border-white/20">
-                        <Trash2 size={20} />
-                      </button>
+                    <div className="absolute inset-0 bg-maritime/80 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center p-6 text-center space-y-4">
+                      <p className="text-[10px] font-bold text-white uppercase tracking-widest">{m.title}</p>
+                      
+                      <div className="flex gap-4 text-[9px] font-black text-white/60 uppercase tracking-widest">
+                        <span className="flex items-center gap-1"><Eye size={12} className="text-gold" /> {m.views || 0}</span>
+                        <NewsComments newsId={m.id} />
+                      </div>
+
+                      <div className="flex gap-2">
+                        <button onClick={() => handleDeleteMedia(m.id)} className="w-10 h-10 bg-white/20 backdrop-blur-md text-white rounded-full flex items-center justify-center hover:bg-rose-600 transition-all border border-white/20">
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -2395,13 +2864,22 @@ function GalleryView({ siteSettings }: { siteSettings: any }) {
   useEffect(() => {
     const q = query(collection(db, 'news'), orderBy('publishedAt', 'desc'));
     const unsub = onSnapshot(q, (snapshot) => {
-      setMedia(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id })));
+      setMedia(snapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          ...data,
+          id: doc.id,
+          processedUrl: data.url || data.videoUrl || data.imageUrl || data.image || data.video || data.contentUrl || '',
+          processedType: (data.type || (data.videoUrl || data.video ? 'video' : (data.imageUrl || data.image ? 'image' : 'text'))).toLowerCase(),
+          processedDesc: data.desc || data.content || data.description || data.text || ''
+        };
+      }));
       setLoading(false);
     });
     return unsub;
   }, []);
 
-  const filteredMedia = filter === 'all' ? media : media.filter(m => m.type === filter);
+  const filteredMedia = filter === 'all' ? media : media.filter(m => m.processedType === filter);
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-12 bg-slate-950 p-4 md:p-12 rounded-[40px] border border-white/5 shadow-2xl">
@@ -2442,10 +2920,10 @@ function GalleryView({ siteSettings }: { siteSettings: any }) {
               className="bg-white/5 border border-white/10 shadow-2xl rounded-3xl overflow-hidden flex flex-col group hover:border-gold/50 transition-all duration-500"
             >
               <div className="aspect-[16/10] bg-slate-900 relative overflow-hidden">
-                {m.type === 'video' ? (
+                {m.processedType === 'video' ? (
                   <div className="w-full h-full relative">
                     <video 
-                      src={m.url || undefined} 
+                      src={m.processedUrl || undefined} 
                       className="w-full h-full object-cover"
                       poster={siteSettings.homeDetail}
                       controls
@@ -2456,13 +2934,27 @@ function GalleryView({ siteSettings }: { siteSettings: any }) {
                        </div>
                     </div>
                   </div>
-                ) : m.type === 'image' ? (
-                  <img src={m.url || undefined} alt={m.title} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" />
+                ) : m.processedType === 'image' ? (
+                  <div className="w-full h-full flex overflow-x-auto snap-x snap-mandatory no-scrollbar bg-slate-900">
+                    {(m.media && m.media.length > 0 ? m.media : [m.processedUrl]).map((img: string, idx: number) => (
+                      <img 
+                        key={idx} 
+                        src={img || undefined} 
+                        className="w-full h-full object-cover snap-center flex-shrink-0 transition-transform duration-700 group-hover:scale-110" 
+                        alt={`${m.title}-${idx}`} 
+                      />
+                    ))}
+                    {m.media && m.media.length > 1 && (
+                      <div className="absolute bottom-4 right-4 bg-black/60 backdrop-blur-md px-2 py-1 rounded text-[8px] font-black text-white uppercase tracking-widest">
+                        {m.media.length} Photos
+                      </div>
+                    )}
+                  </div>
                 ) : (
                   <div className="w-full h-full flex flex-col items-center justify-center p-8 bg-black text-center relative overflow-hidden">
                     <div className="absolute top-0 left-0 w-full h-[2px] bg-gold opacity-50" />
                     <MessageSquareText size={32} className="text-gold mb-4 opacity-20" />
-                    <p className="text-white text-[11px] font-bold uppercase tracking-widest line-clamp-6 leading-relaxed opacity-80 italic">"{m.desc}"</p>
+                    <p className="text-white text-[11px] font-bold uppercase tracking-widest line-clamp-6 leading-relaxed opacity-80 italic">"{m.processedDesc}"</p>
                   </div>
                 )}
               </div>
@@ -2471,9 +2963,9 @@ function GalleryView({ siteSettings }: { siteSettings: any }) {
                   <h3 className="text-lg font-black text-white uppercase tracking-tighter leading-none italic group-hover:text-gold transition-colors">{m.title}</h3>
                   <div className="h-1 w-8 bg-gold/20 mt-2 rounded-full" />
                 </div>
-                <p className="text-white/40 text-[10px] font-bold leading-relaxed line-clamp-2 italic">{m.desc}</p>
+                <p className="text-white/40 text-[10px] font-bold leading-relaxed line-clamp-2 italic">{m.processedDesc}</p>
                 <div className="mt-8 pt-4 border-t border-white/5 flex justify-between items-center text-[8px] font-black text-white/20 uppercase tracking-[0.3em]">
-                  <span className="flex items-center gap-2"><Clock size={10} /> {new Date(m.publishedAt).toLocaleDateString()}</span>
+                  <span className="flex items-center gap-2"><Clock size={10} /> {m.publishedAt ? (m.publishedAt.seconds ? new Date(m.publishedAt.seconds * 1000).toLocaleDateString() : new Date(m.publishedAt).toLocaleDateString()) : 'N/A'}</span>
                   <Anchor size={12} className="opacity-50" />
                 </div>
               </div>
@@ -2485,6 +2977,133 @@ function GalleryView({ siteSettings }: { siteSettings: any }) {
   );
 }
 
+function NewsComments({ newsId }: { newsId: string }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [comments, setComments] = useState<any[]>([]);
+  const [newComment, setNewComment] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [count, setCount] = useState(0);
+
+  useEffect(() => {
+    const q = query(collection(db, 'news', newsId, 'comments'), orderBy('createdAt', 'desc'));
+    const unsub = onSnapshot(q, (snapshot) => {
+      setComments(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id })));
+      setCount(snapshot.size);
+    });
+    return unsub;
+  }, [newsId]);
+
+  // View increment logic
+  useEffect(() => {
+    const incrementView = async () => {
+      const viewedKey = `viewed_${newsId}`;
+      if (!localStorage.getItem(viewedKey)) {
+        try {
+          await updateDoc(doc(db, 'news', newsId), {
+            views: increment(1)
+          });
+          localStorage.setItem(viewedKey, 'true');
+        } catch (e) {
+          console.error("Failed to increment views", e);
+        }
+      }
+    };
+    incrementView();
+  }, [newsId]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!auth.currentUser || !newComment.trim()) return;
+    setSubmitting(true);
+    try {
+      await addDoc(collection(db, 'news', newsId, 'comments'), {
+        userId: auth.currentUser.uid,
+        userName: auth.currentUser.displayName || auth.currentUser.email?.split('@')[0] || 'Utilisateur',
+        text: newComment,
+        createdAt: serverTimestamp()
+      });
+      setNewComment('');
+    } catch (e) {
+      handleFirestoreError(e, OperationType.CREATE, `news/${newsId}/comments`);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="relative">
+      <button 
+        onClick={() => setIsOpen(!isOpen)}
+        className="flex items-center gap-1.5 hover:text-gold transition-colors"
+      >
+        <MessageCircle size={12} className="text-gold" /> {count} commentaires
+      </button>
+
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div 
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 10 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
+            onClick={(e) => e.target === e.currentTarget && setIsOpen(false)}
+          >
+            <div className="w-full max-w-lg bg-slate-900 border border-white/10 rounded-[32px] overflow-hidden flex flex-col max-h-[80vh] shadow-2xl">
+              <div className="p-6 border-b border-white/5 flex justify-between items-center bg-black/20">
+                <h4 className="text-sm font-black uppercase tracking-widest text-white italic">Commentaires</h4>
+                <button onClick={() => setIsOpen(false)} className="text-white/40 hover:text-white"><X size={20} /></button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                {comments.length === 0 ? (
+                  <div className="text-center py-12 opacity-20">
+                    <MessageCircle size={40} className="mx-auto mb-4" />
+                    <p className="text-[10px] font-black uppercase tracking-widest">Aucun commentaire pour le moment</p>
+                  </div>
+                ) : (
+                  comments.map(c => (
+                    <div key={c.id} className="space-y-2 group">
+                      <div className="flex justify-between items-center">
+                        <span className="text-[10px] font-black text-gold uppercase italic">{c.userName}</span>
+                        <span className="text-[8px] font-bold text-white/20 uppercase">{c.createdAt ? new Date(c.createdAt.seconds * 1000).toLocaleString() : 'Envoi...'}</span>
+                      </div>
+                      <p className="text-xs text-white/70 leading-relaxed font-medium bg-white/5 p-3 rounded-2xl group-hover:bg-white/10 transition-colors">{c.text}</p>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              <div className="p-6 border-t border-white/5 bg-black/20">
+                {auth.currentUser ? (
+                  <form onSubmit={handleSubmit} className="relative">
+                    <input 
+                      required
+                      placeholder="Votre commentaire..."
+                      value={newComment}
+                      onChange={e => setNewComment(e.target.value)}
+                      className="w-full px-6 py-4 bg-white/5 border border-white/10 rounded-2xl focus:outline-none focus:border-gold text-white text-xs font-medium pr-16"
+                    />
+                    <button 
+                      disabled={submitting || !newComment.trim()}
+                      className="absolute right-2 top-2 bottom-2 px-4 bg-gold text-black rounded-xl text-[10px] font-black uppercase tracking-widest disabled:opacity-50 hover:scale-105 active:scale-95 transition-all"
+                    >
+                      {submitting ? "..." : "Publier"}
+                    </button>
+                  </form>
+                ) : (
+                  <div className="text-center py-2 bg-rose-500/10 rounded-xl border border-rose-500/20">
+                    <p className="text-[9px] font-black text-rose-500 uppercase tracking-widest">Connectez-vous pour commenter</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
 function NewsView() {
   const [news, setNews] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -2492,7 +3111,16 @@ function NewsView() {
   useEffect(() => {
     const q = query(collection(db, 'news'), orderBy('publishedAt', 'desc'));
     const unsub = onSnapshot(q, (snapshot) => {
-      setNews(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id })));
+      setNews(snapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          ...data,
+          id: doc.id,
+          processedUrl: data.url || data.videoUrl || data.imageUrl || data.image || data.video || data.contentUrl || '',
+          processedType: (data.type || (data.videoUrl || data.video ? 'video' : (data.imageUrl || data.image ? 'image' : 'text'))).toLowerCase(),
+          processedDesc: data.desc || data.content || data.description || data.text || ''
+        };
+      }));
       setLoading(false);
     });
     return unsub;
@@ -2515,35 +3143,53 @@ function NewsView() {
             <div key={i} className="bg-black border border-white/5 shadow-2xl shadow-black/50 rounded-xl overflow-hidden group hover:border-gold transition-all flex flex-col">
               <div className="p-8 flex-1 flex flex-col justify-between">
                 <div className="space-y-4">
-                  <span className="text-[9px] font-extrabold uppercase tracking-[0.3em] text-gold">{n.type === 'text' ? 'Actualité' : n.type === 'image' ? 'Photo' : 'Vidéo'}</span>
+                  <span className="text-[9px] font-extrabold uppercase tracking-[0.3em] text-gold">{n.processedType === 'text' ? 'Actualité' : n.processedType === 'image' ? 'Photo' : 'Vidéo'}</span>
                   <h3 className="text-xl font-extrabold tracking-tighter leading-none text-white group-hover:text-gold transition-colors italic">{n.title}</h3>
-                  <p className="text-white/60 text-xs font-medium leading-relaxed">{n.desc}</p>
+                  <p className="text-white/60 text-xs font-medium leading-relaxed">{n.processedDesc}</p>
+                  <div className="flex items-center gap-4 text-[9px] font-black uppercase tracking-widest text-white/30 pt-4 border-t border-white/5">
+                    <span className="flex items-center gap-1.5"><Eye size={12} className="text-gold" /> {n.views || 0} vues</span>
+                    <NewsComments newsId={n.id} />
+                  </div>
                 </div>
               </div>
-              {(n.url || n.type === 'text') && (
+              {(n.processedUrl || n.processedType === 'text') && (
                 <div className="h-72 overflow-hidden bg-slate-900/50 flex items-center justify-center border-t border-white/5 shadow-inner relative">
-                  {n.type === 'video' ? (
+                  {n.processedType === 'video' ? (
                     <video 
-                      src={n.url || undefined} 
+                      src={n.processedUrl || undefined} 
                       className="w-full h-full object-contain"
                       controls
                       autoPlay={false}
                       muted={false}
                     />
-                  ) : n.type === 'image' ? (
-                    <img src={n.url || undefined} alt={n.title} className="w-full h-full object-cover transition-transform group-hover:scale-105" />
+                  ) : n.processedType === 'image' ? (
+                    <div className="w-full h-full flex overflow-x-auto snap-x snap-mandatory no-scrollbar bg-slate-900">
+                      {(n.media && n.media.length > 0 ? n.media : [n.processedUrl]).map((img: string, idx: number) => (
+                        <img 
+                          key={idx} 
+                          src={img || undefined} 
+                          className="w-full h-full object-cover snap-center flex-shrink-0 transition-transform group-hover:scale-105" 
+                          alt={`${n.title}-${idx}`} 
+                        />
+                      ))}
+                      {n.media && n.media.length > 1 && (
+                        <div className="absolute top-4 right-4 bg-gold px-2 py-1 rounded text-[8px] font-black text-black uppercase tracking-widest shadow-xl">
+                          {n.media.length} PHOTOS
+                        </div>
+                      )}
+                    </div>
                   ) : (
                     <div className="p-10 text-center space-y-4">
                       <FileText size={32} className="mx-auto text-gold opacity-20" />
-                      <p className="text-white text-sm font-medium leading-relaxed max-w-md italic line-clamp-6">"{n.desc}"</p>
+                      <p className="text-white text-sm font-medium leading-relaxed max-w-md italic line-clamp-6">"{n.processedDesc}"</p>
                     </div>
                   )}
                 </div>
               )}
               <div className="px-8 py-4 border-t border-white/5 bg-white/5 flex justify-between items-center text-[9px] font-bold uppercase tracking-widest text-slate-500">
-                <span>{new Date(n.publishedAt).toLocaleDateString()}</span>
-                {n.url && (
-                  <a href={n.url} target="_blank" className="text-gold flex items-center gap-1.5 hover:translate-x-1 transition-transform">En savoir plus <ChevronRight size={12} /></a>
+                <span>{n.publishedAt ? (n.publishedAt.seconds ? new Date(n.publishedAt.seconds * 1000).toLocaleDateString() : new Date(n.publishedAt).toLocaleDateString()) : 'N/A'}</span>
+                {n.processedUrl && (
+                  <a href={n.processedUrl} target="_blank" className="text-gold flex items-center gap-1.5 hover:translate-x-1 transition-transform">En savoir plus <ChevronRight size={12} /></a>
                 )}
               </div>
             </div>

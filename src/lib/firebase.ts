@@ -3,8 +3,11 @@ import { getAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
 
+// Log config keys for diagnostic (not values)
+console.log('Firebase Config Keys:', Object.keys(firebaseConfig));
+
 const app = initializeApp(firebaseConfig);
-export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+export const db = getFirestore(app);
 export const auth = getAuth(app);
 
 // --- Error Handling Utility ---

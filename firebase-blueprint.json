@@ -34,8 +34,22 @@
         "content": { "type": "string" },
         "imageUrl": { "type": "string" },
         "videoUrl": { "type": "string" },
-        "publishedAt": { "type": "string", "format": "date-time" }
+        "media": { "type": "array", "items": { "type": "string" }, "description": "Array of media URLs for multiple photos" },
+        "publishedAt": { "type": "string", "format": "date-time" },
+        "views": { "type": "integer", "default": 0 }
       }
+    },
+    "Comment": {
+      "title": "Comment",
+      "description": "A user comment on a news article.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "text": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "text"]
     },
     "User": {
       "title": "User",
@@ -72,6 +86,19 @@
         "senderRole": { "type": "string", "enum": ["USER", "ADMIN", "AI"] },
         "createdAt": { "type": "string", "format": "date-time" }
       }
+    },
+    "Boat": {
+      "title": "Boat",
+      "description": "A ship in the fleet.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "capacity": { "type": "integer" },
+        "description": { "type": "string" },
+        "imageUrl": { "type": "string" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "capacity"]
     }
   },
   "firestore": {
@@ -83,9 +110,17 @@
       "schema": { "$ref": "#/entities/News" },
       "description": "Collection of news and announcements."
     },
+    "news/{newsId}/comments": {
+      "schema": { "$ref": "#/entities/Comment" },
+      "description": "Comments on a news article."
+    },
     "users": {
       "schema": { "$ref": "#/entities/User" },
       "description": "User profile data."
+    },
+    "fleet": {
+      "schema": { "$ref": "#/entities/Boat" },
+      "description": "List of boats in the fleet."
     },
     "conversations": {
       "schema": { "$ref": "#/entities/Conversation" },

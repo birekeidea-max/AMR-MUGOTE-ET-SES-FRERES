@@ -68,7 +68,24 @@ service cloud.firestore {
     // News (Public Read)
     match /news/{newsId} {
       allow read: if true;
-      allow write: if isAdmin();
+      allow create, delete: if isAdmin();
+      allow update: if isAdmin() || (
+        // Public can only increment views
+        incoming().diff(existing()).affectedKeys().hasOnly(['views']) &&
+        incoming().views == existing().views + 1
+      );
+
+      // Comments Subcollection
+      match /comments/{commentId} {
+        function isValidComment(data) {
+          return data.userId is string && data.userId.size() > 0 &&
+                 data.text is string && data.text.size() > 0 &&
+                 data.text.size() < 1000;
+        }
+        allow read: if true;
+        allow create: if isSignedIn() && isValidComment(incoming()) && incoming().userId == request.auth.uid;
+        allow delete: if isAdmin() || isOwner(existing().userId);
+      }
     }
 
     // Admin lookup
@@ -81,6 +98,16 @@ service cloud.firestore {
     match /settings/{settingId} {
       allow read: if true;
       allow write: if isAdmin();
+    }
+
+    // Fleet (Public Read, Admin Write)
+    match /fleet/{boatId} {
+      function isValidBoat(data) {
+        return data.name is string && data.name.size() > 0 &&
+               data.capacity is number && data.capacity >= 0;
+      }
+      allow read: if true;
+      allow write: if isAdmin() && isValidBoat(incoming());
     }
 
     // Support Conversations
@@ -128,6 +155,10 @@ service cloud.firestore {
                         (incoming().senderRole == 'ADMIN' && isAdmin())
                       );
       }
+    }
+    match /users_list/{userId} {
+      allow read: if isAdmin();
+      allow write: if isOwner(userId) || isAdmin();
     }
   }
 }
