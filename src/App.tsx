@@ -204,7 +204,7 @@ const generateTicket = async (res: Reservation, siteSettings: { homeBg: string }
 
     // Row 4: Date & Heure
     drawField("Date", res.travelDate, 20, 126);
-    drawField("Heure de Départ", res.departureTime || '07:20', 70, 126);
+    drawField("Heure de Départ", res.departureTime || '07:30', 70, 126);
     drawDivider(136);
 
     // Row 5: Montant
@@ -316,7 +316,13 @@ export default function App() {
       }
       setLoading(false);
     });
-    return () => { unsubscribe(); settingsUnsub(); };
+
+    // Safety timeout for loading state
+    const timeoutId = setTimeout(() => {
+      setLoading(false);
+    }, 8000);
+
+    return () => { unsubscribe(); settingsUnsub(); clearTimeout(timeoutId); };
   }, []);
 
   const login = async () => {
@@ -329,6 +335,10 @@ export default function App() {
   };
 
   const logout = () => signOut(auth);
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'instant' });
+  }, [currentPage]);
 
   if (loading) {
     return (
@@ -345,11 +355,11 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-bg flex flex-col font-sans relative overflow-hidden text-center items-center">
+    <div className="min-h-screen bg-bg flex flex-col font-sans relative overflow-hidden">
       <div className="absolute inset-0 grid-pattern pointer-events-none opacity-[0.05]"></div>
       
       <header className="w-full bg-white z-[60] relative">
-        <div className="w-full h-44 md:h-64 relative overflow-hidden">
+        <div className="w-full h-32 md:h-64 relative overflow-hidden">
           <img 
             src={siteSettings.homeBg} 
             className="w-full h-full object-cover" 
@@ -359,16 +369,16 @@ export default function App() {
             }}
           />
           <div className="absolute inset-0 bg-gradient-to-t from-white via-transparent to-black/40"></div>
-          <div className="absolute bottom-10 left-1/2 -translate-x-1/2 w-full text-center px-4">
-            <p className="text-white text-xs md:text-base font-black uppercase tracking-[0.6em] drop-shadow-[0_4px_8px_rgba(0,0,0,0.5)]">
+          <div className="absolute bottom-6 md:bottom-10 left-1/2 -translate-x-1/2 w-full text-center px-4">
+            <p className="text-white text-[10px] md:text-base font-black uppercase tracking-[0.4em] md:tracking-[0.6em] drop-shadow-[0_4px_8px_rgba(0,0,0,0.5)]">
               L'excellence du transport lacustre au Kivu
             </p>
           </div>
         </div>
 
-        <div className="max-w-7xl mx-auto px-6 py-10 flex flex-col items-center justify-center relative -mt-16 bg-white rounded-t-[50px] shadow-[0_-20px_50px_-15px_rgba(0,0,0,0.15)]">
-          <div className="flex flex-col items-center gap-6 cursor-pointer group" onClick={() => setCurrentPage('home')}>
-            <div className="w-32 h-32 md:w-48 md:h-48 rounded-full border-[8px] border-white shadow-2xl overflow-hidden shadow-black/40 transition-all group-hover:scale-105 mb-2 relative ring-1 ring-slate-100 flex items-center justify-center bg-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 md:py-10 flex flex-col items-center justify-center relative -mt-12 md:-mt-16 bg-white rounded-t-[32px] md:rounded-t-[50px] shadow-[0_-20px_50px_-15px_rgba(0,0,0,0.15)]">
+          <div className="flex flex-col items-center gap-4 md:gap-6 cursor-pointer group" onClick={() => setCurrentPage('home')}>
+            <div className="w-24 h-24 md:w-48 md:h-48 rounded-full border-[6px] md:border-[8px] border-white shadow-2xl overflow-hidden shadow-black/40 transition-all group-hover:scale-105 mb-2 relative ring-1 ring-slate-100 flex items-center justify-center bg-white">
               <img 
                 src={siteSettings.logo || siteSettings.homeDetail || "https://images.unsplash.com/photo-1544551763-46a013bb70d5?q=80&w=2070&auto=format&fit=crop"} 
                 className="w-full h-full object-cover" 
@@ -378,37 +388,37 @@ export default function App() {
                 }}
               />
             </div>
-            <div className="text-center space-y-3">
-              <h1 className="text-2xl md:text-4xl font-black tracking-tighter leading-none italic uppercase">
+            <div className="text-center space-y-2 md:space-y-3">
+              <h1 className="text-xl md:text-4xl font-black tracking-tighter leading-none italic uppercase">
                 <span className="text-maritime">ETS AMR</span> <span className="text-gold">MUGOTE</span> <span className="text-maritime-dark">ET SES FRERES</span>
               </h1>
-              <div className="flex items-center justify-center gap-4">
-                <div className="h-[2px] w-12 md:w-24 bg-gold/50"></div>
-                <p className="text-xs md:text-sm font-black tracking-[0.3em] text-slate-900 uppercase italic">
+              <div className="flex items-center justify-center gap-3 md:gap-4">
+                <div className="h-[2px] w-8 md:w-24 bg-gold/50"></div>
+                <p className="text-[9px] md:text-sm font-black tracking-[0.2em] md:tracking-[0.3em] text-slate-900 uppercase italic">
                   VOYAGER EN TOUTE SÉCURITÉ
                 </p>
-                <div className="h-[2px] w-12 md:w-24 bg-gold/50"></div>
+                <div className="h-[2px] w-8 md:w-24 bg-gold/50"></div>
               </div>
             </div>
           </div>
           
-          <div className="absolute right-8 top-10 flex items-center gap-4">
-             <button onClick={() => setIsMenuOpen(true)} className="md:hidden p-4 bg-maritime text-white rounded-2xl shadow-xl hover:bg-black transition-all">
-                <Menu size={24} />
+          <div className="absolute right-4 md:right-8 top-6 md:top-10 flex items-center gap-3">
+             <button onClick={() => setIsMenuOpen(true)} className="md:hidden p-3 sm:p-4 bg-maritime text-white rounded-xl sm:rounded-2xl shadow-xl hover:bg-black transition-all">
+                <Menu size={20} className="sm:w-6 sm:h-6" />
              </button>
              {user ? (
-               <div className="flex items-center gap-3">
+               <div className="flex items-center gap-2 sm:gap-3">
                  <div className="hidden md:block text-right">
                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Connecté</p>
                    <p className="text-xs font-black text-maritime">{user.displayName}</p>
                  </div>
-                 <button onClick={logout} className="p-4 bg-slate-50 text-slate-400 hover:text-rose-600 rounded-2xl transition-all border border-slate-100 hover:border-rose-100 shadow-md">
-                   <LogOut size={20} />
+                 <button onClick={logout} className="p-3 sm:p-4 bg-slate-50 text-slate-400 hover:text-rose-600 rounded-xl sm:rounded-2xl transition-all border border-slate-100 hover:border-rose-100 shadow-md">
+                   <LogOut size={18} className="sm:w-5 sm:h-5" />
                  </button>
                </div>
             ) : (
-              <button onClick={login} className="px-8 py-3 bg-maritime text-white rounded-2xl shadow-xl hover:bg-maritime-dark transition-all text-xs font-black uppercase tracking-widest flex items-center gap-3 border border-white/20">
-                <User size={18} /> Connexion
+              <button onClick={login} className="px-5 sm:px-8 py-2.5 sm:py-3 bg-maritime text-white rounded-xl sm:rounded-2xl shadow-xl hover:bg-maritime-dark transition-all text-[10px] sm:text-xs font-black uppercase tracking-widest flex items-center gap-2 sm:gap-3 border border-white/20">
+                <User size={16} className="sm:w-[18px] sm:h-[18px]" /> <span className="hidden sm:inline">Connexion</span>
               </button>
             )}
           </div>
@@ -419,8 +429,8 @@ export default function App() {
       </header>
 
       <nav className="sticky top-0 z-50 bg-[#001233] w-full border-b border-white/10 shadow-2xl">
-        <div className="max-w-7xl mx-auto px-4 py-4">
-          <div className="flex flex-wrap items-center justify-center gap-2 md:gap-4">
+        <div className="max-w-7xl mx-auto px-2 sm:px-4 py-3 sm:py-4">
+          <div className="flex flex-wrap items-center justify-center gap-1.5 sm:gap-3 md:gap-4">
             {[
               { id: 'home', label: 'ACCUEIL' },
               { id: 'booking', label: 'RÉSERVER' },
@@ -442,21 +452,26 @@ export default function App() {
                     if (item.anchor) {
                       setCurrentPage('home');
                       setTimeout(() => {
-                        document.getElementById(item.anchor!)?.scrollIntoView({ behavior: 'smooth' });
+                        const el = document.getElementById(item.anchor!);
+                        if (el) {
+                          const navHeight = 80;
+                          const top = el.getBoundingClientRect().top + window.pageYOffset - navHeight;
+                          window.scrollTo({ top, behavior: 'smooth' });
+                        }
                       }, 100);
                     } else {
                       setCurrentPage(item.id as Page); 
                     }
                   }} 
                   className={cn(
-                    "rounded-xl font-black uppercase tracking-[0.2em] transition-all duration-300 border relative group",
-                    isDashboard ? "px-6 py-3.5 text-[11px] md:text-sm" : "px-4 py-3 text-[10px] md:text-xs",
+                    "rounded-lg sm:rounded-xl font-black uppercase tracking-[0.1em] sm:tracking-[0.2em] transition-all duration-300 border relative group",
+                    isDashboard ? "px-4 sm:px-6 py-2.5 sm:py-3.5 text-[9px] sm:text-[11px] md:text-sm" : "px-2.5 sm:px-4 py-2 sm:py-3 text-[8px] sm:text-[10px] md:text-xs",
                     currentPage === item.id 
                       ? isDashboard 
-                        ? "bg-emerald-600 text-white border-emerald-400 shadow-xl shadow-emerald-500/30 scale-105 ring-2 ring-emerald-500/50"
-                        : "bg-gold text-maritime border-gold shadow-xl shadow-gold/30 scale-105" 
+                        ? "bg-emerald-600 text-white border-emerald-400 shadow-xl shadow-emerald-500/30 ring-2 ring-emerald-500/50"
+                        : "bg-gold text-maritime border-gold shadow-xl shadow-gold/30" 
                       : isDashboard
-                        ? "bg-emerald-950/60 text-emerald-400 border-emerald-500/50 hover:bg-emerald-600 hover:text-white hover:scale-110 shadow-lg shadow-emerald-900/20"
+                        ? "bg-emerald-950/60 text-emerald-400 border-emerald-500/50 hover:bg-emerald-600 hover:text-white"
                         : "bg-white/5 text-white/50 border-white/5 hover:bg-white/10 hover:text-white"
                   )}
                 >
@@ -567,7 +582,7 @@ export default function App() {
         )}
       </AnimatePresence>
 
-      <main className="flex-1 max-w-7xl mx-auto w-full px-8 py-6 relative z-10 text-center">
+      <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-8 py-4 sm:py-6 relative z-10 text-center">
         <AnimatePresence mode="wait">
           {verifyId ? (
             <VerificationView id={verifyId} onClose={() => { setVerifyId(null); window.history.pushState({}, '', '/'); }} />
@@ -739,6 +754,11 @@ function ChatWidget({ user }: { user: FirebaseUser | null }) {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const scrollEndRef = useRef<HTMLDivElement>(null);
 
+  // Guest chat state
+  const [guestMessages, setGuestMessages] = useState<any[]>([
+    { text: "Bienvenue chez Mugote ! Comment puis-je vous aider aujourd'hui ?", senderRole: 'AI' }
+  ]);
+
   useEffect(() => {
     if (!user || !isOpen) return;
 
@@ -791,11 +811,35 @@ function ChatWidget({ user }: { user: FirebaseUser | null }) {
 
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!inputText.trim() || sending || !convId || !user) return;
+    if (!inputText.trim() || sending) return;
 
     const text = inputText;
     setInputText('');
     setSending(true);
+
+    if (!user) {
+      // Guest Mode: Only IA response, no FireStore
+      setGuestMessages(prev => [...prev, { text, senderRole: 'USER' }]);
+      try {
+        const response = await fetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: text, history: guestMessages.slice(-5).map(m => ({ role: m.senderRole, text: m.text })) })
+        });
+        const data = await response.json();
+        setGuestMessages(prev => [...prev, { text: data.text || "Erreur de connexion", senderRole: 'AI' }]);
+      } catch (err) {
+        setGuestMessages(prev => [...prev, { text: "Désolé, l'IA est indisponible.", senderRole: 'AI' }]);
+      } finally {
+        setSending(false);
+      }
+      return;
+    }
+
+    if (!convId) {
+      setSending(false);
+      return;
+    }
 
     try {
       // 1. Add user message
@@ -845,7 +889,7 @@ function ChatWidget({ user }: { user: FirebaseUser | null }) {
     }
   };
 
-  if (!user) return null;
+  const displayMessages = user ? messages : guestMessages;
 
   return (
     <div className="fixed bottom-6 right-6 z-[100]">
@@ -873,7 +917,7 @@ function ChatWidget({ user }: { user: FirebaseUser | null }) {
              </div>
 
              <div ref={scrollContainerRef} className="flex-1 overflow-y-auto p-6 space-y-4 bg-slate-50/50">
-               {messages.length === 0 ? (
+               {displayMessages.length === 0 ? (
                  <div className="text-center py-20 space-y-4 opacity-20">
                    <MessageSquareText size={48} className="mx-auto" />
                    <p className="text-[10px] font-bold uppercase tracking-[.3em]">Posez vos questions !</p>
@@ -1365,239 +1409,234 @@ function Booking({ onReserved, user }: { onReserved: (res: Reservation) => void,
               </div>
             </div>
 
-            <form onSubmit={handleSubmit} className="bg-white rounded-[32px] border border-slate-200 shadow-2xl overflow-hidden">
-              <table className="w-full border-collapse">
-                <tbody>
-                  {/* Header row */}
-                  <tr className="bg-black text-white">
-                    <th colSpan={2} className="p-6 text-left">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-gold/20 rounded-xl flex items-center justify-center text-gold">
-                          <Ship size={20} />
-                        </div>
-                        <div>
-                          <p className="text-[9px] font-black uppercase tracking-widest opacity-60 leading-none mb-1">Navigation</p>
-                          <p className="text-lg font-black uppercase tracking-tighter italic">Formulaire Officiel Mugote</p>
-                        </div>
-                      </div>
-                    </th>
-                  </tr>
+            <form onSubmit={handleSubmit} className="bg-white rounded-[24px] sm:rounded-[32px] border border-slate-200 shadow-2xl overflow-hidden">
+              {/* Header */}
+              <div className="bg-black text-white p-4 sm:p-6">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gold/20 rounded-xl flex items-center justify-center text-gold">
+                    <Ship size={18} className="sm:w-5 sm:h-5" />
+                  </div>
+                  <div>
+                    <p className="text-[7px] sm:text-[9px] font-black uppercase tracking-widest opacity-60 leading-none mb-1">Navigation</p>
+                    <p className="text-sm sm:text-lg font-black uppercase tracking-tighter italic">Formulaire Officiel Mugote</p>
+                  </div>
+                </div>
+              </div>
 
-                  {/* Identification */}
-                  <tr className="border-b border-slate-100 group transition-colors hover:bg-slate-50/50">
-                    <td className="p-6 border-r border-slate-100 bg-slate-50/30 w-[160px] md:w-[200px]">
-                      <div className="flex flex-col gap-1">
-                        <label className="text-[10px] font-black uppercase text-maritime tracking-widest flex items-center gap-2">
-                          <User size={14} className="text-gold" /> Identité
-                          <Cat size={12} className="text-rose-400 animate-bounce" />
-                        </label>
-                        <p className="text-[8px] text-slate-400 font-bold uppercase">Nom complet du voyageur</p>
-                      </div>
-                    </td>
-                    <td className="p-6">
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <input 
-                          required
-                          type="text" 
-                          value={formData.fullName}
-                          onChange={e => setFormData({ ...formData, fullName: e.target.value })}
-                          className="w-full px-5 py-3 bg-slate-50 border-2 border-maritime/30 rounded-2xl focus:outline-none focus:ring-4 focus:ring-gold/10 focus:border-gold transition-all font-bold text-sm"
-                          placeholder="NOM"
-                        />
-                        <input 
-                          required
-                          type="text" 
-                          value={formData.lastName}
-                          onChange={e => setFormData({ ...formData, lastName: e.target.value })}
-                          className="w-full px-5 py-3 bg-slate-50 border-2 border-maritime/30 rounded-2xl focus:outline-none focus:ring-4 focus:ring-gold/10 focus:border-gold transition-all font-bold text-sm"
-                          placeholder="POST-NOM"
-                        />
-                      </div>
-                    </td>
-                  </tr>
-
-                  {/* Contact & Payment */}
-                  <tr className="border-b border-slate-100 group transition-colors hover:bg-slate-50/50">
-                    <td className="p-6 border-r border-slate-100 bg-slate-50/30">
-                      <div className="flex flex-col gap-1">
-                        <label className="text-[10px] font-black uppercase text-maritime tracking-widest flex items-center gap-2">
-                          <Phone size={14} className="text-gold" /> Contact
-                        </label>
-                        <p className="text-[8px] text-slate-400 font-bold uppercase">Numéro de téléphone</p>
-                      </div>
-                    </td>
-                    <td className="p-6">
+              <div className="divide-y divide-slate-100">
+                {/* Identification */}
+                <div className="flex flex-col sm:flex-row group transition-colors hover:bg-slate-50/50">
+                  <div className="p-4 sm:p-6 sm:border-r border-slate-100 bg-slate-50/30 sm:w-[200px] shrink-0">
+                    <div className="flex flex-col gap-1">
+                      <label className="text-[10px] font-black uppercase text-maritime tracking-widest flex items-center gap-2">
+                        <User size={14} className="text-gold" /> Identité
+                        <Cat size={12} className="text-rose-400 animate-bounce" />
+                      </label>
+                      <p className="text-[8px] text-slate-400 font-bold uppercase">Nom complet du voyageur</p>
+                    </div>
+                  </div>
+                  <div className="p-4 sm:p-6 flex-1">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                       <input 
                         required
-                        type="tel" 
-                        value={formData.phone}
-                        onChange={e => setFormData({ ...formData, phone: e.target.value })}
-                        className="w-full px-5 py-3 bg-slate-50 border-2 border-maritime/30 rounded-2xl focus:outline-none focus:ring-4 focus:ring-gold/10 focus:border-gold transition-all font-mono font-black text-sm text-maritime"
-                        placeholder="+243 999 999 999"
-                        title="Veuillez entrer un numéro congolais valide (+243 suivi de 9 chiffres)"
+                        type="text" 
+                        value={formData.fullName}
+                        onChange={e => setFormData({ ...formData, fullName: e.target.value })}
+                        className="w-full px-4 py-2.5 sm:px-5 sm:py-3 bg-slate-50 border-2 border-maritime/30 rounded-xl sm:rounded-2xl focus:outline-none focus:ring-4 focus:ring-gold/10 focus:border-gold transition-all font-bold text-sm"
+                        placeholder="NOM"
                       />
-                    </td>
-                  </tr>
+                      <input 
+                        required
+                        type="text" 
+                        value={formData.lastName}
+                        onChange={e => setFormData({ ...formData, lastName: e.target.value })}
+                        className="w-full px-4 py-2.5 sm:px-5 sm:py-3 bg-slate-50 border-2 border-maritime/30 rounded-xl sm:rounded-2xl focus:outline-none focus:ring-4 focus:ring-gold/10 focus:border-gold transition-all font-bold text-sm"
+                        placeholder="POST-NOM"
+                      />
+                    </div>
+                  </div>
+                </div>
 
-                  {/* Voyage Details */}
-                  <tr className="border-b border-slate-100 group transition-colors hover:bg-slate-50/50">
-                    <td className="p-6 border-r border-slate-100 bg-slate-50/30">
-                      <div className="flex flex-col gap-1">
-                        <label className="text-[10px] font-black uppercase text-maritime tracking-widest flex items-center gap-2">
-                          <MapPin size={14} className="text-gold" /> Destination
-                        </label>
-                        <p className="text-[8px] text-slate-400 font-bold uppercase">Itinéraire choisi</p>
-                      </div>
-                    </td>
-                    <td className="p-6">
+                {/* Contact */}
+                <div className="flex flex-col sm:flex-row group transition-colors hover:bg-slate-50/50">
+                  <div className="p-4 sm:p-6 sm:border-r border-slate-100 bg-slate-50/30 sm:w-[200px] shrink-0">
+                    <div className="flex flex-col gap-1">
+                      <label className="text-[10px] font-black uppercase text-maritime tracking-widest flex items-center gap-2">
+                        <Phone size={14} className="text-gold" /> Contact
+                      </label>
+                      <p className="text-[8px] text-slate-400 font-bold uppercase">Numéro de téléphone</p>
+                    </div>
+                  </div>
+                  <div className="p-4 sm:p-6 flex-1">
+                    <input 
+                      required
+                      type="tel" 
+                      value={formData.phone}
+                      onChange={e => setFormData({ ...formData, phone: e.target.value })}
+                      className="w-full px-4 py-2.5 sm:px-5 sm:py-3 bg-slate-50 border-2 border-maritime/30 rounded-xl sm:rounded-2xl focus:outline-none focus:ring-4 focus:ring-gold/10 focus:border-gold transition-all font-mono font-black text-sm text-maritime"
+                      placeholder="+243 999 999 999"
+                    />
+                  </div>
+                </div>
+
+                {/* Destination */}
+                <div className="flex flex-col sm:flex-row group transition-colors hover:bg-slate-50/50">
+                  <div className="p-4 sm:p-6 sm:border-r border-slate-100 bg-slate-50/30 sm:w-[200px] shrink-0">
+                    <div className="flex flex-col gap-1">
+                      <label className="text-[10px] font-black uppercase text-maritime tracking-widest flex items-center gap-2">
+                        <MapPin size={14} className="text-gold" /> Destination
+                      </label>
+                      <p className="text-[8px] text-slate-400 font-bold uppercase">Itinéraire choisi</p>
+                    </div>
+                  </div>
+                  <div className="p-4 sm:p-6 flex-1">
+                    <select 
+                      value={formData.itinerary}
+                      onChange={e => setFormData({ ...formData, itinerary: e.target.value as Itinerary })}
+                      className="w-full px-4 py-3 sm:px-6 sm:py-4 bg-maritime border-4 border-gold/30 text-white rounded-xl sm:rounded-2xl focus:outline-none focus:ring-4 ring-gold/20 transition-all font-black uppercase tracking-widest text-[9px] sm:text-[11px] appearance-none cursor-pointer"
+                    >
+                      <option value="Bukavu-Goma">Bukavu (Sud) → Goma (Nord)</option>
+                      <option value="Goma-Bukavu">Goma (Nord) → Bukavu (Sud)</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Schedule */}
+                <div className="flex flex-col sm:flex-row group transition-colors hover:bg-slate-50/50">
+                  <div className="p-4 sm:p-6 sm:border-r border-slate-100 bg-slate-50/30 sm:w-[200px] shrink-0">
+                    <div className="flex flex-col gap-1">
+                      <label className="text-[10px] font-black uppercase text-maritime tracking-widest flex items-center gap-2">
+                        <Calendar size={14} className="text-gold" /> Calendrier
+                      </label>
+                      <p className="text-[8px] text-slate-400 font-bold uppercase">Date & Heure</p>
+                    </div>
+                  </div>
+                  <div className="p-4 sm:p-6 flex-1 space-y-3 sm:space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+                      <input 
+                        required
+                        type="date" 
+                        value={formData.travelDate}
+                        min={new Date().toISOString().split('T')[0]}
+                        onChange={e => setFormData({ ...formData, travelDate: e.target.value })}
+                        className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-4 focus:ring-gold/10 focus:border-gold transition-all font-mono font-black text-xs sm:text-sm"
+                      />
                       <select 
-                        value={formData.itinerary}
-                        onChange={e => setFormData({ ...formData, itinerary: e.target.value as Itinerary })}
-                        className="w-full px-6 py-4 bg-maritime border-4 border-gold/30 text-white rounded-2xl focus:outline-none focus:ring-4 ring-gold/20 transition-all font-black uppercase tracking-widest text-[11px] appearance-none cursor-pointer"
+                        value={formData.departureTime}
+                        onChange={e => setFormData({ ...formData, departureTime: e.target.value })}
+                        className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-4 focus:ring-gold/10 focus:border-gold transition-all font-mono font-black text-xs sm:text-sm cursor-pointer"
                       >
-                        <option value="Bukavu-Goma">Bukavu (Sud) → Goma (Nord)</option>
-                        <option value="Goma-Bukavu">Goma (Nord) → Bukavu (Sud)</option>
+                        <option value="07:30">MATIN (07:30)</option>
+                        <option value="18:00">SOIR (18:00)</option>
                       </select>
-                    </td>
-                  </tr>
+                    </div>
+                  </div>
+                </div>
 
-                  {/* Schedule */}
-                  <tr className="border-b border-slate-100 group transition-colors hover:bg-slate-50/50">
-                    <td className="p-6 border-r border-slate-100 bg-slate-50/30">
-                      <div className="flex flex-col gap-1">
-                        <label className="text-[10px] font-black uppercase text-maritime tracking-widest flex items-center gap-2">
-                          <Calendar size={14} className="text-gold" /> Calendrier
-                        </label>
-                        <p className="text-[8px] text-slate-400 font-bold uppercase">Date & Heure de départ</p>
-                      </div>
-                    </td>
-                    <td className="p-6 space-y-4">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <input 
-                          required
-                          type="date" 
-                          value={formData.travelDate}
-                          min={new Date().toISOString().split('T')[0]}
-                          onChange={e => setFormData({ ...formData, travelDate: e.target.value })}
-                          className="w-full px-5 py-4 bg-white border border-slate-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-gold/10 focus:border-gold transition-all font-mono font-black text-sm"
-                        />
-                        <select 
-                          value={formData.departureTime}
-                          onChange={e => setFormData({ ...formData, departureTime: e.target.value })}
-                          className="w-full px-5 py-4 bg-white border border-slate-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-gold/10 focus:border-gold transition-all font-mono font-black text-sm cursor-pointer"
+                {/* Ship Selection */}
+                <div className="flex flex-col sm:flex-row group transition-colors hover:bg-slate-50/50">
+                  <div className="p-4 sm:p-6 sm:border-r border-slate-100 bg-slate-50/30 sm:w-[200px] shrink-0">
+                    <div className="flex flex-col gap-1">
+                      <label className="text-[10px] font-black uppercase text-maritime tracking-widest flex items-center gap-2">
+                        <Anchor size={14} className="text-gold" /> Navire
+                      </label>
+                      <p className="text-[8px] text-slate-400 font-bold uppercase">Sélection de la flotte</p>
+                    </div>
+                  </div>
+                  <div className="p-4 sm:p-6 flex-1">
+                    <div className="grid grid-cols-3 gap-2 sm:gap-3">
+                      {(['Mugote 1', 'Mugote 2', 'Mugote 3'] as ShipName[]).map(s => (
+                        <button
+                          key={s}
+                          type="button"
+                          onClick={() => setFormData({ ...formData, ship: s })}
+                          className={cn(
+                            "p-2 sm:p-3 rounded-lg sm:rounded-xl border-2 transition-all font-black uppercase tracking-widest text-[8px] sm:text-[9px] relative",
+                            formData.ship === s 
+                              ? "border-black bg-black text-white shadow-xl shadow-black/20" 
+                              : "border-slate-100 bg-slate-50 text-slate-400 hover:border-slate-200"
+                          )}
                         >
-                          <option value="07:30">MATIN (07:30)</option>
-                          <option value="18:00">SOIR (18:00)</option>
-                        </select>
-                      </div>
-                    </td>
-                  </tr>
+                          {s}
+                          {formData.ship === s && <div className="absolute -top-1 -right-1 w-3 h-3 sm:w-4 sm:h-4 bg-gold rounded-full flex items-center justify-center text-black font-black text-[6px] sm:text-[8px]">✓</div>}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
 
-                  {/* Ship Selection */}
-                  <tr className="border-b border-slate-100 group transition-colors hover:bg-slate-50/50">
-                    <td className="p-6 border-r border-slate-100 bg-slate-50/30">
-                      <div className="flex flex-col gap-1">
-                        <label className="text-[10px] font-black uppercase text-maritime tracking-widest flex items-center gap-2">
-                          <Anchor size={14} className="text-gold" /> Navire
-                        </label>
-                        <p className="text-[8px] text-slate-400 font-bold uppercase">Sélection de la flotte</p>
-                      </div>
-                    </td>
-                    <td className="p-6">
-                      <div className="grid grid-cols-3 gap-3">
-                        {(['Mugote 1', 'Mugote 2', 'Mugote 3'] as ShipName[]).map(s => (
+                {/* Travel Class */}
+                <div className="flex flex-col sm:flex-row group transition-colors hover:bg-slate-50/50">
+                  <div className="p-4 sm:p-6 sm:border-r border-slate-100 bg-slate-50/30 sm:w-[200px] shrink-0">
+                    <div className="flex flex-col gap-1">
+                      <label className="text-[10px] font-black uppercase text-maritime tracking-widest flex items-center gap-2">
+                        <CheckCircle size={14} className="text-gold" /> Confort
+                        <Cat size={12} className="text-indigo-400 animate-pulse" />
+                      </label>
+                      <p className="text-[8px] text-slate-400 font-bold uppercase">Niveau de service</p>
+                    </div>
+                  </div>
+                  <div className="p-4 sm:p-6 flex-1">
+                    <div className="grid grid-cols-2 gap-2 sm:gap-3">
+                      {(['1ère Classe', '2ème Classe', '3ème Classe', 'VIP'] as TravelClass[]).map(c => {
+                        const clsColor = CLASS_COLORS[c];
+                        const isActive = formData.travelClass === c;
+                        
+                        return (
                           <button
-                            key={s}
+                            key={c}
                             type="button"
-                            onClick={() => setFormData({ ...formData, ship: s })}
+                            onClick={() => setFormData({ ...formData, travelClass: c })}
                             className={cn(
-                              "p-3 rounded-xl border-2 transition-all font-black uppercase tracking-widest text-[9px] relative",
-                              formData.ship === s 
-                                ? "border-black bg-black text-white shadow-xl shadow-black/20" 
-                                : "border-slate-100 bg-slate-50 text-slate-400 hover:border-slate-200"
+                              "p-3 sm:p-4 rounded-2xl sm:rounded-3xl border-2 transition-all text-center flex flex-col items-center justify-center group relative overflow-hidden active:scale-95 hover:scale-105",
+                              isActive 
+                                ? "border-transparent text-white shadow-lg" 
+                                : "border-slate-100 bg-slate-50 text-slate-500 hover:border-slate-200"
                             )}
+                            style={{ 
+                              backgroundColor: isActive ? clsColor.main : undefined,
+                            }}
                           >
-                            {s}
-                            {formData.ship === s && <div className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-gold rounded-full flex items-center justify-center text-black font-black text-[8px]">✓</div>}
+                            <p className={cn("text-[7px] sm:text-[8px] font-black uppercase tracking-tighter leading-none mb-1", isActive ? "text-white" : "text-slate-400")}>{c}</p>
+                            <p className={cn("text-xs sm:text-sm font-black font-mono", isActive ? "text-white" : "text-black")}>{PRICES[c]}$</p>
+                            {isActive && <div className="absolute top-0 right-0 p-1 opacity-20"><Ship size={18} /></div>}
                           </button>
-                        ))}
-                      </div>
-                    </td>
-                  </tr>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
 
-                  {/* Travel Class */}
-                  <tr className="border-b border-slate-100 group transition-colors hover:bg-slate-50/50">
-                    <td className="p-6 border-r border-slate-100 bg-slate-50/30">
-                      <div className="flex flex-col gap-1">
-                        <label className="text-[10px] font-black uppercase text-maritime tracking-widest flex items-center gap-2">
-                          <CheckCircle size={14} className="text-gold" /> Confort
-                          <Cat size={12} className="text-indigo-400 animate-pulse" />
-                        </label>
-                        <p className="text-[8px] text-slate-400 font-bold uppercase">Niveau de service</p>
-                      </div>
-                    </td>
-                    <td className="p-6">
-                      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                        {(['1ère Classe', '2ème Classe', '3ème Classe', 'VIP'] as TravelClass[]).map(c => {
-                          const clsColor = CLASS_COLORS[c];
-                          const isActive = formData.travelClass === c;
-                          
-                          return (
-                            <button
-                              key={c}
-                              type="button"
-                              onClick={() => setFormData({ ...formData, travelClass: c })}
-                              className={cn(
-                                "p-4 rounded-3xl border-2 transition-all text-center flex flex-col items-center justify-center group relative overflow-hidden active:scale-95 hover:scale-105 hover:shadow-xl",
-                                isActive 
-                                  ? "border-transparent text-white shadow-2xl scale-105" 
-                                  : "border-slate-100 bg-slate-50 text-slate-500 hover:border-slate-200"
-                              )}
-                              style={{ 
-                                backgroundColor: isActive ? clsColor.main : undefined,
-                                boxShadow: isActive ? `0 20px 25px -5px ${clsColor.light}, 0 8px 10px -6px ${clsColor.light}` : undefined
-                              }}
-                            >
-                              <p className={cn("text-[8px] font-black uppercase tracking-tighter leading-none mb-1", isActive ? "text-white" : "text-slate-400")}>{c}</p>
-                              <p className={cn("text-xs font-black font-mono", isActive ? "text-white" : "text-black")}>{PRICES[c]}$</p>
-                              {isActive && <div className="absolute top-0 right-0 p-1 opacity-20"><Ship size={24} /></div>}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </td>
-                  </tr>
+                {/* Passengers */}
+                <div className="flex flex-col sm:flex-row group transition-colors hover:bg-slate-50/50">
+                  <div className="p-4 sm:p-6 sm:border-r border-slate-100 bg-slate-50/30 sm:w-[200px] shrink-0">
+                    <div className="flex flex-col gap-1">
+                      <label className="text-[10px] font-black uppercase text-maritime tracking-widest flex items-center gap-2">
+                        <Users size={14} className="text-gold" /> Billets
+                      </label>
+                      <p className="text-[8px] text-slate-400 font-bold uppercase">Passagers</p>
+                    </div>
+                  </div>
+                  <div className="p-4 sm:p-6 flex-2 flex flex-col sm:flex-row items-center gap-4 sm:gap-6">
+                    <div className="bg-slate-100 rounded-xl p-1 flex items-center gap-1 shadow-inner w-full sm:w-auto justify-between">
+                      <button type="button" onClick={() => setFormData(p => ({...p, passengersCount: Math.max(1, p.passengersCount - 1)}))} className="w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center bg-white rounded-lg shadow-sm hover:scale-105 active:scale-95 transition-all font-black text-lg text-maritime">-</button>
+                      <span className="w-10 sm:w-14 text-center text-lg sm:text-xl font-black font-mono text-maritime">{formData.passengersCount}</span>
+                      <button type="button" onClick={() => setFormData(p => ({...p, passengersCount: Math.min(10, p.passengersCount + 1)}))} className="w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center bg-maritime text-white rounded-lg shadow-lg hover:scale-105 active:scale-95 transition-all font-black text-lg">+</button>
+                    </div>
+                    <div className="flex-1 text-center sm:text-right">
+                      <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Capacité Max</p>
+                      <p className="text-[10px] font-black text-maritime">10 PERSONNES / GROUPE</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
 
-                  {/* Passengers */}
-                  <tr className="border-b border-slate-100 group transition-colors hover:bg-slate-50/50">
-                    <td className="p-6 border-r border-slate-100 bg-slate-50/30">
-                      <div className="flex flex-col gap-1">
-                        <label className="text-[10px] font-black uppercase text-maritime tracking-widest flex items-center gap-2">
-                          <Users size={14} className="text-gold" /> Billets
-                        </label>
-                        <p className="text-[8px] text-slate-400 font-bold uppercase">Nombre de passagers</p>
-                      </div>
-                    </td>
-                    <td className="p-6 flex items-center gap-6">
-                      <div className="bg-slate-100 rounded-2xl p-1 flex items-center gap-1 shadow-inner">
-                        <button type="button" onClick={() => setFormData(p => ({...p, passengersCount: Math.max(1, p.passengersCount - 1)}))} className="w-12 h-12 flex items-center justify-center bg-white rounded-xl shadow-sm hover:scale-105 active:scale-95 transition-all font-black text-xl text-maritime">-</button>
-                        <span className="w-14 text-center text-xl font-black font-mono text-maritime">{formData.passengersCount}</span>
-                        <button type="button" onClick={() => setFormData(p => ({...p, passengersCount: Math.min(10, p.passengersCount + 1)}))} className="w-12 h-12 flex items-center justify-center bg-maritime text-white rounded-xl shadow-lg hover:scale-105 active:scale-95 transition-all font-black text-xl">+</button>
-                      </div>
-                      <div className="flex-1 text-right">
-                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Capacité Max</p>
-                        <p className="text-[10px] font-black text-maritime">10 PERSONNES / GROUPE</p>
-                      </div>
-                    </td>
-                  </tr>
-
-                  {/* Submission Row */}
-                  <tr className="bg-slate-50/80">
-                    <td colSpan={2} className="p-10 text-center">
-                      <div className="max-w-md mx-auto space-y-6">
-                         <div className="space-y-4">
-                            <div className="flex justify-between items-center bg-white p-6 rounded-3xl border-2 border-dashed border-maritime/20 shadow-sm relative overflow-hidden group">
-                              <div className="absolute top-0 left-0 w-1 h-full bg-gold" />
+              {/* Submission Row */}
+              <div className="bg-slate-50/80 p-6 sm:p-10 text-center">
+                <div className="max-w-md mx-auto space-y-6">
+                   <div className="space-y-4">
+                      <div className="flex justify-between items-center bg-white p-4 sm:p-6 rounded-2xl sm:rounded-3xl border-2 border-dashed border-maritime/20 shadow-sm relative overflow-hidden group">
+                        <div className="absolute top-0 left-0 w-1 h-full bg-gold" />
                               <div className="text-left">
                                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Résumé de la commande</p>
                                 <p className="text-sm font-black text-maritime font-mono">{formData.passengersCount} Billets x {PRICES[formData.travelClass]}.00$</p>
@@ -1625,10 +1664,7 @@ function Booking({ onReserved, user }: { onReserved: (res: Reservation) => void,
                             <div className="absolute inset-0 bg-gradient-to-r from-gold via-transparent to-gold opacity-0 group-hover:opacity-20 transition-opacity" />
                           </button>
                       </div>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
+                </div>
             </form>
           </div>
 
@@ -3186,12 +3222,12 @@ function NewsView() {
                   )}
                 </div>
               )}
-              <div className="px-8 py-4 border-t border-white/5 bg-white/5 flex justify-between items-center text-[9px] font-bold uppercase tracking-widest text-slate-500">
-                <span>{n.publishedAt ? (n.publishedAt.seconds ? new Date(n.publishedAt.seconds * 1000).toLocaleDateString() : new Date(n.publishedAt).toLocaleDateString()) : 'N/A'}</span>
-                {n.processedUrl && (
-                  <a href={n.processedUrl} target="_blank" className="text-gold flex items-center gap-1.5 hover:translate-x-1 transition-transform">En savoir plus <ChevronRight size={12} /></a>
-                )}
-              </div>
+                    <div className="px-5 py-4 border-t border-white/5 bg-white/5 flex flex-col sm:flex-row justify-between items-center text-[8px] sm:text-[9px] font-bold uppercase tracking-widest text-slate-500 gap-2 sm:gap-0">
+                      <span>{n.publishedAt ? (n.publishedAt.seconds ? new Date(n.publishedAt.seconds * 1000).toLocaleDateString() : new Date(n.publishedAt).toLocaleDateString()) : 'N/A'}</span>
+                      {n.processedUrl && (
+                        <a href={n.processedUrl} target="_blank" className="text-gold flex items-center gap-1.5 hover:translate-x-1 transition-transform">En savoir plus <ChevronRight size={12} /></a>
+                      )}
+                    </div>
             </div>
           ))}
         </div>
@@ -3222,50 +3258,52 @@ function MyTickets({ user, siteSettings }: { user: FirebaseUser | null, siteSett
     generateTicket(res, siteSettings);
   };
 
-  if (!user) return <div className="p-20 text-center text-slate-400 font-bold uppercase tracking-widest">Connectez-vous pour voir vos billets.</div>;
+  if (!user) return <div className="p-10 sm:p-20 text-center text-slate-400 font-bold uppercase tracking-widest text-[10px] sm:text-xs">Connectez-vous pour voir vos billets.</div>;
 
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-10">
-      <div className="border-b border-slate-200 pb-6 text-center">
-        <h2 className="text-2xl font-extrabold tracking-tighter uppercase mb-1.5 italic">Mes Billets</h2>
-        <p className="text-[10px] uppercase tracking-widest text-slate-400 font-bold">Historique de vos réservations et billets digitaux</p>
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6 sm:space-y-10">
+      <div className="border-b border-slate-200 pb-4 sm:pb-6 text-center">
+        <h2 className="text-xl sm:text-2xl font-extrabold tracking-tighter uppercase mb-1 sm:mb-1.5 italic">Mes Billets</h2>
+        <p className="text-[8px] sm:text-[10px] uppercase tracking-widest text-slate-400 font-bold px-4">Historique de vos réservations et billets digitaux</p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
         {loading ? (
-          <div className="col-span-2 text-center py-16 text-slate-400 animate-pulse uppercase text-[10px] font-bold tracking-widest">Chargement...</div>
+          <div className="col-span-2 text-center py-10 sm:py-16 text-slate-400 animate-pulse uppercase text-[8px] sm:text-[10px] font-bold tracking-widest">Chargement...</div>
         ) : tickets.length === 0 ? (
-          <div className="col-span-2 text-center py-16 text-slate-400 uppercase text-[10px] font-bold tracking-widest border border-dashed border-slate-200 rounded-xl">Aucun billet trouvé.</div>
+          <div className="col-span-2 text-center py-10 sm:py-16 text-slate-400 uppercase text-[8px] sm:text-[10px] font-bold tracking-widest border border-dashed border-slate-200 rounded-xl mx-4">Aucun billet trouvé.</div>
         ) : (
           tickets.map(res => (
-            <div key={res.id} className="bg-white border border-slate-100 shadow-sm rounded-xl overflow-hidden flex flex-col md:flex-row hover:border-maritime transition-all group">
-              <div className="md:w-28 bg-slate-50 flex flex-col items-center justify-center p-4 border-b md:border-b-0 md:border-r border-slate-100">
+            <div key={res.id} className="bg-white border border-slate-100 shadow-sm rounded-xl overflow-hidden flex flex-col sm:flex-row hover:border-maritime transition-all group mx-0 sm:mx-0">
+              <div className="w-full sm:w-28 bg-slate-50 flex flex-row sm:flex-col items-center justify-center p-4 border-b sm:border-b-0 sm:border-r border-slate-100 gap-4 sm:gap-0">
                 {res.status === 'VALIDATED' ? (
-                  <QRCodeSVG value={`https://ais-pre-esphb55wsxkem3z7oxg5he-830128486045.europe-west2.run.app/?verify=${res.id}`} size={64} />
+                  <QRCodeSVG value={`https://ais-pre-esphb55wsxkem3z7oxg5he-830128486045.europe-west2.run.app/?verify=${res.id}`} size={64} className="sm:size-16" />
                 ) : (
-                  <div className="w-16 h-16 bg-slate-100 flex items-center justify-center text-slate-300">
-                    <QrCode size={32} />
+                  <div className="w-12 h-12 sm:w-16 sm:h-16 bg-slate-100 flex items-center justify-center text-slate-300 rounded-lg">
+                    <QrCode size={24} className="sm:w-8 sm:h-8" />
                   </div>
                 )}
-                <p className="text-[7px] font-bold uppercase tracking-widest text-slate-400 mt-3 text-center">DGM Verify</p>
+                <p className="text-[7px] font-bold uppercase tracking-widest text-slate-400 sm:mt-3 text-center">DGM Verify</p>
               </div>
-              <div className="flex-1 p-6 space-y-4">
+              <div className="flex-1 p-4 sm:p-6 space-y-4">
                 <div className="flex justify-between items-start">
-                  <div>
-                    <div className="flex items-center gap-2">
-                       <h3 className="text-sm font-extrabold tracking-tighter uppercase">{res.fullName} {res.lastName}</h3>
-                       <span className="text-[9px] font-mono text-slate-300">#{res.ticketId || 'ID-'+res.id?.substring(0,6).toUpperCase()}</span>
+                  <div className="min-w-0 flex-1 pr-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                       <h3 className="text-xs sm:text-sm font-extrabold tracking-tighter uppercase truncate">{res.fullName} {res.lastName}</h3>
+                       <span className="text-[8px] sm:text-[9px] font-mono text-slate-300">#{res.ticketId || 'ID-'+res.id?.substring(0,6).toUpperCase()}</span>
                     </div>
-                    <div className="flex items-center gap-2 mt-1">
-                      <span className="text-[7px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-full text-white" 
-                            style={{ backgroundColor: CLASS_COLORS[res.travelClass]?.main || '#ccc' }}>
-                        {res.travelClass}
-                      </span>
-                      <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">{res.travelDate} • {res.departureTime} • {res.ship}</p>
+                    <div className="mt-2 space-y-1.5">
+                      <div className="inline-block">
+                        <span className="text-[7px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-full text-white" 
+                              style={{ backgroundColor: CLASS_COLORS[res.travelClass]?.main || '#ccc' }}>
+                          {res.travelClass}
+                        </span>
+                      </div>
+                      <p className="text-[8px] sm:text-[9px] text-slate-400 font-bold uppercase tracking-widest leading-tight">{res.travelDate} • {res.departureTime} • {res.ship}</p>
                     </div>
                   </div>
                   <span className={cn(
-                    "text-[7px] font-extrabold uppercase tracking-widest px-1.5 py-0.5 border rounded-sm",
+                    "text-[7px] font-extrabold uppercase tracking-widest px-1.5 py-0.5 border rounded-sm flex-shrink-0",
                     res.status === 'VALIDATED' ? "bg-emerald-50 text-emerald-600 border-emerald-200" : 
                     res.status === 'PENDING' ? "bg-amber-50 text-amber-600 border-amber-200" : 
                     "bg-red-50 text-red-600 border-red-200"
@@ -3273,19 +3311,19 @@ function MyTickets({ user, siteSettings }: { user: FirebaseUser | null, siteSett
                     {res.status}
                   </span>
                 </div>
-                <div className="flex items-end justify-between pt-4 border-t border-slate-50">
-                  <div className="text-left">
-                    <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Itinéraire</p>
-                    <p className="text-[11px] font-extrabold text-maritime uppercase">{res.itinerary}</p>
+                <div className="flex items-end justify-between pt-3 sm:pt-4 border-t border-slate-50 gap-2">
+                  <div className="text-left min-w-0">
+                    <p className="text-[7px] sm:text-[8px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Itinéraire</p>
+                    <p className="text-[9px] sm:text-[11px] font-extrabold text-maritime uppercase truncate">{res.itinerary}</p>
                   </div>
-                  <div className="text-right">
-                    <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Total</p>
-                    <p className="text-base font-extrabold text-maritime mono tracking-tighter">{res.amount}$</p>
+                  <div className="text-right flex-shrink-0">
+                    <p className="text-[7px] sm:text-[8px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Total</p>
+                    <p className="text-sm sm:text-base font-extrabold text-maritime mono tracking-tighter">{res.amount}$</p>
                   </div>
                   {res.status === 'VALIDATED' && (
                     <button 
                       onClick={() => generateTicketPDF(res)}
-                      className="px-4 py-1.5 bg-maritime text-white text-[8px] font-bold uppercase tracking-widest rounded-lg hover:bg-maritime-dark transition-all"
+                      className="px-3 sm:px-4 py-1.5 bg-maritime text-white text-[7px] sm:text-[8px] font-bold uppercase tracking-widest rounded-lg hover:bg-maritime-dark transition-all flex-shrink-0"
                     >
                       Billet
                     </button>
@@ -3321,81 +3359,77 @@ function VerificationView({ id, onClose }: { id: string, onClose: () => void }) 
   }, [id]);
 
   return (
-    <motion.div initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} className="max-w-2xl mx-auto py-12">
+    <motion.div initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} className="max-w-2xl mx-auto py-6 sm:py-12 px-4 shadow-none">
       <div className="bg-white border border-slate-200 shadow-2xl rounded-sm overflow-hidden border-t-8 border-maritime">
-        <div className="p-12 text-center border-b border-slate-100">
-          <div className="w-20 h-20 bg-maritime/5 text-maritime rounded-sm flex items-center justify-center mx-auto mb-6">
-            <ShieldCheck size={40} />
+        <div className="p-6 sm:p-12 text-center border-b border-slate-100">
+          <div className="w-16 h-16 sm:w-20 sm:h-20 bg-maritime/5 text-maritime rounded-sm flex items-center justify-center mx-auto mb-4 sm:mb-6">
+            <ShieldCheck size={32} className="sm:size-10" />
           </div>
-          <h2 className="text-3xl font-extrabold tracking-tighter uppercase mb-2">Vérification de Billet</h2>
-          <p className="text-[11px] uppercase tracking-widest text-slate-400 font-bold">Système Officiel AMR MUGOTE / DGM</p>
+          <h2 className="text-xl sm:text-3xl font-extrabold tracking-tighter uppercase mb-1 sm:mb-2">Vérification de Billet</h2>
+          <p className="text-[9px] sm:text-[11px] uppercase tracking-widest text-slate-400 font-bold">Système Officiel AMR MUGOTE / DGM</p>
         </div>
 
-        <div className="p-12 space-y-8">
+        <div className="p-6 sm:p-12 space-y-6 sm:space-y-8">
           {loading ? (
-            <div className="text-center py-10 animate-pulse text-slate-400 uppercase text-xs font-bold tracking-widest">Recherche dans la base de données...</div>
+            <div className="text-center py-6 sm:py-10 animate-pulse text-slate-400 uppercase text-[10px] sm:text-xs font-bold tracking-widest">Recherche...</div>
           ) : !res ? (
-            <div className="text-center py-10 text-red-500 uppercase text-sm font-extrabold tracking-widest">
-              Alerte : Billet Non Trouvé ou Invalide
+            <div className="text-center py-6 sm:py-10 text-red-500 uppercase text-xs sm:text-sm font-extrabold tracking-widest">
+              Alerte : Billet Invalide
             </div>
           ) : (
             <>
-              <div className="grid grid-cols-2 gap-8">
-                <div>
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Statut de Validité</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-8">
+                <div className="col-span-1 sm:col-span-2 border-b border-slate-50 pb-4 sm:border-0 sm:pb-0">
+                  <p className="text-[9px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Statut</p>
                   <span className={cn(
-                    "inline-block px-4 py-2 text-xs font-extrabold uppercase tracking-widest border rounded-sm",
+                    "inline-block px-3 sm:px-4 py-1.5 sm:py-2 text-[10px] sm:text-xs font-extrabold uppercase tracking-widest border rounded-sm",
                     res.status === 'VALIDATED' ? "bg-emerald-50 text-emerald-600 border-emerald-200" : "bg-amber-50 text-amber-600 border-amber-200"
                   )}>
-                    {res.status === 'VALIDATED' ? 'OFFICIELLEMENT VALIDÉ' : 'EN ATTENTE DE CONTRÔLE'}
+                    {res.status === 'VALIDATED' ? 'OFFICIELLEMENT VALIDÉ' : 'EN ATTENTE'}
                   </span>
                 </div>
                 <div>
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Ticket ID</p>
-                  <p className="text-lg font-extrabold mono tracking-tighter uppercase">#{res.ticketId || 'N/A'}</p>
+                  <p className="text-[9px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 sm:mb-2">Ticket ID</p>
+                  <p className="text-sm sm:text-lg font-extrabold mono tracking-tighter uppercase">#{res.ticketId || 'N/A'}</p>
                 </div>
-                <div className="col-span-2 pt-6 border-t border-slate-50">
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Passager</p>
-                  <p className="text-2xl font-extrabold tracking-tighter uppercase">{res.fullName} {res.lastName}</p>
+                <div className="pt-4 sm:pt-6 border-t border-slate-50 sm:border-0 sm:pt-0">
+                  <p className="text-[9px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 sm:mb-2">Passager</p>
+                  <p className="text-lg sm:text-2xl font-extrabold tracking-tighter uppercase truncate">{res.fullName} {res.lastName}</p>
                 </div>
-                <div className="pt-6 border-t border-slate-50">
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Itinéraire</p>
-                  <p className="text-lg font-extrabold tracking-tighter uppercase">{res.itinerary}</p>
+                <div className="pt-4 sm:pt-6 border-t border-slate-50">
+                  <p className="text-[9px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 sm:mb-2">Itinéraire</p>
+                  <p className="text-base sm:text-lg font-extrabold tracking-tighter uppercase">{res.itinerary}</p>
                 </div>
-                <div className="pt-6 border-t border-slate-50">
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Bateau</p>
-                  <p className="text-lg font-extrabold tracking-tighter uppercase">{res.ship}</p>
+                <div className="pt-4 sm:pt-6 border-t border-slate-50">
+                  <p className="text-[9px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 sm:mb-2">Bateau</p>
+                  <p className="text-base sm:text-lg font-extrabold tracking-tighter uppercase">{res.ship}</p>
                 </div>
-                <div className="pt-6 border-t border-slate-50">
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Date de Voyage</p>
-                  <p className="text-lg font-extrabold mono tracking-tighter">{res.travelDate}</p>
+                <div className="pt-4 sm:pt-6 border-t border-slate-50">
+                  <p className="text-[9px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 sm:mb-2">Date</p>
+                  <p className="text-base sm:text-lg font-extrabold mono tracking-tighter">{res.travelDate}</p>
                 </div>
-                <div className="pt-6 border-t border-slate-50">
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Classe</p>
-                  <p className="text-lg font-extrabold tracking-tighter uppercase">{res.travelClass}</p>
-                </div>
-                <div className="pt-6 border-t border-slate-50">
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Montant Payé</p>
-                  <p className="text-lg font-extrabold tracking-tighter uppercase">{res.amount}.00 USD</p>
+                <div className="pt-4 sm:pt-6 border-t border-slate-50">
+                  <p className="text-[9px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 sm:mb-2">Montant</p>
+                  <p className="text-base sm:text-lg font-extrabold tracking-tighter uppercase">{res.amount}.00 $</p>
                 </div>
               </div>
 
-              <div className="p-6 bg-slate-50 border border-slate-100 rounded-sm">
-                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-[0.2em] mb-4">Empreinte Digitale Transactionnelle</p>
-                <p className="text-[10px] mono text-slate-600 break-all leading-relaxed">
-                  ID: {res.transactionId}<br />
-                  USER: {res.userId}<br />
-                  VALID_TS: {res.validatedAt ? new Date(res.validatedAt).toISOString() : 'NOT_VALIDATED'}
-                </p>
+              <div className="p-4 sm:p-6 bg-slate-50 border border-slate-100 rounded-sm overflow-hidden">
+                <p className="text-[8px] sm:text-[9px] font-bold text-slate-400 uppercase tracking-[0.2em] mb-2 sm:mb-4">Empreinte Digitale</p>
+                <div className="text-[8px] sm:text-[10px] mono text-slate-600 break-all space-y-1">
+                  <p>ID: {res.id}</p>
+                  <p>TX: {res.transactionId}</p>
+                  <p>USR: {res.userId?.substring(0,10)}...</p>
+                </div>
               </div>
             </>
           )}
 
           <button 
             onClick={onClose}
-            className="w-full py-4 bg-slate-900 text-white text-[10px] font-extrabold uppercase tracking-[0.3em] rounded-sm hover:bg-black transition-all"
+            className="w-full py-4 bg-slate-900 text-white text-[9px] sm:text-[10px] font-extrabold uppercase tracking-[0.3em] rounded-sm hover:bg-black transition-all"
           >
-            Fermer le Panneau
+            Fermer
           </button>
         </div>
       </div>
