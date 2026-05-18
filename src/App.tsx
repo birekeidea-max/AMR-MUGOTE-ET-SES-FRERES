@@ -669,11 +669,18 @@ export default function App() {
         </AnimatePresence>
       </main>
 
-      <footer className="bg-[#003135] py-20 px-8 mt-12 w-full text-center relative overflow-hidden">
-        {/* Subtle background decoration */}
-        <div className="absolute inset-0 opacity-10 pointer-events-none">
-          <div className="absolute top-0 left-0 w-64 h-64 bg-white/20 rounded-full blur-[100px] -translate-x-1/2 -translate-y-1/2" />
-          <div className="absolute bottom-0 right-0 w-96 h-96 bg-gold/10 rounded-full blur-[120px] translate-x-1/2 translate-y-1/2" />
+      <footer className="relative py-20 px-8 mt-12 w-full text-center overflow-hidden group">
+        {/* Background Image with Overlay */}
+        <div className="absolute inset-0 z-0">
+          <img 
+            src={siteSettings.homeDetail} 
+            className="w-full h-full object-cover transition-transform duration-[10s] group-hover:scale-110" 
+            alt="Footer Background"
+            onError={(e) => {
+              (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1544551763-46a013bb70d5?q=80&w=2070&auto=format&fit=crop";
+            }}
+          />
+          {/* Background Image fully visible */}
         </div>
 
         <div className="max-w-7xl mx-auto flex flex-col items-center text-center space-y-16 relative z-10">
@@ -2134,7 +2141,7 @@ function Dashboard({ siteSettings, onNavigate, schedules }: { siteSettings?: { h
   const [newsList, setNewsList] = useState<any[]>([]);
   const [conversations, setConversations] = useState<any[]>([]);
   const [selectedConv, setSelectedConv] = useState<any | null>(null);
-  const [stats, setStats] = useState({ total: 0, pending: 0, validated: 0 });
+  const [stats, setStats] = useState({ total: 0, pending: 0, validated: 0, validatedRevenue: 0, validatedPassengers: 0 });
   const [newMedia, setNewMedia] = useState({ 
     title: '', 
     desc: '', 
@@ -2267,10 +2274,13 @@ function Dashboard({ siteSettings, onNavigate, schedules }: { siteSettings?: { h
         return tb - ta;
       });
       setReservations(data);
+      const validatedRes = data.filter(r => r.status === 'VALIDATED');
       setStats({
         total: data.length,
         pending: data.filter(r => r.status === 'PENDING').length,
-        validated: data.filter(r => r.status === 'VALIDATED').length
+        validated: validatedRes.length,
+        validatedRevenue: validatedRes.reduce((sum, r) => sum + (Number(r.amount) || 0), 0),
+        validatedPassengers: validatedRes.reduce((sum, r) => sum + (Number(r.passengersCount) || 1), 0)
       });
     });
 
@@ -2710,11 +2720,13 @@ function Dashboard({ siteSettings, onNavigate, schedules }: { siteSettings?: { h
                 {[
                   { label: "Total Réservations", val: stats.total, color: "bg-black text-white" },
                   { label: "En attente", val: stats.pending, color: "bg-amber-100 text-amber-700 border border-amber-200" },
-                  { label: "Validées", val: stats.validated, color: "bg-emerald-100 text-emerald-700 border border-emerald-200" }
+                  { label: "Validées", val: stats.validated, color: "bg-emerald-100 text-emerald-700 border border-emerald-200" },
+                  { label: "Passagers Validés", val: stats.validatedPassengers, color: "bg-blue-100 text-blue-700 border border-blue-200" },
+                  { label: "Recettes (USD)", val: `${stats.validatedRevenue}$`, color: "bg-gold/10 text-gold-700 border-2 border-gold/30" }
                 ].map((s, i) => (
-                  <div key={i} className={cn("px-8 py-4 rounded-2xl text-center min-w-[140px]", s.color)}>
-                    <p className="text-[9px] font-extrabold uppercase tracking-widest opacity-60 mb-1">{s.label}</p>
-                    <p className="text-xl font-extrabold font-mono tracking-tighter leading-none">{s.val}</p>
+                  <div key={i} className={cn("px-4 lg:px-8 py-3 lg:py-4 rounded-2xl text-center min-w-[120px] lg:min-w-[140px]", s.color)}>
+                    <p className="text-[7px] lg:text-[9px] font-extrabold uppercase tracking-widest opacity-60 mb-1">{s.label}</p>
+                    <p className="text-sm lg:text-xl font-extrabold font-mono tracking-tighter leading-none">{s.val}</p>
                   </div>
                 ))}
               </div>
