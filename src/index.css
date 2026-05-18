@@ -59,5 +59,42 @@
       0% calc(70% - 15px)
     );
   }
+
+  @media print {
+    header, nav, footer, .print\:hidden {
+      display: none !important;
+    }
+    
+    body {
+      background: white !important;
+      padding: 0 !important;
+      margin: 0 !important;
+    }
+
+    .Dashboard {
+      padding: 0 !important;
+      margin: 0 !important;
+      width: 100% !important;
+    }
+
+    table {
+      width: 100% !important;
+      border-collapse: collapse !important;
+    }
+
+    th, td {
+      border: 1px solid #eee !important;
+      padding: 12px !important;
+      text-align: left !important;
+    }
+
+    .max-w-7xl, .max-w-5xl {
+      max-width: none !important;
+    }
+    
+    @page {
+      margin: 1cm;
+    }
+  }
 }
 

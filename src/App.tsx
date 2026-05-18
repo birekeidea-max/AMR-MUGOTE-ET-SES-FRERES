@@ -23,6 +23,7 @@ import {
   Upload,
   Trash2,
   ImagePlus,
+  Edit,
   Search,
   Settings,
   Printer,
@@ -42,7 +43,7 @@ import {
   PhoneCall
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { auth, db, handleFirestoreError, OperationType } from './lib/firebase';
+import { auth, db, handleFirestoreError, OperationType, uploadToStorage } from './lib/firebase';
 import { GoogleGenAI } from "@google/genai";
 import { 
   signInWithPopup, 
@@ -210,6 +211,15 @@ const generateTicket = async (res: Reservation, siteSettings: { homeBg: string }
     // Row 5: Montant
     drawField("Montant Payé", `${res.amount}.00 USD`, 20, 143);
     drawField("ID Transaction", res.transactionId || 'A VALIDER', 70, 143);
+    
+    if (res.validatedAt) {
+      pdf.setFontSize(6);
+      pdf.setFont("helvetica", "normal");
+      pdf.setTextColor(150, 150, 150);
+      const valDate = new Date(res.validatedAt).toLocaleString('fr-FR');
+      pdf.text(`Validé le: ${valDate}`, 70, 152);
+    }
+    
     drawDivider(153);
 
     // QR Code Section
@@ -298,6 +308,7 @@ export default function App() {
             uid: u.uid,
             email: u.email,
             displayName: u.displayName || '',
+            photoURL: u.photoURL || '',
             lastLogin: serverTimestamp(),
             emailVerified: u.emailVerified
           }, { merge: true });
@@ -306,6 +317,8 @@ export default function App() {
           await setDoc(doc(db, 'users', u.uid), {
             uid: u.uid,
             email: u.email,
+            displayName: u.displayName || '',
+            photoURL: u.photoURL || '',
             updatedAt: serverTimestamp()
           }, { merge: true });
         } catch (error) {
@@ -329,8 +342,15 @@ export default function App() {
     const provider = new GoogleAuthProvider();
     try {
       await signInWithPopup(auth, provider);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Login failed", error);
+      if (error.code === 'auth/popup-blocked') {
+        alert("Le popup de connexion a été bloqué par votre navigateur. Veuillez l'autoriser et réessayer.");
+      } else if (error.code === 'auth/unauthorized-domain') {
+        alert("Ce domaine n'est pas autorisé pour l'authentification Firebase. Veuillez ajouter ce domaine dans la console Firebase (Authentification > Paramètres > Domaines autorisés).");
+      } else {
+        alert("Échec de la connexion : " + (error.message || "Erreur inconnue"));
+      }
     }
   };
 
@@ -361,7 +381,7 @@ export default function App() {
       <header className="w-full bg-white z-[60] relative">
         <div className="w-full h-32 md:h-64 relative overflow-hidden">
           <img 
-            src={siteSettings.homeBg} 
+            src={siteSettings.homeBg || undefined} 
             className="w-full h-full object-cover" 
             alt="Mugote Fleet Background"
             onError={(e) => {
@@ -497,7 +517,7 @@ export default function App() {
                 <div className="w-10 h-10 bg-white/10 rounded-xl overflow-hidden border border-white/20 flex items-center justify-center">
                   {siteSettings.logo || siteSettings.homeDetail ? (
                     <img 
-                      src={siteSettings.logo || siteSettings.homeDetail} 
+                      src={siteSettings.logo || siteSettings.homeDetail || undefined} 
                       className="w-full h-full object-cover" 
                       onError={(e) => {
                         (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1559139225-8216b8e8303e?q=80&w=2070&auto=format&fit=crop";
@@ -923,7 +943,7 @@ function ChatWidget({ user }: { user: FirebaseUser | null }) {
                    <p className="text-[10px] font-bold uppercase tracking-[.3em]">Posez vos questions !</p>
                  </div>
                ) : (
-                 messages.map((m, i) => (
+                 displayMessages.map((m, i) => (
                    <motion.div 
                     initial={{ opacity: 0, x: m.senderRole === 'USER' ? 10 : -10 }}
                     animate={{ opacity: 1, x: 0 }}
@@ -1221,7 +1241,7 @@ function Home({ onBook, onNavigate, siteSettings }: { onBook: () => void, onNavi
             {galleryImages.length > 0 ? (
               galleryImages.slice(0, 4).map((img, i) => (
                 <div key={img.id} className="aspect-square rounded-xl overflow-hidden border border-slate-100 shadow-sm opacity-80 hover:opacity-100 transition-opacity cursor-pointer" onClick={() => onNavigate('gallery')}>
-                  <img src={img.processedUrl} className="w-full h-full object-cover" alt={img.title} />
+                  <img src={img.processedUrl || undefined} className="w-full h-full object-cover" alt={img.title} />
                 </div>
               ))
             ) : (
@@ -1318,7 +1338,8 @@ function Booking({ onReserved, user }: { onReserved: (res: Reservation) => void,
     departureTime: '07:30',
     travelClass: '2ème Classe' as TravelClass,
     passengersCount: 1,
-    paymentMethod: 'Airtel Money'
+    paymentMethod: 'Airtel Money',
+    transactionId: ''
   });
   const [submitting, setSubmitting] = useState(false);
 
@@ -1377,9 +1398,9 @@ function Booking({ onReserved, user }: { onReserved: (res: Reservation) => void,
       userId: user.uid,
       status: 'PENDING',
       amount,
-      transactionId: '',
+      transactionId: formData.transactionId,
       createdAt: Date.now(),
-      ticketId: 'Ticket-' + Math.random().toString(36).substring(2, 8).toUpperCase()
+      ticketId: ''
     };
 
     try {
@@ -1629,6 +1650,42 @@ function Booking({ onReserved, user }: { onReserved: (res: Reservation) => void,
                     </div>
                   </div>
                 </div>
+
+                {/* Transaction ID */}
+                <div className="flex flex-col sm:flex-row group transition-colors hover:bg-slate-50/50">
+                  <div className="p-4 sm:p-6 sm:border-r border-slate-100 bg-slate-50/30 sm:w-[200px] shrink-0">
+                    <div className="flex flex-col gap-1">
+                      <label className="text-[10px] font-black uppercase text-maritime tracking-widest flex items-center gap-2">
+                        <CheckCircle size={14} className="text-gold" /> Paiement
+                      </label>
+                      <p className="text-[8px] text-slate-400 font-bold uppercase">Preuve de paiement</p>
+                    </div>
+                  </div>
+                  <div className="p-4 sm:p-6 flex-1">
+                    <div className="space-y-4">
+                      <div className="p-4 bg-maritime/5 border border-maritime/10 rounded-xl space-y-2">
+                        <p className="text-[9px] font-black text-maritime uppercase tracking-widest leading-none">Instructions de paiement :</p>
+                        <p className="text-[11px] font-bold text-slate-700 leading-relaxed uppercase">
+                          Effectuez votre paiement mobile sur le numéro : <br/>
+                          <span className="text-sm font-black text-maritime select-all tracking-wider">+243 994 286 469</span>
+                        </p>
+                      </div>
+                      <div className="p-3 bg-indigo-50 border border-indigo-100 rounded-lg">
+                        <p className="text-[9px] font-bold text-indigo-900 uppercase leading-relaxed tracking-wider">
+                          Une fois le paiement effectué, veuillez saisir l'ID de transaction reçu par SMS ci-dessous.
+                        </p>
+                      </div>
+                      <input 
+                        required
+                        type="text" 
+                        value={formData.transactionId}
+                        onChange={e => setFormData({ ...formData, transactionId: e.target.value })}
+                        className="w-full px-4 py-2.5 sm:px-5 sm:py-3 bg-slate-50 border-2 border-maritime/30 rounded-xl sm:rounded-2xl focus:outline-none focus:ring-4 focus:ring-gold/10 focus:border-gold transition-all font-mono font-black text-sm uppercase"
+                        placeholder="ID TRANSACTION (EX: PP2304...)"
+                      />
+                    </div>
+                  </div>
+                </div>
               </div>
 
               {/* Submission Row */}
@@ -1650,7 +1707,7 @@ function Booking({ onReserved, user }: { onReserved: (res: Reservation) => void,
                             <div className="flex items-start gap-4 p-4 bg-amber-50 rounded-2xl text-left border border-amber-100">
                               <AlertCircle size={20} className="text-amber-500 flex-shrink-0 mt-0.5" />
                               <p className="text-[10px] font-bold leading-relaxed text-amber-900 uppercase tracking-[0.05em]">
-                                Votre réservation sera validée après confirmation du paiement mobile sur le numéro <span className="font-black text-black">099 428 64 69</span>.
+                                Votre réservation sera validée après confirmation du paiement mobile sur le numéro <span className="font-black text-black">+243 994 286 469</span>.
                               </p>
                             </div>
                          </div>
@@ -1787,10 +1844,29 @@ function Payment({ reservation, onComplete }: { reservation: Reservation | null,
   if (!reservation) return null;
 
   const handleManualConfirm = async (id: string) => {
+    const cleanId = id.trim();
+    if (!cleanId) {
+      alert("Veuillez saisir l'ID de transaction pour confirmer votre billet.");
+      return;
+    }
+
     setSubmitting(true);
     try {
+      // Vérifier si l'ID de transaction est unique
+      const q = query(collection(db, 'reservations'), where('transactionId', '==', cleanId));
+      const querySnapshot = await getDocs(q);
+      
+      // On vérifie si un AUTRE document possède déjà cet ID
+      const alreadyExists = querySnapshot.docs.some(d => d.id !== reservation.id);
+      
+      if (alreadyExists) {
+        alert("Cet ID de transaction a déjà été utilisé. Un ID de transaction doit être unique pour chaque billet.");
+        setSubmitting(false);
+        return;
+      }
+
       await updateDoc(doc(db, 'reservations', reservation.id!), {
-        transactionId: id,
+        transactionId: cleanId,
         status: 'PENDING'
       });
       onComplete();
@@ -1874,9 +1950,9 @@ function Payment({ reservation, onComplete }: { reservation: Reservation | null,
                   <div className="relative flex justify-center text-[8px] font-black uppercase tracking-widest text-slate-400 px-2 bg-white">Ou entrez l'ID manuellement</div>
                 </div>
 
-                <div className="space-y-4">
+                  <div className="space-y-4">
                   <div className="space-y-2">
-                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1">Code reçu par SMS après paiement</p>
+                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1">Code reçu par SMS après paiement (ID Unique)</p>
                     <input 
                       type="text" 
                       placeholder="Ex: MP240512.1345.B12345"
@@ -1890,7 +1966,7 @@ function Payment({ reservation, onComplete }: { reservation: Reservation | null,
                     onClick={() => handleManualConfirm(transactionId)}
                     className="w-full py-4 border-2 border-slate-100 text-slate-400 font-black uppercase tracking-widest rounded-2xl hover:bg-slate-50 transition-all text-[10px]"
                   >
-                    Confirmer manuellement
+                    Confirmer avec cet ID Unique
                   </button>
                 </div>
               </div>
@@ -1992,6 +2068,7 @@ function Dashboard({ siteSettings, onNavigate }: { siteSettings?: { homeBg: stri
   const [usersList, setUsersList] = useState<any[]>([]);
   const [fleetList, setFleetList] = useState<any[]>([]);
   const [boatForm, setBoatForm] = useState({ id: '', name: '', capacity: 0, description: '', imageUrl: '' });
+  const [editMediaId, setEditMediaId] = useState<string | null>(null);
   const [isAdminUnlocked, setIsAdminUnlocked] = useState(false);
   const [adminCode, setAdminCode] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
@@ -1999,50 +2076,88 @@ function Dashboard({ siteSettings, onNavigate }: { siteSettings?: { homeBg: stri
   const [conversations, setConversations] = useState<any[]>([]);
   const [selectedConv, setSelectedConv] = useState<any | null>(null);
   const [stats, setStats] = useState({ total: 0, pending: 0, validated: 0 });
-  const [newMedia, setNewMedia] = useState({ title: '', desc: '', url: '', type: 'image' as 'image' | 'video' | 'text', media: [] as string[] });
+  const [newMedia, setNewMedia] = useState({ 
+    title: '', 
+    desc: '', 
+    url: '', 
+    type: 'image' as 'image' | 'video' | 'text', 
+    media: [] as string[],
+    pendingFiles: [] as File[]
+  });
   const [uploading, setUploading] = useState<string | null>(null);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [previewUrls, setPreviewUrls] = useState<string[]>([]);
   
   const bgInputRef = useRef<HTMLInputElement>(null);
   const detailInputRef = useRef<HTMLInputElement>(null);
   const mediaInputRef = useRef<HTMLInputElement>(null);
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, target: 'media' | 'homeBg' | 'homeDetail') => {
+  const compressImage = (file: File, maxWidth: number = 1200, quality: number = 0.6): Promise<Blob> => {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = (event) => {
+        const img = new Image();
+        img.src = event.target?.result as string;
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
+
+          if (width > maxWidth) {
+            height = (maxWidth / width) * height;
+            width = maxWidth;
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx?.drawImage(img, 0, 0, width, height);
+          canvas.toBlob((blob) => {
+            if (blob) resolve(blob);
+          }, 'image/jpeg', quality);
+        };
+      };
+    });
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
-    if (target === 'media' && files.length > 1) {
-      setUploading('media_load');
-      const base64Promises = Array.from(files).map((file: File) => {
-        return new Promise<string>((resolve) => {
-          const reader = new FileReader();
-          reader.onloadend = () => resolve(reader.result as string);
-          reader.readAsDataURL(file);
-        });
-      });
-      const results = await Promise.all(base64Promises);
-      setNewMedia(prev => ({ ...prev, media: results, url: results[0] }));
-      setUploading(null);
-      return;
-    }
+    const newFiles = Array.from(files) as File[];
+    setNewMedia(prev => ({ ...prev, pendingFiles: [...prev.pendingFiles, ...newFiles] }));
+    
+    // Create local previews
+    const newPreviews = newFiles.map((file: File) => URL.createObjectURL(file));
+    setPreviewUrls(prev => [...prev, ...newPreviews]);
+  };
 
-    const file = files[0];
-    const reader = new FileReader();
-    reader.onloadend = async () => {
-      const base64 = reader.result as string;
-      if (target === 'media') {
-        setNewMedia(prev => ({ ...prev, url: base64, media: [base64] }));
-      } else {
-        setUploading(target);
-        try {
-          await setDoc(doc(db, 'settings', 'site'), { [target]: base64 }, { merge: true });
-        } catch (error) {
-          handleFirestoreError(error, OperationType.UPDATE, 'settings');
-        } finally {
-          setUploading(null);
-        }
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, target: 'homeBg' | 'homeDetail') => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    setUploading(target);
+    
+    try {
+      const file = files[0];
+      const path = `settings/${target}_${Date.now()}`;
+      
+      let finalFile: File | Blob = file;
+      if (file.type.startsWith('image/')) {
+        finalFile = await compressImage(file);
       }
-    };
-    reader.readAsDataURL(file);
+
+      const downloadUrl = await uploadToStorage(finalFile, path);
+      await setDoc(doc(db, 'settings', 'site'), { [target]: downloadUrl }, { merge: true });
+      alert("Paramètre mis à jour avec succès !");
+    } catch (error) {
+      console.error("Upload error:", error);
+      alert("Erreur lors de l'envoi du fichier.");
+      handleFirestoreError(error, OperationType.UPDATE, 'settings');
+    } finally {
+      setUploading(null);
+    }
   };
 
   useEffect(() => {
@@ -2146,44 +2261,145 @@ function Dashboard({ siteSettings, onNavigate }: { siteSettings?: { homeBg: stri
 
   const handleAddMedia = async (e: React.FormEvent) => {
     e.preventDefault();
+    setUploading('media_publish');
+    setUploadProgress(0);
+    
     try {
-      // Basic validation: Title and desc are required
       if (!newMedia.title || !newMedia.desc) {
-          alert("Titre et description sont requis.");
+          alert("Le titre et la description sont obligatoires.");
+          setUploading(null);
           return;
       }
       
-      // If not text, URL/File is required
-      if (newMedia.type !== 'text' && !newMedia.url) {
-        alert("Veuillez sélectionner un fichier (image ou vidéo).");
-        return;
+      let finalType = newMedia.type;
+      if (finalType !== 'text' && !newMedia.url && newMedia.media.length === 0 && newMedia.pendingFiles.length === 0) {
+        finalType = 'text';
       }
 
-      await addDoc(collection(db, 'news'), {
+      let uploadedUrls: string[] = [...newMedia.media];
+      if (newMedia.pendingFiles.length > 0) {
+        const total = newMedia.pendingFiles.length;
+        let completed = 0;
+        
+        const uploadPromises = newMedia.pendingFiles.map(async (file, i) => {
+          try {
+            const path = `news/${Date.now()}_${i}_${file.name.replace(/\s+/g, '_')}`;
+            let finalToUpload: File | Blob = file;
+            
+            if (file.type.startsWith('image/') && file.type !== 'image/gif') {
+              try {
+                finalToUpload = await compressImage(file);
+              } catch (err) {
+                console.warn("Compression failed", err);
+              }
+            }
+            
+            const url = await uploadToStorage(finalToUpload, path);
+            completed++;
+            setUploadProgress(Math.round((completed / total) * 100));
+            return url;
+          } catch (err) {
+            console.error("Upload failed for file", i, err);
+            return null;
+          }
+        });
+        
+        const results = await Promise.all(uploadPromises);
+        const successfulUrls = results.filter((url): url is string => !!url);
+        uploadedUrls = [...uploadedUrls, ...successfulUrls];
+      }
+      
+      const finalUrl = uploadedUrls[0] || newMedia.url || '';
+      const mediaData: any = {
         title: newMedia.title,
         desc: newMedia.desc,
-        url: newMedia.url,
-        type: newMedia.type,
-        publishedAt: Date.now()
+        content: newMedia.desc, // Compatibility with blueprint
+        url: finalUrl,
+        imageUrl: finalType === 'image' ? finalUrl : '', // Compatibility
+        videoUrl: finalType === 'video' ? finalUrl : '', // Compatibility
+        type: finalType,
+        media: uploadedUrls,
+        updatedAt: serverTimestamp(),
+        processedUrl: finalUrl,
+        processedType: finalType,
+        processedDesc: newMedia.desc
+      };
+
+      if (!editMediaId) {
+        mediaData.publishedAt = serverTimestamp();
+        mediaData.views = 0;
+        mediaData.commentsCount = 0;
+      }
+
+      if (editMediaId) {
+        await updateDoc(doc(db, 'news', editMediaId), mediaData);
+      } else {
+        await addDoc(collection(db, 'news'), mediaData);
+      }
+      
+      alert("Publication réussie !");
+      
+      previewUrls.forEach(url => {
+        if (url.startsWith('blob:')) URL.revokeObjectURL(url);
       });
-      setNewMedia({ title: '', desc: '', url: '', type: 'image' });
-      alert("Contenu publié avec succès !");
+      setNewMedia({ title: '', desc: '', url: '', type: 'image', media: [], pendingFiles: [] });
+      setPreviewUrls([]);
+      setEditMediaId(null);
+      if (mediaInputRef.current) mediaInputRef.current.value = '';
+      
+      onNavigate('news');
+      
     } catch (error) {
-      handleFirestoreError(error, OperationType.CREATE, 'news');
+      console.error("Publication error:", error);
+      alert("Erreur lors de la publication. Veuillez réessayer.");
+      handleFirestoreError(error, editMediaId ? OperationType.UPDATE : OperationType.CREATE, 'news');
+    } finally {
+      setUploading(null);
+      setUploadProgress(0);
     }
+  };
+
+  const handleEditMedia = (m: any) => {
+    setNewMedia({
+      title: m.title || '',
+      desc: m.processedDesc || '',
+      url: m.processedUrl || '',
+      type: m.processedType as any,
+      media: m.media || [],
+      pendingFiles: []
+    });
+    setPreviewUrls([]);
+    setEditMediaId(m.id);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleAction = async (resId: string, action: 'VALIDATED' | 'REJECTED') => {
     try {
-      const ticketId = action === 'VALIDATED' ? `AMR-${Math.random().toString(36).substr(2, 6).toUpperCase()}` : '';
+      let ticketId = '';
+      if (action === 'VALIDATED') {
+        let isUnique = false;
+        while (!isUnique) {
+          const randomId = Math.random().toString(36).substring(2, 8).toUpperCase();
+          ticketId = `AMR-${randomId}`;
+          
+          // Verify uniqueness in DB
+          const q = query(collection(db, 'reservations'), where('ticketId', '==', ticketId));
+          const querySnapshot = await getDocs(q);
+          if (querySnapshot.empty) {
+            isUnique = true;
+          }
+        }
+      }
+
       await updateDoc(doc(db, 'reservations', resId), {
         status: action,
-        validatedAt: Date.now(),
+        validatedAt: action === 'VALIDATED' ? Date.now() : null,
         validatedBy: auth.currentUser?.uid,
-        ticketId
+        ticketId: action === 'VALIDATED' ? ticketId : ''
       });
     } catch (error) {
       console.error("Action failed", error);
+      handleFirestoreError(error, action === 'VALIDATED' ? OperationType.UPDATE : OperationType.UPDATE, `reservations/${resId}`);
     }
   };
 
@@ -2330,9 +2546,9 @@ function Dashboard({ siteSettings, onNavigate }: { siteSettings?: { homeBg: stri
             <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
               <div className="flex flex-wrap justify-center gap-4">
                 {[
-                  { label: "Total", val: stats.total, color: "bg-black text-white" },
-                  { label: "Pending", val: stats.pending, color: "bg-amber-100 text-amber-700 border border-amber-200" },
-                  { label: "Validés", val: stats.validated, color: "bg-emerald-100 text-emerald-700 border border-emerald-200" }
+                  { label: "Total Réservations", val: stats.total, color: "bg-black text-white" },
+                  { label: "En attente", val: stats.pending, color: "bg-amber-100 text-amber-700 border border-amber-200" },
+                  { label: "Validées", val: stats.validated, color: "bg-emerald-100 text-emerald-700 border border-emerald-200" }
                 ].map((s, i) => (
                   <div key={i} className={cn("px-8 py-4 rounded-2xl text-center min-w-[140px]", s.color)}>
                     <p className="text-[9px] font-extrabold uppercase tracking-widest opacity-60 mb-1">{s.label}</p>
@@ -2341,7 +2557,13 @@ function Dashboard({ siteSettings, onNavigate }: { siteSettings?: { homeBg: stri
                 ))}
               </div>
 
-              <div className="flex gap-2">
+              <div className="flex gap-2 print:hidden">
+                <button 
+                  onClick={() => window.print()}
+                  className="px-4 py-2 bg-maritime text-white rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-black transition-all flex items-center gap-2"
+                >
+                   <Printer size={14} /> Imprimer Liste
+                </button>
                 <button 
                   onClick={() => copyToClipboard('reservations')}
                   className="px-4 py-2 bg-slate-100 text-slate-600 rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-slate-200 transition-all flex items-center gap-2"
@@ -2380,9 +2602,9 @@ function Dashboard({ siteSettings, onNavigate }: { siteSettings?: { homeBg: stri
                     <div key={m.id} className="flex-shrink-0 w-32 group cursor-pointer" onClick={() => setTab('media')}>
                       <div className="aspect-square rounded-2xl overflow-hidden border border-slate-200 relative mb-2">
                         {m.type === 'video' ? (
-                          <video src={m.url} className="w-full h-full object-cover" />
+                          <video src={m.url || undefined} className="w-full h-full object-cover" />
                         ) : m.type === 'image' ? (
-                          <img src={m.url} className="w-full h-full object-cover" />
+                          <img src={m.url || undefined} className="w-full h-full object-cover" />
                         ) : (
                           <div className="w-full h-full bg-slate-50 flex items-center justify-center"><FileText size={16} className="text-slate-300" /></div>
                         )}
@@ -2536,10 +2758,9 @@ function Dashboard({ siteSettings, onNavigate }: { siteSettings?: { homeBg: stri
               <table className="w-full text-left">
                 <thead>
                   <tr className="bg-slate-50 border-b border-slate-100">
-                    <th className="px-8 py-5 text-[10px] font-black uppercase text-slate-400">Utilisateur</th>
-                    <th className="px-8 py-5 text-[10px] font-black uppercase text-slate-400">Email</th>
-                    <th className="px-8 py-5 text-[10px] font-black uppercase text-slate-400">Dernière Connexion</th>
-                    <th className="px-8 py-5 text-[10px] font-black uppercase text-slate-400">Vérifié</th>
+                    <th className="px-8 py-5 text-[10px] font-black uppercase text-slate-400 text-left">Utilisateur</th>
+                    <th className="px-8 py-5 text-[10px] font-black uppercase text-slate-400 text-left">Dernière Connexion</th>
+                    <th className="px-8 py-5 text-[10px] font-black uppercase text-slate-400 text-left">Vérifié</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
@@ -2547,18 +2768,22 @@ function Dashboard({ siteSettings, onNavigate }: { siteSettings?: { homeBg: stri
                     <tr key={u.id} className="hover:bg-slate-50/50 transition-colors">
                       <td className="px-8 py-5">
                         <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-xl bg-maritime text-white flex items-center justify-center font-black text-[10px]">
-                            {u.displayName ? u.displayName[0].toUpperCase() : u.email[0].toUpperCase()}
+                            {u.photoURL ? (
+                              <img src={u.photoURL || undefined} alt="" className="w-9 h-9 rounded-full object-cover border border-slate-100 shadow-sm" referrerPolicy="no-referrer" />
+                            ) : (
+                              <div className="w-9 h-9 rounded-full bg-maritime/5 flex items-center justify-center text-maritime">
+                                <User size={16} />
+                              </div>
+                            )}
+                          <div className="flex flex-col">
+                             <span className="text-sm font-black uppercase tracking-tight italic">{u.displayName || 'Utilisateur'}</span>
+                             <span className="text-[10px] font-mono text-slate-400">{u.email}</span>
                           </div>
-                          <span className="text-sm font-bold text-black uppercase tracking-tight">{u.displayName || 'Utilisateur'}</span>
                         </div>
                       </td>
                       <td className="px-8 py-5">
-                        <span className="text-xs font-mono text-slate-500">{u.email}</span>
-                      </td>
-                      <td className="px-8 py-5">
-                        <span className="text-[10px] font-bold text-slate-400 uppercase">
-                          {u.lastLogin ? new Date(u.lastLogin.seconds * 1000).toLocaleString() : 'N/A'}
+                        <span className="text-[10px] font-bold text-slate-500 uppercase">
+                          {u.lastLogin ? (u.lastLogin.seconds ? new Date(u.lastLogin.seconds * 1000).toLocaleString() : new Date(u.lastLogin).toLocaleString()) : 'N/A'}
                         </span>
                       </td>
                       <td className="px-8 py-5">
@@ -2606,13 +2831,43 @@ function Dashboard({ siteSettings, onNavigate }: { siteSettings?: { homeBg: stri
                 </div>
                 <div className="space-y-4">
                    <div>
-                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 block">URL Image (Optionnel)</label>
-                    <input 
-                      value={boatForm.imageUrl}
-                      onChange={e => setBoatForm({...boatForm, imageUrl: e.target.value})}
-                      className="w-full px-6 py-3 border border-slate-200 rounded-xl focus:border-maritime outline-none text-xs font-mono"
-                      placeholder="https://..."
-                    />
+                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 block">Image du Navire</label>
+                    <div className="flex gap-2">
+                      <input 
+                        value={boatForm.imageUrl}
+                        onChange={e => setBoatForm({...boatForm, imageUrl: e.target.value})}
+                        className="flex-1 px-6 py-3 border border-slate-200 rounded-xl focus:border-maritime outline-none text-xs font-mono"
+                        placeholder="URL Image (ou chargez ci-contre)"
+                      />
+                      <input 
+                        type="file"
+                        className="hidden"
+                        id="fleet-upload"
+                        accept="image/*"
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                             setUploading('fleet_img');
+                             try {
+                               const blob = await compressImage(file);
+                               const url = await uploadToStorage(blob, `fleet/${Date.now()}_${file.name}`);
+                               setBoatForm(prev => ({ ...prev, imageUrl: url }));
+                             } catch (e) {
+                               console.error(e);
+                             } finally {
+                               setUploading(null);
+                             }
+                          }
+                        }}
+                      />
+                      <button 
+                        type="button"
+                        onClick={() => document.getElementById('fleet-upload')?.click()}
+                        className="px-4 bg-slate-50 border border-slate-200 rounded-xl text-maritime hover:bg-slate-100 transition-all font-bold text-[10px]"
+                      >
+                        {uploading === 'fleet_img' ? "..." : "Charger"}
+                      </button>
+                    </div>
                   </div>
                   <div>
                     <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 block">Description</label>
@@ -2647,7 +2902,7 @@ function Dashboard({ siteSettings, onNavigate }: { siteSettings?: { homeBg: stri
                   <div key={boat.id} className="bg-white border border-slate-100 rounded-[32px] overflow-hidden shadow-xl shadow-slate-100 p-2">
                     <div className="aspect-[4/3] rounded-[24px] bg-slate-50 overflow-hidden relative mb-4">
                       {boat.imageUrl ? (
-                        <img src={boat.imageUrl} className="w-full h-full object-cover" />
+                        <img src={boat.imageUrl || undefined} className="w-full h-full object-cover" />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center bg-maritime/5 text-maritime/20">
                           <Ship size={64} />
@@ -2690,20 +2945,10 @@ function Dashboard({ siteSettings, onNavigate }: { siteSettings?: { homeBg: stri
         ) : tab === 'media' ? (
           <div className="p-12 space-y-16">
             <div className="max-w-2xl">
-              <h3 className="text-lg font-extrabold text-maritime uppercase tracking-tighter mb-8 italic">Publier une Actualité</h3>
-              <form onSubmit={async (e) => {
-                e.preventDefault();
-                setUploading('media_publish');
-                try {
-                  await addDoc(collection(db, 'news'), { 
-                    ...newMedia, 
-                    publishedAt: Date.now() 
-                  });
-                  setNewMedia({ title: '', desc: '', url: '', type: 'image', media: [] });
-                  alert("Publié !");
-                } catch (e) { handleFirestoreError(e, OperationType.CREATE, 'news'); }
-                finally { setUploading(null); }
-              }} className="space-y-6">
+              <h3 className="text-lg font-extrabold text-maritime uppercase tracking-tighter mb-8 italic">
+                {editMediaId ? 'Modifier la Publication' : 'Publier une Actualité'}
+              </h3>
+              <form onSubmit={handleAddMedia} className="space-y-6">
                 <div className="grid grid-cols-2 gap-4">
                   <input 
                     required
@@ -2717,84 +2962,198 @@ function Dashboard({ siteSettings, onNavigate }: { siteSettings?: { homeBg: stri
                     onChange={e => setNewMedia({...newMedia, type: e.target.value as any})}
                     className="px-6 py-3 border border-slate-200 rounded-xl focus:border-maritime outline-none text-[11px] font-bold uppercase tracking-widest"
                   >
-                    <option value="image">Format Photo</option>
+                    <option value="image">Format Photo(s)</option>
                     <option value="video">Format Vidéo</option>
                     <option value="text">Format Texte</option>
                   </select>
                 </div>
+                {newMedia.type !== 'text' && (
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black uppercase text-slate-400 px-1 tracking-widest">URL Externe (Youtube, Direct Link...) ou Fichier</label>
+                    <input 
+                      placeholder="https://..."
+                      value={newMedia.url}
+                      onChange={e => setNewMedia({...newMedia, url: e.target.value})}
+                      className="w-full px-6 py-3 border border-slate-200 rounded-xl focus:border-maritime outline-none text-xs font-mono"
+                    />
+                  </div>
+                )}
                 <textarea 
                   required
-                  placeholder="Description ou contenu textuel..."
+                  placeholder="Partagez les détails de cette mise à jour..."
                   value={newMedia.desc}
                   onChange={e => setNewMedia({...newMedia, desc: e.target.value})}
-                  className="w-full px-6 py-4 border border-slate-200 rounded-xl focus:border-maritime outline-none h-32 text-sm leading-relaxed"
+                  className="w-full px-8 py-6 bg-slate-50 border border-slate-100 rounded-3xl focus:outline-none focus:ring-4 focus:ring-maritime/5 focus:bg-white transition-all text-sm font-medium leading-relaxed resize-none h-40"
                 />
-                <div className="flex gap-4 items-center">
-                  {newMedia.type !== 'text' && (
-                    <div className="flex-1">
-                      <input 
-                        type="file" 
-                        ref={mediaInputRef}
-                        onChange={e => handleFileUpload(e, 'media')}
-                        className="hidden"
-                        accept={newMedia.type === 'video' ? "video/*" : "image/*"}
-                        multiple={newMedia.type === 'image'}
-                      />
-                      <button 
-                        type="button"
-                        onClick={() => mediaInputRef.current?.click()}
-                        className="w-full py-3 border-2 border-dashed border-slate-200 rounded-xl text-[10px] font-bold text-slate-400 hover:border-maritime hover:text-maritime transition-all flex items-center justify-center gap-2 uppercase tracking-widest"
+                  <div className="space-y-6">
+                    {newMedia.type !== 'text' && (
+                      <div className="flex flex-col gap-4">
+                        <input 
+                          type="file" 
+                          ref={mediaInputRef}
+                          onChange={handleFileChange}
+                          className="hidden"
+                          accept={newMedia.type === 'video' ? "video/*" : "image/*"}
+                          multiple={newMedia.type === 'image'}
+                        />
+                        <button 
+                          type="button"
+                          onClick={() => mediaInputRef.current?.click()}
+                          className={cn(
+                            "w-full py-5 border-2 border-dashed rounded-[24px] text-[11px] font-bold transition-all flex items-center justify-center gap-3 uppercase tracking-[0.2em] shadow-inner",
+                            (newMedia.media.length > 0 || previewUrls.length > 0) ? "border-emerald-200 bg-emerald-50 text-emerald-600" : "border-slate-200 bg-slate-50 text-slate-400 hover:border-maritime hover:text-maritime"
+                          )}
+                        >
+                          <ImagePlus size={18} /> 
+                          {(newMedia.media.length > 0 || previewUrls.length > 0) ? `${newMedia.media.length + previewUrls.length} fichier(s) sélectionné(s) ✓` : `Sélectionner ${newMedia.type === 'video' ? 'la Vidéo' : 'la Photo'}`}
+                        </button>
+                        
+                        {(newMedia.media.length > 0 || previewUrls.length > 0) && (
+                          <div className="flex gap-4 p-5 bg-slate-100/50 rounded-3xl border border-slate-200/50 overflow-x-auto no-scrollbar scroll-smooth shadow-inner">
+                            {/* Existing URLs */}
+                            {newMedia.media.map((url, i) => (
+                              <div key={`existing-${i}`} className="relative group flex-shrink-0">
+                                {newMedia.type === 'video' ? (
+                                  <video src={url || undefined} className="w-28 h-28 rounded-2xl object-cover border border-slate-200 shadow-sm opacity-50 transition-all group-hover:opacity-100" />
+                                ) : (
+                                  <img src={url || undefined} className="w-28 h-28 rounded-2xl object-cover border border-slate-200 shadow-sm opacity-50 transition-all group-hover:opacity-100" />
+                                )}
+                                <button 
+                                  type="button" 
+                                  onClick={() => {
+                                    const next = [...newMedia.media];
+                                    next.splice(i, 1);
+                                    setNewMedia(prev => ({ ...prev, media: next, url: next[0] || '' }));
+                                  }}
+                                  className="absolute -top-2 -right-2 bg-rose-500 text-white p-2.5 rounded-full shadow-xl hover:scale-110 active:scale-90 transition-all border-2 border-white z-10"
+                                >
+                                  <X size={14} />
+                                </button>
+                              </div>
+                            ))}
+                            {/* Pending Files (Previews) */}
+                            {previewUrls.map((url, i) => (
+                              <div key={`pending-${i}`} className="relative group flex-shrink-0">
+                                {newMedia.type === 'video' ? (
+                                  <video src={url || undefined} className="w-28 h-28 rounded-2xl object-cover border-2 border-emerald-500/30 shadow-md" />
+                                ) : (
+                                  <img src={url || undefined} className="w-28 h-28 rounded-2xl object-cover border-2 border-emerald-500/30 shadow-md" />
+                                )}
+                                <button 
+                                  type="button" 
+                                  onClick={() => {
+                                    const nextPreviews = [...previewUrls];
+                                    nextPreviews.splice(i, 1);
+                                    setPreviewUrls(nextPreviews);
+                                    const nextFiles = [...newMedia.pendingFiles];
+                                    nextFiles.splice(i, 1);
+                                    setNewMedia(prev => ({ ...prev, pendingFiles: nextFiles }));
+                                  }}
+                                  className="absolute -top-2 -right-2 bg-rose-500 text-white p-2.5 rounded-full shadow-xl hover:scale-110 active:scale-90 transition-all border-2 border-white z-10"
+                                >
+                                  <X size={14} />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                     <div className="flex flex-col gap-4">
+                       <button 
+                        type="submit"
+                        disabled={uploading === 'media_publish'}
+                        className="w-full py-5 bg-maritime text-white rounded-[24px] text-xs font-black uppercase tracking-[0.3em] shadow-xl shadow-maritime/30 hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-30 flex items-center justify-center min-w-[200px]"
                       >
-                        <ImagePlus size={16} /> 
-                        {newMedia.media.length > 0 ? `${newMedia.media.length} fichier(s) chargé(s) ✓` : `Charger ${newMedia.type === 'video' ? 'la Vidéo' : 'la Photo'}`}
+                        {uploading === 'media_publish' ? (
+                          <div className="flex flex-col items-center gap-2">
+                             <div className="flex items-center gap-3">
+                               <div className="w-5 h-5 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+                               <span className="text-[10px] lowercase opacity-70">Publication en cours...</span>
+                             </div>
+                             {uploadProgress > 0 && (
+                               <div className="w-full bg-white/10 h-1 rounded-full overflow-hidden">
+                                  <div className="bg-gold h-full transition-all duration-300" style={{ width: `${uploadProgress}%` }} />
+                               </div>
+                             )}
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2">
+                             <Send size={18} />
+                             {editMediaId ? "Enregistrer" : "Publier"}
+                          </div>
+                        )}
                       </button>
+                      {editMediaId && (
+                        <button 
+                          type="button"
+                          onClick={() => {
+                            setEditMediaId(null);
+                            setNewMedia({ title: '', desc: '', url: '', type: 'image', media: [], pendingFiles: [] });
+                            setPreviewUrls([]);
+                          }}
+                          className="w-full py-4 text-slate-400 font-bold uppercase tracking-widest text-[10px] rounded-2xl hover:bg-slate-50 transition-all"
+                        >
+                          Annuler modification
+                        </button>
+                      )}
                     </div>
-                  )}
-                  <button 
-                    disabled={uploading === 'media_publish' || uploading === 'media_load' || (newMedia.type !== 'text' && !newMedia.url && newMedia.media.length === 0)}
-                    className="px-12 py-3 bg-maritime text-white rounded-xl text-[11px] font-bold uppercase tracking-widest shadow-xl shadow-maritime/20 hover:scale-105 transition-all disabled:opacity-50"
-                  >
-                    {uploading === 'media_publish' ? "Envoi..." : "Publier"}
-                  </button>
-                </div>
+                  </div>
               </form>
             </div>
 
             <div className="space-y-6">
-              <h4 className="text-sm font-bold uppercase tracking-[0.2em] text-slate-400">Contenus en Ligne</h4>
-              <div className="flex flex-wrap gap-6">
+              <div className="flex justify-between items-center">
+                <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">Contenus en Ligne ({newsList.length})</h4>
+                <button 
+                  onClick={() => window.location.reload()}
+                  className="flex items-center gap-2 text-[9px] font-black uppercase tracking-widest text-maritime bg-maritime/5 px-4 py-2 rounded-full hover:bg-maritime/10 transition-all border border-maritime/10"
+                >
+                  <Clock3 size={12} /> Sync. Flux
+                </button>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                 {newsList.map(m => (
-                  <div key={m.id} className="w-56 group relative aspect-[4/5] rounded-2xl overflow-hidden bg-slate-100 border border-slate-200 shadow-sm transition-all hover:shadow-xl hover:shadow-slate-200">
-                    <div className="absolute top-2 left-2 z-10">
+                  <div key={m.id} className="group relative aspect-[4/5] rounded-3xl overflow-hidden bg-slate-50 border border-slate-200 shadow-sm transition-all hover:shadow-2xl hover:shadow-slate-200 hover:-translate-y-1">
+                    <div className="absolute top-3 left-3 z-10 flex gap-2">
                       <span className={cn(
-                        "px-2 py-1 rounded-md text-[7px] font-black uppercase tracking-widest shadow-sm",
-                        m.processedType === 'video' ? "bg-emerald-500 text-white" : m.processedType === 'text' ? "bg-indigo-500 text-white" : "bg-white text-black"
+                        "px-2.5 py-1 rounded-lg text-[7px] font-black uppercase tracking-[0.2em] shadow-lg backdrop-blur-md border border-white/20",
+                        m.processedType === 'video' ? "bg-emerald-500 text-white" : m.processedType === 'text' ? "bg-indigo-500 text-white" : "bg-white/90 text-black"
                       )}>
                         {m.processedType}
                       </span>
                     </div>
                     {m.processedType === 'video' ? (
-                      <video src={m.processedUrl || undefined} className="w-full h-full object-cover" controls />
+                      <video src={m.processedUrl || undefined} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
                     ) : m.processedType === 'text' ? (
-                      <div className="p-6 h-full flex flex-col justify-center text-center bg-white">
-                        <FileText size={32} className="mx-auto text-maritime opacity-20 mb-3" />
-                        <p className="text-[11px] font-extrabold uppercase leading-tight line-clamp-3">{m.title}</p>
+                      <div className="p-8 h-full flex flex-col justify-center text-center bg-white">
+                        <FileText size={32} className="mx-auto text-maritime opacity-10 mb-4" />
+                        <p className="text-xs font-black uppercase leading-tight line-clamp-4 tracking-tight italic">"{m.title}"</p>
                       </div>
                     ) : (
-                      <img src={m.processedUrl || undefined} className="w-full h-full object-cover" />
+                      <img src={m.processedUrl || undefined} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" />
                     )}
-                    <div className="absolute inset-0 bg-maritime/80 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center p-6 text-center space-y-4">
-                      <p className="text-[10px] font-bold text-white uppercase tracking-widest">{m.title}</p>
-                      
-                      <div className="flex gap-4 text-[9px] font-black text-white/60 uppercase tracking-widest">
-                        <span className="flex items-center gap-1"><Eye size={12} className="text-gold" /> {m.views || 0}</span>
-                        <NewsComments newsId={m.id} />
+                    <div className="absolute inset-0 bg-maritime/90 opacity-0 group-hover:opacity-100 transition-all duration-300 flex flex-col items-center justify-center p-8 text-center space-y-6 backdrop-blur-[2px]">
+                      <div className="space-y-2">
+                        <p className="text-[11px] font-black text-white uppercase tracking-tighter leading-tight italic">{m.title}</p>
+                        <p className="text-[8px] font-bold text-white/60 uppercase tracking-widest line-clamp-1">{m.processedDesc.substring(0, 30)}...</p>
                       </div>
+                      
+                      <div className="flex flex-col items-center gap-4 w-full">
+                        <div className="flex gap-4 text-[9px] font-black text-white/90 uppercase tracking-[0.2em] bg-white/10 px-4 py-2 rounded-full border border-white/10">
+                          <span className="flex items-center gap-1.5"><Eye size={12} className="text-gold" /> {m.views || 0}</span>
+                          <span className="w-[1px] h-3 bg-white/20" />
+                          <div className="flex items-center gap-1.5"><MessageSquare size={12} className="text-gold" /> {m.commentsCount || 0}</div>
+                        </div>
 
-                      <div className="flex gap-2">
-                        <button onClick={() => handleDeleteMedia(m.id)} className="w-10 h-10 bg-white/20 backdrop-blur-md text-white rounded-full flex items-center justify-center hover:bg-rose-600 transition-all border border-white/20">
-                          <Trash2 size={16} />
-                        </button>
+                        <div className="flex gap-3">
+                          <button onClick={() => handleEditMedia(m)} className="w-12 h-12 bg-white text-maritime rounded-2xl flex items-center justify-center hover:bg-gold hover:text-black transition-all shadow-xl hover:scale-110 active:scale-90">
+                            <Edit size={18} />
+                          </button>
+                          <button onClick={() => handleDeleteMedia(m.id)} className="w-12 h-12 bg-rose-500 text-white rounded-2xl flex items-center justify-center hover:bg-rose-600 transition-all shadow-xl hover:scale-110 active:scale-90">
+                            <Trash2 size={18} />
+                          </button>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -2862,7 +3221,7 @@ function Dashboard({ siteSettings, onNavigate }: { siteSettings?: { homeBg: stri
                 <div className="space-y-4">
                   <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Fond d'écran Accueil</p>
                   <div className="aspect-video rounded-[32px] bg-slate-100 overflow-hidden relative border border-slate-200 group shadow-md">
-                    {siteSettings?.homeBg && <img src={siteSettings.homeBg} className="w-full h-full object-cover" />}
+                    {siteSettings?.homeBg && <img src={siteSettings.homeBg || undefined} className="w-full h-full object-cover" />}
                     <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center backdrop-blur-[2px]">
                       <input type="file" ref={bgInputRef} className="hidden" onChange={e => handleFileUpload(e, 'homeBg')} accept="image/*" />
                       <button onClick={() => bgInputRef.current?.click()} className="px-6 py-2.5 bg-white text-maritime text-[10px] font-bold rounded-xl shadow-xl uppercase tracking-widest hover:scale-105 active:scale-95 transition-all">
@@ -2874,7 +3233,7 @@ function Dashboard({ siteSettings, onNavigate }: { siteSettings?: { homeBg: stri
                 <div className="space-y-4">
                   <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Visuel de Détail</p>
                   <div className="aspect-video rounded-[32px] bg-slate-100 overflow-hidden relative border border-slate-200 group shadow-md">
-                    {siteSettings?.homeDetail && <img src={siteSettings.homeDetail} className="w-full h-full object-cover" />}
+                    {siteSettings?.homeDetail && <img src={siteSettings.homeDetail || undefined} className="w-full h-full object-cover" />}
                     <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center backdrop-blur-[2px]">
                       <input type="file" ref={detailInputRef} className="hidden" onChange={e => handleFileUpload(e, 'homeDetail')} accept="image/*" />
                       <button onClick={() => detailInputRef.current?.click()} className="px-6 py-2.5 bg-white text-maritime text-[10px] font-bold rounded-xl shadow-xl uppercase tracking-widest hover:scale-105 active:scale-95 transition-all">
@@ -3001,8 +3360,11 @@ function GalleryView({ siteSettings }: { siteSettings: any }) {
                 </div>
                 <p className="text-white/40 text-[10px] font-bold leading-relaxed line-clamp-2 italic">{m.processedDesc}</p>
                 <div className="mt-8 pt-4 border-t border-white/5 flex justify-between items-center text-[8px] font-black text-white/20 uppercase tracking-[0.3em]">
-                  <span className="flex items-center gap-2"><Clock size={10} /> {m.publishedAt ? (m.publishedAt.seconds ? new Date(m.publishedAt.seconds * 1000).toLocaleDateString() : new Date(m.publishedAt).toLocaleDateString()) : 'N/A'}</span>
-                  <Anchor size={12} className="opacity-50" />
+                  <div className="flex items-center gap-4">
+                    <span className="flex items-center gap-2"><Clock size={10} /> {m.publishedAt ? (m.publishedAt.seconds ? new Date(m.publishedAt.seconds * 1000).toLocaleDateString() : new Date(m.publishedAt).toLocaleDateString()) : 'N/A'}</span>
+                    <span className="flex items-center gap-2 text-gold/40"><Eye size={10} /> {m.views || 0}</span>
+                  </div>
+                  <NewsComments newsId={m.id} />
                 </div>
               </div>
             </motion.div>
@@ -3057,6 +3419,10 @@ function NewsComments({ newsId }: { newsId: string }) {
         userName: auth.currentUser.displayName || auth.currentUser.email?.split('@')[0] || 'Utilisateur',
         text: newComment,
         createdAt: serverTimestamp()
+      });
+      // Increment comment count on parent doc
+      await updateDoc(doc(db, 'news', newsId), {
+        commentsCount: increment(1)
       });
       setNewComment('');
     } catch (e) {
@@ -3300,6 +3666,9 @@ function MyTickets({ user, siteSettings }: { user: FirebaseUser | null, siteSett
                         </span>
                       </div>
                       <p className="text-[8px] sm:text-[9px] text-slate-400 font-bold uppercase tracking-widest leading-tight">{res.travelDate} • {res.departureTime} • {res.ship}</p>
+                      {res.transactionId && (
+                        <p className="text-[7px] text-slate-300 font-mono italic">TX: {res.transactionId}</p>
+                      )}
                     </div>
                   </div>
                   <span className={cn(
@@ -3412,6 +3781,12 @@ function VerificationView({ id, onClose }: { id: string, onClose: () => void }) 
                   <p className="text-[9px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 sm:mb-2">Montant</p>
                   <p className="text-base sm:text-lg font-extrabold tracking-tighter uppercase">{res.amount}.00 $</p>
                 </div>
+                {res.transactionId && (
+                  <div className="pt-4 sm:pt-6 border-t border-slate-50 col-span-1 sm:col-span-2">
+                    <p className="text-[9px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 sm:mb-2">ID Transaction (Confirmé)</p>
+                    <p className="text-sm sm:text-base font-extrabold font-mono tracking-widest text-maritime bg-slate-50 p-2 border border-slate-100 rounded-lg">{res.transactionId}</p>
+                  </div>
+                )}
               </div>
 
               <div className="p-4 sm:p-6 bg-slate-50 border border-slate-100 rounded-sm overflow-hidden">

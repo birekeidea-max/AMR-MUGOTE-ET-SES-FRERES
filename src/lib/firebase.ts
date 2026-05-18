@@ -1,14 +1,25 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
+import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import firebaseConfig from '../../firebase-applet-config.json';
 
 // Log config keys for diagnostic (not values)
 console.log('Firebase Config Keys:', Object.keys(firebaseConfig));
 
 const app = initializeApp(firebaseConfig);
-export const db = getFirestore(app);
+export const db = getFirestore(app, (firebaseConfig as any).firestoreDatabaseId);
 export const auth = getAuth(app);
+export const storage = getStorage(app);
+
+/**
+ * Uploads a file to Firebase Storage and returns its download URL.
+ */
+export async function uploadToStorage(file: File | Blob, path: string): Promise<string> {
+  const storageRef = ref(storage, path);
+  await uploadBytes(storageRef, file);
+  return getDownloadURL(storageRef);
+}
 
 // --- Error Handling Utility ---
 export enum OperationType {
