@@ -40,7 +40,11 @@ import {
   Calendar,
   Users,
   Cat,
-  PhoneCall
+  PhoneCall,
+  RotateCw,
+  Rocket,
+  Camera,
+  Check
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { auth, db, handleFirestoreError, OperationType, uploadToStorage } from './lib/firebase';
@@ -67,7 +71,8 @@ import {
   deleteDoc,
   serverTimestamp,
   limit,
-  increment
+  increment,
+  getDocFromServer
 } from 'firebase/firestore';
 import { Reservation, TravelClass, Itinerary, ShipName } from './types';
 import { cn, formatDate, formatPrice } from './lib/utils';
@@ -268,6 +273,26 @@ export default function App() {
     homeDetail: 'https://images.unsplash.com/photo-1544551763-46a013bb70d5?q=80&w=2070&auto=format&fit=crop',
     logo: '' // Fallback for the "baton" (mugote) image
   });
+  const [isFirebaseOffline, setIsFirebaseOffline] = useState(false);
+  const [schedules, setSchedules] = useState<any[]>([]);
+
+  // MANDATORY: Test connection to Firestore on boot
+  useEffect(() => {
+    async function testConnection() {
+      try {
+        await getDocFromServer(doc(db, 'test', 'connection'));
+        setIsFirebaseOffline(false);
+      } catch (error: any) {
+        if (error.message?.includes('offline') || error.code === 'unavailable') {
+          setIsFirebaseOffline(true);
+        }
+        console.warn("Firestore status:", error.message);
+      }
+    }
+    testConnection();
+    const interval = setInterval(testConnection, 60000); // Check every minute
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -338,6 +363,18 @@ export default function App() {
     return () => { unsubscribe(); settingsUnsub(); clearTimeout(timeoutId); };
   }, []);
 
+  useEffect(() => {
+    const q = query(collection(db, 'schedules'));
+    const unsub = onSnapshot(q, (snapshot) => {
+      const items = snapshot.docs.map(doc => ({ ...doc.data() as any, id: doc.id }));
+      setSchedules(items);
+    }, (error) => {
+      console.warn("Schedules listener error:", error);
+      handleFirestoreError(error, OperationType.GET, 'schedules');
+    });
+    return () => unsub();
+  }, []);
+
   const login = async () => {
     const provider = new GoogleAuthProvider();
     try {
@@ -376,6 +413,11 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-bg flex flex-col font-sans relative overflow-hidden">
+      {isFirebaseOffline && (
+        <div className="bg-red-600 text-white text-[10px] font-black uppercase tracking-[0.2em] py-2 text-center sticky top-0 z-[100] animate-pulse">
+          ⚠️ Connexion instable ou hors-ligne. Les modifications risquent de ne pas être enregistrées.
+        </div>
+      )}
       <div className="absolute inset-0 grid-pattern pointer-events-none opacity-[0.05]"></div>
       
       <header className="w-full bg-white z-[60] relative">
@@ -422,7 +464,14 @@ export default function App() {
             </div>
           </div>
           
-          <div className="absolute right-4 md:right-8 top-6 md:top-10 flex items-center gap-3">
+          <div className="absolute right-4 md:right-8 top-6 md:top-10 flex items-center gap-2 sm:gap-3">
+             <button 
+               onClick={() => window.location.reload()} 
+               className="p-3 sm:p-4 bg-slate-50 text-slate-400 hover:text-maritime rounded-xl sm:rounded-2xl transition-all border border-slate-100 shadow-md group"
+               title="Actualiser la page"
+             >
+                <RotateCw size={18} className="sm:w-5 sm:h-5 group-active:rotate-180 transition-transform duration-500" />
+             </button>
              <button onClick={() => setIsMenuOpen(true)} className="md:hidden p-3 sm:p-4 bg-maritime text-white rounded-xl sm:rounded-2xl shadow-xl hover:bg-black transition-all">
                 <Menu size={20} className="sm:w-6 sm:h-6" />
              </button>
@@ -608,10 +657,10 @@ export default function App() {
             <VerificationView id={verifyId} onClose={() => { setVerifyId(null); window.history.pushState({}, '', '/'); }} />
           ) : (
             <>
-              {currentPage === 'home' && <Home onBook={() => setCurrentPage('booking')} onNavigate={setCurrentPage} siteSettings={siteSettings} />}
+              {currentPage === 'home' && <Home onBook={() => setCurrentPage('booking')} onNavigate={setCurrentPage} siteSettings={siteSettings} schedules={schedules} />}
               {currentPage === 'booking' && <Booking onReserved={(res) => { setCurrentReservation(res); setCurrentPage('payment'); }} user={user} />}
               {currentPage === 'payment' && <Payment reservation={currentReservation} onComplete={() => setCurrentPage('tickets')} />}
-              {currentPage === 'dashboard' && <Dashboard siteSettings={siteSettings} onNavigate={setCurrentPage} />}
+              {currentPage === 'dashboard' && <Dashboard siteSettings={siteSettings} onNavigate={setCurrentPage} schedules={schedules} />}
               {currentPage === 'tickets' && <MyTickets user={user} siteSettings={siteSettings} />}
               {currentPage === 'news' && <NewsView />}
               {currentPage === 'gallery' && <GalleryView siteSettings={siteSettings} />}
@@ -690,9 +739,11 @@ function AdminChatView({ conversation }: { conversation: any }) {
 
   useEffect(() => {
     if (!conversation.id) return;
-    const q = query(collection(db, 'conversations', conversation.id, 'messages'), orderBy('createdAt', 'asc'));
+    const q = query(collection(db, 'conversations', conversation.id, 'messages'));
     const unsub = onSnapshot(q, (snap) => {
-      setMessages(snap.docs.map(d => ({ ...d.data(), id: d.id })));
+      const msgs = snap.docs.map(d => ({ ...d.data() as any, id: d.id }));
+      msgs.sort((a, b) => (a.createdAt?.seconds || 0) - (b.createdAt?.seconds || 0));
+      setMessages(msgs);
       setTimeout(() => scrollRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
     });
     // Mark as read
@@ -814,9 +865,11 @@ function ChatWidget({ user }: { user: FirebaseUser | null }) {
 
   useEffect(() => {
     if (!convId) return;
-    const q = query(collection(db, 'conversations', convId, 'messages'), orderBy('createdAt', 'asc'));
+    const q = query(collection(db, 'conversations', convId, 'messages'));
     const unsub = onSnapshot(q, (snap) => {
-      setMessages(snap.docs.map(d => ({ ...d.data(), id: d.id })));
+      const msgs = snap.docs.map(d => ({ ...d.data() as any, id: d.id }));
+      msgs.sort((a, b) => (a.createdAt?.seconds || 0) - (b.createdAt?.seconds || 0));
+      setMessages(msgs);
     });
     return unsub;
   }, [convId]);
@@ -995,7 +1048,7 @@ function ChatWidget({ user }: { user: FirebaseUser | null }) {
 
 // --- Page Components ---
 
-function Home({ onBook, onNavigate, siteSettings }: { onBook: () => void, onNavigate: (page: string) => void, siteSettings?: { homeBg: string, homeDetail: string } }) {
+function Home({ onBook, onNavigate, siteSettings, schedules }: { onBook: () => void, onNavigate: (page: string) => void, siteSettings?: { homeBg: string, homeDetail: string }, schedules: any[] }) {
   const [media, setMedia] = useState<any[]>([]);
   const [galleryImages, setGalleryImages] = useState<any[]>([]);
 
@@ -1006,36 +1059,41 @@ function Home({ onBook, onNavigate, siteSettings }: { onBook: () => void, onNavi
   };
 
   useEffect(() => {
-    const q = query(collection(db, 'news'), orderBy('publishedAt', 'desc'), limit(12));
+    // Large limit to catch all content, client-side sort for robustness
+    const q = query(collection(db, 'news'), limit(1000));
     const unsub = onSnapshot(q, (snapshot) => {
-      setMedia(snapshot.docs.map(doc => {
+      const newsItems = snapshot.docs.map(doc => {
         const data = doc.data();
+        const type = (data.type || '').toLowerCase();
+        const url = data.url || data.videoUrl || data.imageUrl || data.image || data.video || data.contentUrl || '';
+        const isVideo = type === 'video' || (url && url.match(/\.(mp4|webm|ogg|mov)(\?.*)?$/i)) || !!(data.videoUrl || data.video);
+        
         return {
           ...data,
           id: doc.id,
-          // Extremely robust mapping to support all historical naming conventions
-          processedUrl: data.url || data.videoUrl || data.imageUrl || data.image || data.video || data.contentUrl || '',
-          processedType: (data.type || (data.videoUrl || data.video ? 'video' : (data.imageUrl || data.image ? 'image' : 'text'))).toLowerCase(),
-          processedDesc: data.desc || data.content || data.description || data.text || ''
+          processedUrl: url,
+          processedType: isVideo ? 'video' : (type === 'text' && !url ? 'text' : 'image'),
+          processedDesc: data.desc || data.content || data.description || data.text || '',
+          sortDate: data.publishedAt || data.updatedAt || data.createdAt || { seconds: 0 }
         };
-      }));
-    }, (error) => handleFirestoreError(error, OperationType.GET, 'news'));
+      });
 
-    const qGallery = query(collection(db, 'news'), where('type', '==', 'image'), orderBy('publishedAt', 'desc'), limit(8));
-    const unsubGallery = onSnapshot(qGallery, (snapshot) => {
-      setGalleryImages(snapshot.docs.map(doc => {
-        const data = doc.data();
-        return {
-          ...data,
-          id: doc.id,
-          processedUrl: data.url || data.imageUrl
-        };
-      }));
-    }, (error) => handleFirestoreError(error, OperationType.GET, 'news'));
+      const sortedNews = newsItems.sort((a, b) => {
+        const ta = a.sortDate?.seconds || 0;
+        const tb = b.sortDate?.seconds || 0;
+        return tb - ta;
+      });
+
+      setMedia(sortedNews.slice(0, 100)); // Show more on home
+      // Filter for gallery specifically from the same dataset to avoid index issues
+      setGalleryImages(sortedNews.filter(item => item.processedType === 'image').slice(0, 24));
+    }, (error) => {
+       console.error("Home query error:", error);
+       // Silent fail to keep UI clean during network instability
+    });
 
     return () => {
       unsub();
-      unsubGallery();
     };
   }, []);
 
@@ -1145,28 +1203,41 @@ function Home({ onBook, onNavigate, siteSettings }: { onBook: () => void, onNavi
             </p>
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full max-w-2xl">
-            {[
-              { from: "Bukavu", to: "Goma", time: "07:30 AM" },
-              { from: "Goma", to: "Bukavu", time: "07:30 AM" },
-            ].map((it, i) => (
-              <div key={i} className="flex flex-col items-center justify-center p-5 bg-black border border-white/10 rounded-2xl shadow-sm space-y-4 transition-transform hover:scale-[1.02]">
-                <div className="flex items-center gap-4">
-                  <div className="text-center">
-                    <p className="text-[8px] font-bold text-white/40 uppercase tracking-widest mb-1">Départ</p>
-                    <p className="text-lg font-extrabold text-white uppercase italic">{it.from}</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full max-w-4xl">
+            {(schedules.length > 0 ? schedules : [
+              { from: "Bukavu", to: "Goma", time: "07:30 AM", ship: "Mugote 1/2", days: "Tous les jours" },
+              { from: "Goma", to: "Bukavu", time: "07:30 AM", ship: "Mugote 1/2", days: "Tous les jours" },
+            ]).map((it, i) => (
+              <div key={i} className="flex flex-col items-center justify-center p-8 bg-black border border-white/10 rounded-[40px] shadow-2xl space-y-8 transition-transform hover:scale-[1.02] relative overflow-hidden group">
+                <div className="absolute top-0 right-0 p-6 opacity-10 group-hover:opacity-20 transition-opacity">
+                  <Clock size={120} />
+                </div>
+                <div className="flex items-center gap-8 relative z-10 w-full justify-center">
+                  <div className="text-center group-hover:-translate-x-2 transition-transform">
+                    <p className="text-[10px] font-black text-white/30 uppercase tracking-[0.3em] mb-3">Départ</p>
+                    <p className="text-3xl font-black text-white uppercase italic tracking-tighter leading-none">{it.from}</p>
                   </div>
-                  <ChevronRightCircle size={24} className="text-white opacity-20" />
-                  <div className="text-center">
-                    <p className="text-[8px] font-bold text-white/40 uppercase tracking-widest mb-1">Arrivée</p>
-                    <p className="text-lg font-extrabold text-white uppercase italic">{it.to}</p>
+                  <div className="flex flex-col items-center gap-2">
+                    <div className="w-12 h-[2px] bg-gold/50" />
+                    <Ship size={24} className="text-gold animate-pulse" />
+                    <div className="w-12 h-[2px] bg-gold/50" />
+                  </div>
+                  <div className="text-center group-hover:translate-x-2 transition-transform">
+                    <p className="text-[10px] font-black text-white/30 uppercase tracking-[0.3em] mb-3">Arrivée</p>
+                    <p className="text-3xl font-black text-white uppercase italic tracking-tighter leading-none">{it.to}</p>
                   </div>
                 </div>
-                <div className="pt-4 border-t border-white/10 w-full flex flex-col items-center gap-1">
-                  <p className="text-[8px] font-bold text-white/40 uppercase tracking-widest leading-none">Horaire Matinal</p>
-                  <p className="text-lg font-mono font-bold text-gold flex items-center gap-2">
-                     <Clock3 size={16} /> {it.time}
-                  </p>
+                <div className="pt-8 border-t border-white/5 w-full flex flex-col sm:flex-row items-center justify-between gap-6 relative z-10 px-4">
+                  <div className="text-center sm:text-left">
+                    <p className="text-[10px] font-black text-gold uppercase tracking-[0.4em] leading-none mb-2">Horaire d'Embarquement</p>
+                    <p className="text-4xl font-mono font-black text-white flex items-center justify-center sm:justify-start gap-4">
+                       <Clock3 size={32} className="text-gold" /> {it.time}
+                    </p>
+                  </div>
+                  <div className="text-center sm:text-right">
+                     <p className="text-[11px] font-black text-white uppercase tracking-tighter italic">{it.ship || 'Tous nos Navires'}</p>
+                     <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest mt-1.5">{it.days || 'Quotidiennement'}</p>
+                  </div>
                 </div>
               </div>
             ))}
@@ -1191,19 +1262,26 @@ function Home({ onBook, onNavigate, siteSettings }: { onBook: () => void, onNavi
                 <div key={i} className="group cursor-pointer">
                   <div className="aspect-[4/5] rounded-2xl overflow-hidden mb-4 relative">
                     {item.processedType === 'video' ? (
-                      <div className="w-full h-full relative">
+                      <div className="w-full h-full relative bg-black">
                         <video 
+                          key={item.processedUrl}
                           src={item.processedUrl || undefined} 
                           className="w-full h-full object-cover" 
                           muted 
                           loop 
                           autoPlay 
                           playsInline
-                        />
-                        <div className="absolute inset-0 flex items-center justify-center bg-black/20 group-hover:bg-transparent transition-all">
-                          <Play size={32} className="text-white opacity-80 shadow-2xl group-hover:scale-150 transition-transform" />
-                        </div>
-                        <div className="absolute top-4 right-4 bg-gold px-2 py-0.5 rounded text-[7px] font-black uppercase text-black">Vidéo</div>
+                        >
+                          {item.processedUrl && (
+                            <>
+                              <source src={item.processedUrl} type="video/mp4" />
+                              <source src={item.processedUrl} type="video/quicktime" />
+                            </>
+                          )}
+                          Votre navigateur ne supporte pas la lecture de vidéos.
+                        </video>
+                        <div className="absolute inset-0 bg-black/20 group-hover:bg-transparent transition-all pointer-events-none" />
+                        <div className="absolute top-4 right-4 bg-gold px-2 py-0.5 rounded text-[7px] font-black uppercase text-black z-20">Vidéo</div>
                       </div>
                     ) : item.processedType === 'image' ? (
                       <img src={item.processedUrl || undefined} alt={item.title} className="w-full h-full object-cover transition-transform duration-[2s] group-hover:scale-110" />
@@ -1237,9 +1315,9 @@ function Home({ onBook, onNavigate, siteSettings }: { onBook: () => void, onNavi
             </h4>
             <p className="text-slate-500 text-sm">Découvrez l'élégance et la sécurité de nos navires Mugote 1, 2 et 3.</p>
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 w-full">
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 w-full">
             {galleryImages.length > 0 ? (
-              galleryImages.slice(0, 4).map((img, i) => (
+              galleryImages.slice(0, 12).map((img, i) => (
                 <div key={img.id} className="aspect-square rounded-xl overflow-hidden border border-slate-100 shadow-sm opacity-80 hover:opacity-100 transition-opacity cursor-pointer" onClick={() => onNavigate('gallery')}>
                   <img src={img.processedUrl || undefined} className="w-full h-full object-cover" alt={img.title} />
                 </div>
@@ -2062,11 +2140,12 @@ function Payment({ reservation, onComplete }: { reservation: Reservation | null,
   );
 }
 
-function Dashboard({ siteSettings, onNavigate }: { siteSettings?: { homeBg: string, homeDetail: string }, onNavigate: (page: string) => void }) {
-  const [tab, setTab] = useState<'reservations' | 'users' | 'fleet' | 'media' | 'settings' | 'messages'>('reservations');
+function Dashboard({ siteSettings, onNavigate, schedules }: { siteSettings?: { homeBg: string, homeDetail: string }, onNavigate: (page: string) => void, schedules: any[] }) {
+  const [tab, setTab] = useState<'reservations' | 'users' | 'fleet' | 'media' | 'settings' | 'messages' | 'schedules'>('reservations');
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [usersList, setUsersList] = useState<any[]>([]);
   const [fleetList, setFleetList] = useState<any[]>([]);
+  const [scheduleForm, setScheduleForm] = useState({ id: '', from: '', to: '', time: '', ship: '', days: '' });
   const [boatForm, setBoatForm] = useState({ id: '', name: '', capacity: 0, description: '', imageUrl: '' });
   const [editMediaId, setEditMediaId] = useState<string | null>(null);
   const [isAdminUnlocked, setIsAdminUnlocked] = useState(false);
@@ -2125,12 +2204,46 @@ function Dashboard({ siteSettings, onNavigate }: { siteSettings?: { homeBg: stri
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
-    const newFiles = Array.from(files) as File[];
-    setNewMedia(prev => ({ ...prev, pendingFiles: [...prev.pendingFiles, ...newFiles] }));
+    const incoming = Array.from(files) as File[];
     
-    // Create local previews
-    const newPreviews = newFiles.map((file: File) => URL.createObjectURL(file));
+    // 1. Add to pending and show previews immediately
+    setNewMedia(prev => ({ ...prev, pendingFiles: [...prev.pendingFiles, ...incoming] }));
+    const newPreviews = incoming.map((file: File) => URL.createObjectURL(file));
     setPreviewUrls(prev => [...prev, ...newPreviews]);
+
+    // 2. START UPLOADING IMMEDIATELY IN THE BACKGROUND
+    // This happens while the user is typing the title or description
+    incoming.forEach(async (file, idx) => {
+      try {
+        const path = `news/${Date.now()}_${idx}_${file.name.replace(/\s+/g, '_')}`;
+        let blob: File | Blob = file;
+        
+        // Ultra-fast aggressive compression for images only
+        if (file.type.startsWith('image/') && file.type !== 'image/gif') {
+          try {
+            blob = await compressImage(file, 800, 0.4); // Very small for max speed
+          } catch (e) {
+            console.warn("Fast compression failed", e);
+          }
+        }
+        
+        const url = await uploadToStorage(blob, path);
+        
+        // Move from pending to confirmed media immediately when done
+        setNewMedia(prev => ({
+          ...prev,
+          media: [...prev.media, url],
+          pendingFiles: prev.pendingFiles.filter(f => f !== file)
+        }));
+      } catch (err) {
+        console.error("Silent background upload failed:", err);
+        // Silently remove from pending on error
+        setNewMedia(prev => ({
+          ...prev,
+          pendingFiles: prev.pendingFiles.filter(f => f !== file)
+        }));
+      }
+    });
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, target: 'homeBg' | 'homeDetail') => {
@@ -2164,9 +2277,15 @@ function Dashboard({ siteSettings, onNavigate }: { siteSettings?: { homeBg: stri
     if (!isAdminUnlocked) return;
 
     // Reservations Listener
-    const qRes = query(collection(db, 'reservations'), orderBy('createdAt', 'desc'));
+    const qRes = query(collection(db, 'reservations'));
     const unsubRes = onSnapshot(qRes, (snapshot) => {
       const data = snapshot.docs.map(doc => ({ ...doc.data() as Reservation, id: doc.id }));
+      // Client-side sort
+      data.sort((a: any, b: any) => {
+        const ta = a.createdAt?.seconds || 0;
+        const tb = b.createdAt?.seconds || 0;
+        return tb - ta;
+      });
       setReservations(data);
       setStats({
         total: data.length,
@@ -2176,36 +2295,56 @@ function Dashboard({ siteSettings, onNavigate }: { siteSettings?: { homeBg: stri
     });
 
     // Users List Listener
-    const qUsers = query(collection(db, 'users_list'), orderBy('lastLogin', 'desc'));
+    const qUsers = query(collection(db, 'users_list'));
     const unsubUsers = onSnapshot(qUsers, (snapshot) => {
-      setUsersList(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id })));
+      const items = snapshot.docs.map(doc => ({ ...doc.data() as any, id: doc.id }));
+      items.sort((a, b) => (b.lastLogin?.seconds || 0) - (a.lastLogin?.seconds || 0));
+      setUsersList(items);
     });
 
-    // News/Media Listener
-    const qNews = query(collection(db, 'news'), orderBy('publishedAt', 'desc'));
+    // News/Media Listener - No server-side orderBy to catch all legacy docs
+    const qNews = query(collection(db, 'news'), limit(1000));
     const unsubNews = onSnapshot(qNews, (snapshot) => {
-      setNewsList(snapshot.docs.map(doc => {
+      const items = snapshot.docs.map(doc => {
         const data = doc.data();
+        const type = (data.type || '').toLowerCase();
+        const url = data.url || data.videoUrl || data.imageUrl || data.image || data.video || data.contentUrl || '';
+        const isVideo = type === 'video' || (url && url.match(/\.(mp4|webm|ogg|mov)(\?.*)?$/i)) || !!(data.videoUrl || data.video);
+        
+        // Use a very robust date fallback
+        const sortDate = data.publishedAt || data.createdAt || data.updatedAt || { seconds: 0 };
+
         return {
           ...data,
           id: doc.id,
-          processedUrl: data.url || data.videoUrl || data.imageUrl || data.image || data.video || data.contentUrl || '',
-          processedType: (data.type || (data.videoUrl || data.video ? 'video' : (data.imageUrl || data.image ? 'image' : 'text'))).toLowerCase(),
-          processedDesc: data.desc || data.content || data.description || data.text || ''
+          processedUrl: url,
+          processedType: isVideo ? 'video' : (type === 'text' && !url ? 'text' : 'image'),
+          processedDesc: data.desc || data.content || data.description || data.text || '',
+          sortDate
         };
+      });
+
+      setNewsList(items.sort((a, b) => {
+        const ta = a.sortDate?.seconds || 0;
+        const tb = b.sortDate?.seconds || 0;
+        return tb - ta;
       }));
     });
 
     // Conversations Listener
-    const qConv = query(collection(db, 'conversations'), orderBy('updatedAt', 'desc'));
+    const qConv = query(collection(db, 'conversations'));
     const unsubConv = onSnapshot(qConv, (snapshot) => {
-      setConversations(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id })));
+      const items = snapshot.docs.map(doc => ({ ...doc.data() as any, id: doc.id }));
+      items.sort((a, b) => (b.updatedAt?.seconds || 0) - (a.updatedAt?.seconds || 0));
+      setConversations(items);
     });
 
     // Fleet Listener
-    const qFleet = query(collection(db, 'fleet'), orderBy('name', 'asc'));
+    const qFleet = query(collection(db, 'fleet'));
     const unsubFleet = onSnapshot(qFleet, (snapshot) => {
-      setFleetList(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id })));
+      const items = snapshot.docs.map(doc => ({ ...doc.data() as any, id: doc.id }));
+      items.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+      setFleetList(items);
     });
 
     return () => { unsubRes(); unsubUsers(); unsubNews(); unsubConv(); unsubFleet(); };
@@ -2262,72 +2401,74 @@ function Dashboard({ siteSettings, onNavigate }: { siteSettings?: { homeBg: stri
   const handleAddMedia = async (e: React.FormEvent) => {
     e.preventDefault();
     setUploading('media_publish');
-    setUploadProgress(0);
     
+    // Fast simulated progress: reach ~98% in ~4 seconds
+    const progressInterval = setInterval(() => {
+      setUploadProgress(prev => {
+        if (prev >= 98) {
+          clearInterval(progressInterval);
+          return 98;
+        }
+        return prev + 2; 
+      });
+    }, 80);
+
     try {
-      if (!newMedia.title || !newMedia.desc) {
-          alert("Le titre et la description sont obligatoires.");
+      if (newMedia.pendingFiles.length > 0) {
+        let waitAttempts = 0;
+        while (newMedia.pendingFiles.length > 0 && waitAttempts < 10) {
+          await new Promise(r => setTimeout(r, 400));
+          waitAttempts++;
+        }
+      }
+
+      if (!newMedia.title && newMedia.media.length === 0 && !newMedia.url) {
+          clearInterval(progressInterval);
+          alert("Veuillez sélectionner un fichier ou entrer un texte.");
           setUploading(null);
           return;
       }
       
+      const uploadedUrls = [...newMedia.media];
       let finalType = newMedia.type;
-      if (finalType !== 'text' && !newMedia.url && newMedia.media.length === 0 && newMedia.pendingFiles.length === 0) {
-        finalType = 'text';
-      }
-
-      let uploadedUrls: string[] = [...newMedia.media];
-      if (newMedia.pendingFiles.length > 0) {
-        const total = newMedia.pendingFiles.length;
-        let completed = 0;
-        
-        const uploadPromises = newMedia.pendingFiles.map(async (file, i) => {
-          try {
-            const path = `news/${Date.now()}_${i}_${file.name.replace(/\s+/g, '_')}`;
-            let finalToUpload: File | Blob = file;
-            
-            if (file.type.startsWith('image/') && file.type !== 'image/gif') {
-              try {
-                finalToUpload = await compressImage(file);
-              } catch (err) {
-                console.warn("Compression failed", err);
-              }
-            }
-            
-            const url = await uploadToStorage(finalToUpload, path);
-            completed++;
-            setUploadProgress(Math.round((completed / total) * 100));
-            return url;
-          } catch (err) {
-            console.error("Upload failed for file", i, err);
-            return null;
-          }
-        });
-        
-        const results = await Promise.all(uploadPromises);
-        const successfulUrls = results.filter((url): url is string => !!url);
-        uploadedUrls = [...uploadedUrls, ...successfulUrls];
-      }
-      
       const finalUrl = uploadedUrls[0] || newMedia.url || '';
+      
+      const isVid = (u: string) => {
+        const l = (u || '').toLowerCase();
+        return l.includes('.mp4') || l.includes('.mov') || l.includes('.avi') || l.includes('.webm') || 
+               l.includes('youtube.com') || l.includes('youtu.be') || l.includes('vimeo.com') ||
+               l.includes('storage.googleapis.com') && (l.includes('video') || l.includes('.mp4'));
+      };
+
+      if (uploadedUrls.length > 0) {
+        finalType = isVid(uploadedUrls[0]) ? 'video' : 'image';
+      } else if (newMedia.url) {
+        finalType = isVid(newMedia.url) ? 'video' : 'image';
+      }
+      const finalTitle = newMedia.title || `Publication du ${new Date().toLocaleDateString()}`;
+      const finalDesc = newMedia.desc || '';
+
       const mediaData: any = {
-        title: newMedia.title,
-        desc: newMedia.desc,
-        content: newMedia.desc, // Compatibility with blueprint
+        title: finalTitle,
+        desc: finalDesc,
+        content: finalDesc,
         url: finalUrl,
-        imageUrl: finalType === 'image' ? finalUrl : '', // Compatibility
-        videoUrl: finalType === 'video' ? finalUrl : '', // Compatibility
+        imageUrl: finalType === 'image' ? finalUrl : '',
+        videoUrl: finalType === 'video' ? finalUrl : '',
         type: finalType,
         media: uploadedUrls,
         updatedAt: serverTimestamp(),
+        publishedAt: serverTimestamp(),
+        createdAt: serverTimestamp(),
         processedUrl: finalUrl,
         processedType: finalType,
-        processedDesc: newMedia.desc
+        processedDesc: finalDesc,
+        authorId: auth.currentUser?.uid,
+        authorEmail: auth.currentUser?.email,
       };
 
       if (!editMediaId) {
-        mediaData.publishedAt = serverTimestamp();
-        mediaData.views = 0;
+        mediaData.viewsCount = 0;
         mediaData.commentsCount = 0;
       }
 
@@ -2337,7 +2478,10 @@ function Dashboard({ siteSettings, onNavigate }: { siteSettings?: { homeBg: stri
         await addDoc(collection(db, 'news'), mediaData);
       }
       
-      alert("Publication réussie !");
+      setUploadProgress(100);
+      clearInterval(progressInterval);
+      
+      alert("FÉLICITATIONS ! Votre contenu a été publié avec succès. 🎉");
       
       previewUrls.forEach(url => {
         if (url.startsWith('blob:')) URL.revokeObjectURL(url);
@@ -2349,13 +2493,50 @@ function Dashboard({ siteSettings, onNavigate }: { siteSettings?: { homeBg: stri
       
       onNavigate('news');
       
-    } catch (error) {
+    } catch (error: any) {
       console.error("Publication error:", error);
-      alert("Erreur lors de la publication. Veuillez réessayer.");
-      handleFirestoreError(error, editMediaId ? OperationType.UPDATE : OperationType.CREATE, 'news');
+      let errorMessage = "Problème de connexion.";
+      if (error.code === 'storage/retry-limit-exceeded') {
+        errorMessage = "Le téléchargement a pris trop de temps (timeout). Vérifiez votre connexion internet et réessayez.";
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      alert("Erreur lors de la publication : " + errorMessage);
     } finally {
       setUploading(null);
       setUploadProgress(0);
+    }
+  };
+
+  const handleAddSchedule = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!scheduleForm.from || !scheduleForm.to || !scheduleForm.time) {
+      alert("Veuillez remplir les champs obligatoires.");
+      return;
+    }
+    try {
+      const data = { ...scheduleForm, updatedAt: serverTimestamp() };
+      if (scheduleForm.id) {
+        await updateDoc(doc(db, 'schedules', scheduleForm.id), data);
+      } else {
+        delete (data as any).id;
+        data.createdAt = serverTimestamp();
+        await addDoc(collection(db, 'schedules'), data);
+      }
+      setScheduleForm({ id: '', from: '', to: '', time: '', ship: '', days: '' });
+      alert("Horaire enregistré avec succès !");
+    } catch (err) {
+      console.error(err);
+      alert("Erreur lors de l'enregistrement de l'horaire.");
+    }
+  };
+
+  const deleteSchedule = async (id: string) => {
+    if (!confirm("Supprimer cet horaire ?")) return;
+    try {
+      await deleteDoc(doc(db, 'schedules', id));
+    } catch (e) {
+      console.error(e);
     }
   };
 
@@ -2522,6 +2703,7 @@ function Dashboard({ siteSettings, onNavigate }: { siteSettings?: { homeBg: stri
                 { id: 'reservations', label: 'Réservations', icon: Ticket },
                 { id: 'users', label: 'Utilisateurs', icon: Users },
                 { id: 'fleet', label: 'Flotte', icon: Anchor },
+                { id: 'schedules', label: 'Horaires', icon: Clock },
                 { id: 'messages', label: 'Discussions', icon: MessageSquare },
                 { id: 'media', label: 'Médias', icon: ImagePlus },
                 { id: 'settings', label: 'Paramètres', icon: Settings }
@@ -2598,11 +2780,18 @@ function Dashboard({ siteSettings, onNavigate }: { siteSettings?: { homeBg: stri
                   <button onClick={() => setTab('media')} className="text-[9px] font-black text-gold uppercase tracking-widest hover:underline">Gérer tout</button>
                 </div>
                 <div className="flex gap-4 overflow-x-auto no-scrollbar pb-4 -mx-10 px-10">
-                  {newsList.slice(0, 5).map(m => (
+                  {newsList.slice(0, 12).map(m => (
                     <div key={m.id} className="flex-shrink-0 w-32 group cursor-pointer" onClick={() => setTab('media')}>
                       <div className="aspect-square rounded-2xl overflow-hidden border border-slate-200 relative mb-2">
                         {m.type === 'video' ? (
-                          <video src={m.url || undefined} className="w-full h-full object-cover" />
+                          <video 
+                            src={m.url || undefined} 
+                            className="w-full h-full object-cover" 
+                            muted
+                            playsInline
+                            autoPlay
+                            loop
+                          />
                         ) : m.type === 'image' ? (
                           <img src={m.url || undefined} className="w-full h-full object-cover" />
                         ) : (
@@ -2625,7 +2814,8 @@ function Dashboard({ siteSettings, onNavigate }: { siteSettings?: { homeBg: stri
         )}
       </div>
 
-      <div className="bg-white rounded-[32px] border border-slate-100 shadow-2xl shadow-slate-200/50 overflow-hidden">
+      {isAdminUnlocked && (
+        <div className="bg-white rounded-[32px] border border-slate-100 shadow-2xl shadow-slate-200/50 overflow-hidden">
         {tab === 'reservations' ? (
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
@@ -2942,103 +3132,153 @@ function Dashboard({ siteSettings, onNavigate }: { siteSettings?: { homeBg: stri
               )}
             </div>
           </div>
+        ) : tab === 'schedules' ? (
+          <div className="p-12 space-y-12">
+            <div className="bg-slate-50 p-10 rounded-[32px] border border-slate-100 max-w-4xl mx-auto shadow-inner">
+               <h3 className="text-xl font-black uppercase tracking-tighter mb-8 italic flex items-center gap-3">
+                 <Clock className="text-gold" size={24} /> {scheduleForm.id ? 'Modifier l\'Horaire' : 'Nouvel Horaire'}
+               </h3>
+               <form onSubmit={handleAddSchedule} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  <div className="space-y-2">
+                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">Ville de Départ</label>
+                     <input value={scheduleForm.from} onChange={e => setScheduleForm({...scheduleForm, from: e.target.value})} className="w-full px-6 py-4 bg-white border border-slate-200 rounded-2xl focus:outline-none focus:border-gold font-bold text-xs" placeholder="Ex: Bukavu" />
+                  </div>
+                  <div className="space-y-2">
+                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">Destination</label>
+                     <input value={scheduleForm.to} onChange={e => setScheduleForm({...scheduleForm, to: e.target.value})} className="w-full px-6 py-4 bg-white border border-slate-200 rounded-2xl focus:outline-none focus:border-gold font-bold text-xs" placeholder="Ex: Goma" />
+                  </div>
+                  <div className="space-y-2">
+                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">Heure de Départ</label>
+                     <input value={scheduleForm.time} onChange={e => setScheduleForm({...scheduleForm, time: e.target.value})} className="w-full px-6 py-4 bg-white border border-slate-200 rounded-2xl focus:outline-none focus:border-gold font-bold text-xs" placeholder="Ex: 07h30" />
+                  </div>
+                  <div className="space-y-2">
+                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">Bateau</label>
+                     <input value={scheduleForm.ship} onChange={e => setScheduleForm({...scheduleForm, ship: e.target.value})} className="w-full px-6 py-4 bg-white border border-slate-200 rounded-2xl focus:outline-none focus:border-gold font-bold text-xs" placeholder="Ex: Mugote 1" />
+                  </div>
+                  <div className="space-y-2">
+                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">Fréquence/Jours</label>
+                     <input value={scheduleForm.days} onChange={e => setScheduleForm({...scheduleForm, days: e.target.value})} className="w-full px-6 py-4 bg-white border border-slate-200 rounded-2xl focus:outline-none focus:border-gold font-bold text-xs" placeholder="Ex: Tous les jours" />
+                  </div>
+                  <div className="flex items-end gap-2">
+                     <button type="submit" className="flex-1 py-4 bg-black text-white rounded-2xl font-black uppercase text-[10px] tracking-widest hover:scale-105 active:scale-95 transition-all shadow-xl shadow-black/20">
+                       Publier Horaire
+                     </button>
+                     {scheduleForm.id && (
+                        <button type="button" onClick={() => setScheduleForm({ id: '', from: '', to: '', time: '', ship: '', days: '' })} className="p-4 bg-slate-200 text-slate-600 rounded-2xl">
+                          <X size={20} />
+                        </button>
+                     )}
+                  </div>
+               </form>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+              {schedules.map((s, i) => (
+                <div key={i} className="bg-white p-8 rounded-[40px] border border-slate-100 shadow-xl shadow-slate-200/50 group relative overflow-hidden">
+                  <div className="absolute top-0 right-0 p-6 flex gap-2">
+                    <button onClick={() => setScheduleForm(s)} className="w-10 h-10 bg-slate-50 text-slate-400 hover:bg-black hover:text-white rounded-xl flex items-center justify-center transition-all border border-slate-100"><Edit size={16} /></button>
+                    <button onClick={() => deleteSchedule(s.id)} className="w-10 h-10 bg-slate-50 text-slate-400 hover:bg-rose-500 hover:text-white rounded-xl flex items-center justify-center transition-all border border-slate-100"><Trash2 size={16} /></button>
+                  </div>
+                  <div className="w-16 h-16 bg-slate-50 rounded-3xl flex items-center justify-center text-maritime mb-8 border border-slate-100">
+                    <Clock size={32} />
+                  </div>
+                  <div className="flex items-center gap-6 mb-8">
+                     <div className="flex-1">
+                        <p className="text-[10px] font-black text-slate-300 uppercase mb-2 tracking-widest">DÉPART</p>
+                        <p className="text-2xl font-black uppercase italic tracking-tighter text-black">{s.from}</p>
+                     </div>
+                     <div className="w-10 h-px bg-slate-100" />
+                     <div className="flex-1 text-right">
+                        <p className="text-[10px] font-black text-slate-300 uppercase mb-2 tracking-widest">ARRIVÉE</p>
+                        <p className="text-2xl font-black uppercase italic tracking-tighter text-black">{s.to}</p>
+                     </div>
+                  </div>
+                  <div className="pt-8 border-t border-slate-50 flex justify-between items-center bg-slate-50/30 -mx-8 px-8 -mb-8 py-6">
+                     <div className="flex flex-col">
+                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Heure Locale</span>
+                        <span className="text-3xl font-mono font-black text-gold leading-none mt-1">{s.time}</span>
+                     </div>
+                     <div className="text-right">
+                         <p className="text-[11px] font-black text-maritime uppercase tracking-tighter italic">{s.ship || 'Tous Navires'}</p>
+                         <p className="text-[9px] font-bold text-slate-400 uppercase mt-1">{s.days || 'Quotidien'}</p>
+                     </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
         ) : tab === 'media' ? (
           <div className="p-12 space-y-16">
-            <div className="max-w-2xl">
-              <h3 className="text-lg font-extrabold text-maritime uppercase tracking-tighter mb-8 italic">
-                {editMediaId ? 'Modifier la Publication' : 'Publier une Actualité'}
-              </h3>
-              <form onSubmit={handleAddMedia} className="space-y-6">
-                <div className="grid grid-cols-2 gap-4">
-                  <input 
-                    required
-                    placeholder="Titre de l'article"
-                    value={newMedia.title}
-                    onChange={e => setNewMedia({...newMedia, title: e.target.value})}
-                    className="px-6 py-3 border border-slate-200 rounded-xl focus:border-maritime outline-none text-sm font-bold"
-                  />
-                  <select 
-                    value={newMedia.type}
-                    onChange={e => setNewMedia({...newMedia, type: e.target.value as any})}
-                    className="px-6 py-3 border border-slate-200 rounded-xl focus:border-maritime outline-none text-[11px] font-bold uppercase tracking-widest"
-                  >
-                    <option value="image">Format Photo(s)</option>
-                    <option value="video">Format Vidéo</option>
-                    <option value="text">Format Texte</option>
-                  </select>
+            <div className="max-w-4xl mx-auto">
+              <div className="bg-slate-50 p-10 rounded-[32px] border border-slate-100 mb-12 shadow-inner">
+                <div className="mb-8">
+                  <h3 className="text-xl font-black text-maritime uppercase tracking-tighter italic mb-2">
+                    {editMediaId ? 'Modifier la Publication' : 'Publication Rapide'}
+                  </h3>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Postez vos photos, vidéos ou messages instantanément</p>
                 </div>
-                {newMedia.type !== 'text' && (
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black uppercase text-slate-400 px-1 tracking-widest">URL Externe (Youtube, Direct Link...) ou Fichier</label>
-                    <input 
-                      placeholder="https://..."
-                      value={newMedia.url}
-                      onChange={e => setNewMedia({...newMedia, url: e.target.value})}
-                      className="w-full px-6 py-3 border border-slate-200 rounded-xl focus:border-maritime outline-none text-xs font-mono"
-                    />
-                  </div>
-                )}
-                <textarea 
-                  required
-                  placeholder="Partagez les détails de cette mise à jour..."
-                  value={newMedia.desc}
-                  onChange={e => setNewMedia({...newMedia, desc: e.target.value})}
-                  className="w-full px-8 py-6 bg-slate-50 border border-slate-100 rounded-3xl focus:outline-none focus:ring-4 focus:ring-maritime/5 focus:bg-white transition-all text-sm font-medium leading-relaxed resize-none h-40"
-                />
-                  <div className="space-y-6">
-                    {newMedia.type !== 'text' && (
+                
+                <form onSubmit={handleAddMedia} className="space-y-8">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-6">
                       <div className="flex flex-col gap-4">
                         <input 
                           type="file" 
                           ref={mediaInputRef}
                           onChange={handleFileChange}
                           className="hidden"
-                          accept={newMedia.type === 'video' ? "video/*" : "image/*"}
-                          multiple={newMedia.type === 'image'}
+                          accept="image/*,video/*"
+                          multiple
                         />
                         <button 
                           type="button"
                           onClick={() => mediaInputRef.current?.click()}
                           className={cn(
-                            "w-full py-5 border-2 border-dashed rounded-[24px] text-[11px] font-bold transition-all flex items-center justify-center gap-3 uppercase tracking-[0.2em] shadow-inner",
-                            (newMedia.media.length > 0 || previewUrls.length > 0) ? "border-emerald-200 bg-emerald-50 text-emerald-600" : "border-slate-200 bg-slate-50 text-slate-400 hover:border-maritime hover:text-maritime"
+                            "w-full aspect-[16/6] border-4 border-dashed rounded-[32px] transition-all flex flex-col items-center justify-center gap-4 uppercase tracking-[0.2em] shadow-xl group",
+                            (newMedia.media.length > 0 || previewUrls.length > 0) ? "border-emerald-400 bg-emerald-50 text-emerald-600" : "border-slate-200 bg-white text-slate-300 hover:border-maritime hover:text-maritime hover:bg-slate-50"
                           )}
                         >
-                          <ImagePlus size={18} /> 
-                          {(newMedia.media.length > 0 || previewUrls.length > 0) ? `${newMedia.media.length + previewUrls.length} fichier(s) sélectionné(s) ✓` : `Sélectionner ${newMedia.type === 'video' ? 'la Vidéo' : 'la Photo'}`}
+                          <div className={cn(
+                            "w-16 h-16 rounded-full flex items-center justify-center transition-all",
+                            (newMedia.media.length > 0 || previewUrls.length > 0) ? "bg-emerald-500 text-white" : "bg-slate-100 text-slate-400 group-hover:bg-maritime group-hover:text-white"
+                          )}>
+                            {(newMedia.media.length > 0 || previewUrls.length > 0) ? <Check size={32} /> : <Camera size={32} />}
+                          </div>
+                          <div className="text-center">
+                            <span className="text-[11px] font-black block">
+                              {(newMedia.media.length > 0 || previewUrls.length > 0) ? `${newMedia.media.length + previewUrls.length} Fichiers sélectionnés` : "Sélectionner Photos / Vidéos"}
+                            </span>
+                            <span className="text-[8px] opacity-60">Glissez-déposez ou cliquez ici</span>
+                          </div>
                         </button>
                         
                         {(newMedia.media.length > 0 || previewUrls.length > 0) && (
-                          <div className="flex gap-4 p-5 bg-slate-100/50 rounded-3xl border border-slate-200/50 overflow-x-auto no-scrollbar scroll-smooth shadow-inner">
-                            {/* Existing URLs */}
+                          <div className="flex gap-3 p-4 bg-white/50 rounded-2xl border border-slate-100 overflow-x-auto no-scrollbar scroll-smooth">
+                            {/* Previously uploaded media items */}
                             {newMedia.media.map((url, i) => (
                               <div key={`existing-${i}`} className="relative group flex-shrink-0">
-                                {newMedia.type === 'video' ? (
-                                  <video src={url || undefined} className="w-28 h-28 rounded-2xl object-cover border border-slate-200 shadow-sm opacity-50 transition-all group-hover:opacity-100" />
-                                ) : (
-                                  <img src={url || undefined} className="w-28 h-28 rounded-2xl object-cover border border-slate-200 shadow-sm opacity-50 transition-all group-hover:opacity-100" />
-                                )}
+                                <div className="w-20 h-20 rounded-xl overflow-hidden border-2 border-emerald-500 shadow-sm">
+                                  <img src={url || undefined} className="w-full h-full object-cover" />
+                                </div>
                                 <button 
                                   type="button" 
                                   onClick={() => {
                                     const next = [...newMedia.media];
                                     next.splice(i, 1);
-                                    setNewMedia(prev => ({ ...prev, media: next, url: next[0] || '' }));
+                                    setNewMedia(prev => ({ ...prev, media: next }));
                                   }}
-                                  className="absolute -top-2 -right-2 bg-rose-500 text-white p-2.5 rounded-full shadow-xl hover:scale-110 active:scale-90 transition-all border-2 border-white z-10"
+                                  className="absolute -top-1 -right-1 bg-rose-500 text-white p-1.5 rounded-full shadow-lg hover:scale-110 transition-all border border-white z-10"
                                 >
-                                  <X size={14} />
+                                  <X size={10} />
                                 </button>
                               </div>
                             ))}
-                            {/* Pending Files (Previews) */}
+                            {/* New files to be uploaded */}
                             {previewUrls.map((url, i) => (
                               <div key={`pending-${i}`} className="relative group flex-shrink-0">
-                                {newMedia.type === 'video' ? (
-                                  <video src={url || undefined} className="w-28 h-28 rounded-2xl object-cover border-2 border-emerald-500/30 shadow-md" />
-                                ) : (
-                                  <img src={url || undefined} className="w-28 h-28 rounded-2xl object-cover border-2 border-emerald-500/30 shadow-md" />
-                                )}
+                                <div className="w-20 h-20 rounded-xl overflow-hidden border-2 border-slate-200 shadow-sm">
+                                  <img src={url || undefined} className="w-full h-full object-cover" />
+                                </div>
                                 <button 
                                   type="button" 
                                   onClick={() => {
@@ -3049,58 +3289,78 @@ function Dashboard({ siteSettings, onNavigate }: { siteSettings?: { homeBg: stri
                                     nextFiles.splice(i, 1);
                                     setNewMedia(prev => ({ ...prev, pendingFiles: nextFiles }));
                                   }}
-                                  className="absolute -top-2 -right-2 bg-rose-500 text-white p-2.5 rounded-full shadow-xl hover:scale-110 active:scale-90 transition-all border-2 border-white z-10"
+                                  className="absolute -top-1 -right-1 bg-rose-500 text-white p-1.5 rounded-full shadow-lg hover:scale-110 transition-all border border-white z-10"
                                 >
-                                  <X size={14} />
+                                  <X size={10} />
                                 </button>
                               </div>
                             ))}
                           </div>
                         )}
                       </div>
-                    )}
-                     <div className="flex flex-col gap-4">
-                       <button 
-                        type="submit"
-                        disabled={uploading === 'media_publish'}
-                        className="w-full py-5 bg-maritime text-white rounded-[24px] text-xs font-black uppercase tracking-[0.3em] shadow-xl shadow-maritime/30 hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-30 flex items-center justify-center min-w-[200px]"
-                      >
-                        {uploading === 'media_publish' ? (
-                          <div className="flex flex-col items-center gap-2">
-                             <div className="flex items-center gap-3">
-                               <div className="w-5 h-5 border-2 border-white/20 border-t-white rounded-full animate-spin" />
-                               <span className="text-[10px] lowercase opacity-70">Publication en cours...</span>
-                             </div>
-                             {uploadProgress > 0 && (
-                               <div className="w-full bg-white/10 h-1 rounded-full overflow-hidden">
-                                  <div className="bg-gold h-full transition-all duration-300" style={{ width: `${uploadProgress}%` }} />
-                               </div>
-                             )}
-                          </div>
-                        ) : (
-                          <div className="flex items-center gap-2">
-                             <Send size={18} />
-                             {editMediaId ? "Enregistrer" : "Publier"}
-                          </div>
-                        )}
-                      </button>
-                      {editMediaId && (
-                        <button 
-                          type="button"
-                          onClick={() => {
-                            setEditMediaId(null);
-                            setNewMedia({ title: '', desc: '', url: '', type: 'image', media: [], pendingFiles: [] });
-                            setPreviewUrls([]);
-                          }}
-                          className="w-full py-4 text-slate-400 font-bold uppercase tracking-widest text-[10px] rounded-2xl hover:bg-slate-50 transition-all"
-                        >
-                          Annuler modification
-                        </button>
-                      )}
+                    </div>
+
+                    <div className="space-y-6 flex flex-col justify-between">
+                      <div className="space-y-4">
+                        <input 
+                          placeholder="Titre (ex: Mugote 2 à l'embarcadère)"
+                          value={newMedia.title}
+                          onChange={e => setNewMedia({...newMedia, title: e.target.value})}
+                          className="w-full px-8 py-5 bg-white border border-slate-100 rounded-[20px] focus:outline-none focus:ring-4 focus:ring-maritime/5 transition-all text-sm font-bold uppercase tracking-tight italic"
+                        />
+                        <textarea 
+                          placeholder="Écrivez une description ou un message ici..."
+                          value={newMedia.desc}
+                          onChange={e => setNewMedia({...newMedia, desc: e.target.value})}
+                          className="w-full px-8 py-6 bg-white border border-slate-100 rounded-[24px] focus:outline-none focus:ring-4 focus:ring-maritime/5 transition-all text-sm font-medium leading-relaxed resize-none h-40"
+                        />
+                      </div>
                     </div>
                   </div>
-              </form>
-            </div>
+
+                  <div className="pt-6 border-t border-slate-200/50 flex flex-col md:flex-row gap-4 items-center">
+                    <button 
+                      type="submit"
+                      disabled={uploading === 'media_publish'}
+                      className={cn(
+                        "flex-1 w-full py-6 rounded-[24px] text-xs font-black uppercase tracking-[0.4em] shadow-2xl transition-all flex items-center justify-center min-w-[200px] border-b-4",
+                        uploading === 'media_publish'
+                          ? "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed" 
+                          : "bg-black text-white border-slate-700 hover:scale-[1.02] active:scale-95 shadow-black/30"
+                      )}
+                    >
+                      {uploading === 'media_publish' ? (
+                        <div className="flex flex-col items-center gap-2">
+                           <div className="flex items-center gap-3 text-gold">
+                             <div className="w-5 h-5 border-2 border-gold/20 border-t-gold rounded-full animate-spin" />
+                             <span className="text-[10px] font-black uppercase tracking-widest animate-pulse italic">
+                               Publication en cours... {uploadProgress > 0 ? `${uploadProgress}%` : ''}
+                             </span>
+                           </div>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-4">
+                           <Rocket size={24} className="text-gold" />
+                           <span>Publier Maintenant</span>
+                        </div>
+                      )}
+                    </button>
+                    {editMediaId && (
+                      <button 
+                        type="button"
+                        onClick={() => {
+                          setEditMediaId(null);
+                          setNewMedia({ title: '', desc: '', url: '', type: 'image', media: [], pendingFiles: [] });
+                          setPreviewUrls([]);
+                        }}
+                        className="px-10 py-6 text-slate-400 font-bold uppercase tracking-widest text-[10px] rounded-[24px] hover:bg-slate-200 transition-all"
+                      >
+                        Annuler modification
+                      </button>
+                    )}
+                  </div>
+                </form>
+              </div>
 
             <div className="space-y-6">
               <div className="flex justify-between items-center">
@@ -3109,7 +3369,7 @@ function Dashboard({ siteSettings, onNavigate }: { siteSettings?: { homeBg: stri
                   onClick={() => window.location.reload()}
                   className="flex items-center gap-2 text-[9px] font-black uppercase tracking-widest text-maritime bg-maritime/5 px-4 py-2 rounded-full hover:bg-maritime/10 transition-all border border-maritime/10"
                 >
-                  <Clock3 size={12} /> Sync. Flux
+                  <RotateCw size={12} /> Actualiser tout
                 </button>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
@@ -3161,7 +3421,8 @@ function Dashboard({ siteSettings, onNavigate }: { siteSettings?: { homeBg: stri
               </div>
             </div>
           </div>
-        ) : tab === 'messages' ? (
+        </div>
+      ) : tab === 'messages' ? (
           <div className="grid grid-cols-1 md:grid-cols-12 min-h-[600px]">
             <div className="md:col-span-4 border-r border-slate-100 overflow-y-auto max-h-[600px] bg-slate-50/20">
                <div className="p-6 border-b border-slate-100 bg-white/50 backdrop-blur-md sticky top-0 z-10">
@@ -3247,8 +3508,9 @@ function Dashboard({ siteSettings, onNavigate }: { siteSettings?: { homeBg: stri
           </div>
         )}
       </div>
-    </motion.div>
-  );
+    )}
+  </motion.div>
+);
 }
 
 function GalleryView({ siteSettings }: { siteSettings: any }) {
@@ -3257,17 +3519,28 @@ function GalleryView({ siteSettings }: { siteSettings: any }) {
   const [filter, setFilter] = useState<'all' | 'video' | 'image' | 'text'>('all');
 
   useEffect(() => {
-    const q = query(collection(db, 'news'), orderBy('publishedAt', 'desc'));
+    const q = query(collection(db, 'news'), limit(1000));
     const unsub = onSnapshot(q, (snapshot) => {
-      setMedia(snapshot.docs.map(doc => {
+      const items = snapshot.docs.map(doc => {
         const data = doc.data();
+        const type = (data.type || '').toLowerCase();
+        const url = data.url || data.videoUrl || data.imageUrl || data.image || data.video || data.contentUrl || '';
+        const isVideo = type === 'video' || (url && url.match(/\.(mp4|webm|ogg|mov)(\?.*)?$/i)) || !!(data.videoUrl || data.video);
+
         return {
           ...data,
           id: doc.id,
-          processedUrl: data.url || data.videoUrl || data.imageUrl || data.image || data.video || data.contentUrl || '',
-          processedType: (data.type || (data.videoUrl || data.video ? 'video' : (data.imageUrl || data.image ? 'image' : 'text'))).toLowerCase(),
-          processedDesc: data.desc || data.content || data.description || data.text || ''
+          processedUrl: url,
+          processedType: isVideo ? 'video' : (type === 'text' && !url ? 'text' : 'image'),
+          processedDesc: data.desc || data.content || data.description || data.text || '',
+          sortDate: data.publishedAt || data.updatedAt || data.createdAt || { seconds: 0 }
         };
+      });
+
+      setMedia(items.sort((a, b) => {
+        const ta = a.sortDate?.seconds || 0;
+        const tb = b.sortDate?.seconds || 0;
+        return tb - ta;
       }));
       setLoading(false);
     });
@@ -3383,9 +3656,15 @@ function NewsComments({ newsId }: { newsId: string }) {
   const [count, setCount] = useState(0);
 
   useEffect(() => {
-    const q = query(collection(db, 'news', newsId, 'comments'), orderBy('createdAt', 'desc'));
+    const q = query(collection(db, 'news', newsId, 'comments'));
     const unsub = onSnapshot(q, (snapshot) => {
-      setComments(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id })));
+      const items = snapshot.docs.map(doc => ({ ...doc.data() as any, id: doc.id }));
+      items.sort((a, b) => {
+        const ta = a.createdAt?.seconds || 0;
+        const tb = b.createdAt?.seconds || 0;
+        return tb - ta;
+      });
+      setComments(items);
       setCount(snapshot.size);
     });
     return unsub;
@@ -3511,18 +3790,32 @@ function NewsView() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const q = query(collection(db, 'news'), orderBy('publishedAt', 'desc'));
+    const q = query(collection(db, 'news'), limit(1000));
     const unsub = onSnapshot(q, (snapshot) => {
-      setNews(snapshot.docs.map(doc => {
+      const items = snapshot.docs.map(doc => {
         const data = doc.data();
+        const type = (data.type || '').toLowerCase();
+        const url = data.url || data.videoUrl || data.imageUrl || data.image || data.video || data.contentUrl || '';
+        const isVideo = type === 'video' || (url && url.match(/\.(mp4|webm|ogg|mov)(\?.*)?$/i)) || !!(data.videoUrl || data.video);
+
         return {
           ...data,
           id: doc.id,
-          processedUrl: data.url || data.videoUrl || data.imageUrl || data.image || data.video || data.contentUrl || '',
-          processedType: (data.type || (data.videoUrl || data.video ? 'video' : (data.imageUrl || data.image ? 'image' : 'text'))).toLowerCase(),
-          processedDesc: data.desc || data.content || data.description || data.text || ''
+          processedUrl: url,
+          processedType: isVideo ? 'video' : (type === 'text' && !url ? 'text' : 'image'),
+          processedDesc: data.desc || data.content || data.description || data.text || '',
+          sortDate: data.publishedAt || data.updatedAt || data.createdAt || { seconds: 0 }
         };
+      });
+
+      setNews(items.sort((a, b) => {
+        const ta = a.sortDate?.seconds || 0;
+        const tb = b.sortDate?.seconds || 0;
+        return tb - ta;
       }));
+      setLoading(false);
+    }, (error) => {
+      console.error("News view error:", error);
       setLoading(false);
     });
     return unsub;
@@ -3558,12 +3851,22 @@ function NewsView() {
                 <div className="h-72 overflow-hidden bg-slate-900/50 flex items-center justify-center border-t border-white/5 shadow-inner relative">
                   {n.processedType === 'video' ? (
                     <video 
+                      key={n.processedUrl}
                       src={n.processedUrl || undefined} 
-                      className="w-full h-full object-contain"
+                      className="w-full h-full object-contain bg-black"
                       controls
                       autoPlay={false}
                       muted={false}
-                    />
+                      playsInline
+                    >
+                      {n.processedUrl && (
+                        <>
+                          <source src={n.processedUrl} type="video/mp4" />
+                          <source src={n.processedUrl} type="video/quicktime" />
+                        </>
+                      )}
+                      Votre navigateur ne supporte pas la lecture de vidéos.
+                    </video>
                   ) : n.processedType === 'image' ? (
                     <div className="w-full h-full flex overflow-x-auto snap-x snap-mandatory no-scrollbar bg-slate-900">
                       {(n.media && n.media.length > 0 ? n.media : [n.processedUrl]).map((img: string, idx: number) => (

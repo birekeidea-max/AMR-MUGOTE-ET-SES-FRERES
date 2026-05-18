@@ -99,6 +99,20 @@
         "updatedAt": { "type": "string", "format": "date-time" }
       },
       "required": ["name", "capacity"]
+    },
+    "Schedule": {
+      "title": "Schedule",
+      "description": "Port departure schedule.",
+      "type": "object",
+      "properties": {
+        "from": { "type": "string" },
+        "to": { "type": "string" },
+        "time": { "type": "string" },
+        "ship": { "type": "string" },
+        "days": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["from", "to", "time"]
     }
   },
   "firestore": {
@@ -129,6 +143,10 @@
     "conversations/{conversationId}/messages": {
       "schema": { "$ref": "#/entities/Message" },
       "description": "Messages within a specific chat."
+    },
+    "schedules": {
+      "schema": { "$ref": "#/entities/Schedule" },
+      "description": "Port departure schedules."
     }
   }
 }

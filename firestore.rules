@@ -160,5 +160,16 @@ service cloud.firestore {
       allow read: if isAdmin();
       allow write: if isOwner(userId) || isAdmin();
     }
+
+    // Schedules (Public Read, Admin Write)
+    match /schedules/{scheduleId} {
+      function isValidSchedule(data) {
+        return data.from is string && data.from.size() > 0 &&
+               data.to is string && data.to.size() > 0 &&
+               data.time is string && data.time.size() > 0;
+      }
+      allow read: if true;
+      allow write: if isAdmin() && isValidSchedule(incoming());
+    }
   }
 }
