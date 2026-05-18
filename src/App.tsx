@@ -54,6 +54,9 @@ import {
   GoogleAuthProvider, 
   onAuthStateChanged, 
   signOut,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  updateProfile,
   User as FirebaseUser
 } from 'firebase/auth';
 import { 
@@ -263,6 +266,7 @@ const generateTicket = async (res: Reservation, siteSettings: { homeBg: string }
 export default function App() {
   const [currentPage, setCurrentPage] = useState<Page>('home');
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [showLoginModal, setShowLoginModal] = useState(false);
   const [user, setUser] = useState<FirebaseUser | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -375,22 +379,7 @@ export default function App() {
     return () => unsub();
   }, []);
 
-  const login = async () => {
-    const provider = new GoogleAuthProvider();
-    try {
-      await signInWithPopup(auth, provider);
-    } catch (error: any) {
-      console.error("Login failed", error);
-      if (error.code === 'auth/popup-blocked') {
-        alert("Le popup de connexion a été bloqué par votre navigateur. Veuillez l'autoriser et réessayer.");
-      } else if (error.code === 'auth/unauthorized-domain') {
-        alert("Ce domaine n'est pas autorisé pour l'authentification Firebase. Veuillez ajouter ce domaine dans la console Firebase (Authentification > Paramètres > Domaines autorisés).");
-      } else {
-        alert("Échec de la connexion : " + (error.message || "Erreur inconnue"));
-      }
-    }
-  };
-
+  const login = () => setShowLoginModal(true);
   const logout = () => signOut(auth);
 
   useEffect(() => {
@@ -734,6 +723,170 @@ export default function App() {
         </div>
       </footer>
       <ChatWidget user={user} />
+      <LoginModal isOpen={showLoginModal} onClose={() => setShowLoginModal(false)} />
+    </div>
+  );
+}
+
+function LoginModal({ isOpen, onClose }: { isOpen: boolean, onClose: () => void }) {
+  const [isSignUp, setIsSignUp] = useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [name, setName] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleGoogleLogin = async () => {
+    setLoading(true);
+    setError(null);
+    const provider = new GoogleAuthProvider();
+    try {
+      await signInWithPopup(auth, provider);
+      onClose();
+    } catch (err: any) {
+      console.error(err);
+      setError("Échec de la connexion avec Google.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+    try {
+      if (isSignUp) {
+        const res = await createUserWithEmailAndPassword(auth, email, password);
+        await updateProfile(res.user, { displayName: name });
+      } else {
+        await signInWithEmailAndPassword(auth, email, password);
+      }
+      onClose();
+    } catch (err: any) {
+      console.error(err);
+      let msg = "Une erreur est survenue.";
+      if (err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') msg = "Mot de passe ou identifiant incorrect.";
+      else if (err.code === 'auth/user-not-found') msg = "Aucun compte trouvé avec cet e-mail.";
+      else if (err.code === 'auth/email-already-in-use') msg = "Cet e-mail est déjà utilisé.";
+      else if (err.code === 'auth/weak-password') msg = "Le mot de passe est trop court.";
+      setError(msg);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
+      <motion.div 
+        initial={{ opacity: 0 }} 
+        animate={{ opacity: 1 }} 
+        exit={{ opacity: 0 }}
+        onClick={onClose}
+        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+      />
+      <motion.div 
+        initial={{ opacity: 0, scale: 0.9, y: 20 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        className="bg-white w-full max-w-md rounded-[32px] overflow-hidden shadow-2xl relative z-10 p-8 md:p-12"
+      >
+        <button onClick={onClose} className="absolute top-6 right-6 p-2 hover:bg-slate-100 rounded-full transition-colors">
+          <X size={20} />
+        </button>
+
+        <div className="text-center mb-8">
+          <div className="w-16 h-16 bg-maritime/5 rounded-2xl flex items-center justify-center mx-auto mb-4">
+            <Ship className="text-maritime" size={32} />
+          </div>
+          <h2 className="text-2xl font-black uppercase tracking-tight italic">
+            {isSignUp ? "Créer un compte" : "Connexion"}
+          </h2>
+          <p className="text-slate-500 text-sm font-medium mt-1 uppercase tracking-wider text-center">
+            {isSignUp ? "Rejoignez la flotte Mugote" : "Bienvenue à bord"}
+          </p>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {isSignUp && (
+            <div>
+              <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1 ml-1 text-left">Nom Complet</label>
+              <input 
+                required
+                type="text" 
+                value={name} 
+                onChange={e => setName(e.target.value)}
+                className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl focus:outline-none focus:ring-2 ring-maritime/5 text-sm font-bold"
+                placeholder="Ex: John Doe"
+              />
+            </div>
+          )}
+          <div>
+            <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1 ml-1 text-left">Email</label>
+            <input 
+              required
+              type="email" 
+              value={email} 
+              onChange={e => setEmail(e.target.value)}
+              className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl focus:outline-none focus:ring-2 ring-maritime/5 text-sm font-bold"
+              placeholder="Ex: passager@email.com"
+            />
+          </div>
+          <div>
+            <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1 ml-1 text-left">Mot de Passe</label>
+            <input 
+              required
+              type="password" 
+              value={password} 
+              onChange={e => setPassword(e.target.value)}
+              className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl focus:outline-none focus:ring-2 ring-maritime/5 text-sm font-bold"
+              placeholder="••••••••"
+            />
+          </div>
+
+          {error && (
+            <p className="text-rose-500 text-[11px] font-black uppercase text-center bg-rose-50 py-3 rounded-xl border border-rose-100">
+              {error}
+            </p>
+          )}
+
+          <button 
+            type="submit"
+            disabled={loading}
+            className="w-full py-5 bg-black text-white font-black rounded-2xl uppercase tracking-[0.2em] text-xs shadow-xl shadow-black/20 hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-50"
+          >
+            {loading ? "Chargement..." : isSignUp ? "S'inscrire" : "Se Connecter"}
+          </button>
+        </form>
+
+        <div className="mt-8">
+          <div className="relative mb-8">
+            <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-slate-100"></div></div>
+            <div className="relative flex justify-center text-[10px] font-black uppercase tracking-widest"><span className="bg-white px-4 text-slate-300 italic">Ou continuer avec</span></div>
+          </div>
+
+          <button 
+            onClick={handleGoogleLogin}
+            disabled={loading}
+            className="w-full py-4 border-2 border-slate-100 text-slate-600 font-bold rounded-2xl flex items-center justify-center gap-3 hover:bg-slate-50 transition-all text-sm"
+          >
+            <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-5 h-5" alt="Google" />
+            Google
+          </button>
+        </div>
+
+        <p className="mt-8 text-center text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+          {isSignUp ? "Déjà un compte ?" : "Nouveau passager ?"} 
+          <button 
+            type="button"
+            onClick={() => setIsSignUp(!isSignUp)}
+            className="ml-2 text-maritime hover:underline"
+          >
+            {isSignUp ? "Se connecter" : "Créer un compte"}
+          </button>
+        </p>
+      </motion.div>
     </div>
   );
 }
@@ -964,6 +1117,13 @@ function ChatWidget({ user }: { user: FirebaseUser | null }) {
 
     } catch (error) {
       console.error("Chat error", error);
+      // Show error in chat if it fails
+      await addDoc(collection(db, 'conversations', convId, 'messages'), {
+        text: "Désolé, je rencontre un problème technique. Veuillez réessayer dans quelques instants.",
+        senderId: 'ai',
+        senderRole: 'AI',
+        createdAt: serverTimestamp()
+      });
     } finally {
       setSending(false);
     }
@@ -2135,8 +2295,6 @@ function Dashboard({ siteSettings, onNavigate, schedules }: { siteSettings?: { h
   const [scheduleForm, setScheduleForm] = useState({ id: '', from: '', to: '', time: '', ship: '', days: '' });
   const [boatForm, setBoatForm] = useState({ id: '', name: '', capacity: 0, description: '', imageUrl: '' });
   const [editMediaId, setEditMediaId] = useState<string | null>(null);
-  const [isAdminUnlocked, setIsAdminUnlocked] = useState(false);
-  const [adminCode, setAdminCode] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [newsList, setNewsList] = useState<any[]>([]);
   const [conversations, setConversations] = useState<any[]>([]);
@@ -2261,8 +2419,6 @@ function Dashboard({ siteSettings, onNavigate, schedules }: { siteSettings?: { h
   };
 
   useEffect(() => {
-    if (!isAdminUnlocked) return;
-
     // Reservations Listener
     const qRes = query(collection(db, 'reservations'));
     const unsubRes = onSnapshot(qRes, (snapshot) => {
@@ -2338,16 +2494,7 @@ function Dashboard({ siteSettings, onNavigate, schedules }: { siteSettings?: { h
     });
 
     return () => { unsubRes(); unsubUsers(); unsubNews(); unsubConv(); unsubFleet(); };
-  }, [isAdminUnlocked]);
-
-  const handleCodeSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (adminCode === 'b012000b') {
-      setIsAdminUnlocked(true);
-    } else {
-      alert("Code incorrect.");
-    }
-  };
+  }, []);
 
   const copyToClipboard = (type: 'reservations' | 'users') => {
     let text = "";
@@ -2664,31 +2811,9 @@ function Dashboard({ siteSettings, onNavigate, schedules }: { siteSettings?: { h
       </button>
 
       <div className="flex flex-col items-center gap-10 border-b border-slate-200 pb-12 text-center">
-        {!isAdminUnlocked ? (
-          <div className="max-w-md w-full p-10 bg-white rounded-[32px] border border-slate-200 shadow-2xl">
-            <div className="w-20 h-20 bg-emerald-50 text-emerald-600 rounded-3xl flex items-center justify-center mx-auto mb-6">
-              <ShieldCheck size={40} />
-            </div>
-            <h3 className="text-xl font-extrabold uppercase tracking-tighter mb-6 italic">Accès Base de Données</h3>
-            <form onSubmit={handleCodeSubmit} className="space-y-4">
-              <input 
-                type="password"
-                placeholder="Entrez le code de sécurité"
-                value={adminCode}
-                onChange={e => setAdminCode(e.target.value)}
-                className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:border-emerald-500 font-mono text-center tracking-[0.5em] font-black"
-                autoFocus
-              />
-              <button className="w-full py-4 bg-emerald-600 text-white rounded-2xl font-black uppercase tracking-widest text-[10px] shadow-lg shadow-emerald-600/20 hover:scale-105 transition-all">
-                Déverrouiller
-              </button>
-            </form>
-            <p className="mt-8 text-[9px] font-black text-slate-400 uppercase tracking-widest">Seul l'Administrateur peut accéder à cette section</p>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            <h2 className="text-3xl font-extrabold tracking-tighter uppercase text-black leading-none">Administration</h2>
-            <div className="flex flex-wrap justify-center gap-2">
+        <div className="space-y-4">
+          <h2 className="text-3xl font-extrabold tracking-tighter uppercase text-black leading-none">Administration</h2>
+          <div className="flex flex-wrap justify-center gap-2">
               {[
                 { id: 'reservations', label: 'Réservations', icon: Ticket },
                 { id: 'users', label: 'Utilisateurs', icon: Users },
@@ -2711,9 +2836,8 @@ function Dashboard({ siteSettings, onNavigate, schedules }: { siteSettings?: { h
               ))}
             </div>
           </div>
-        )}
         
-        {isAdminUnlocked && tab === 'reservations' && (
+        {tab === 'reservations' && (
           <div className="space-y-6 w-full max-w-5xl mx-auto px-4">
             <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
               <div className="flex flex-wrap justify-center gap-4">
@@ -2806,8 +2930,7 @@ function Dashboard({ siteSettings, onNavigate, schedules }: { siteSettings?: { h
         )}
       </div>
 
-      {isAdminUnlocked && (
-        <div className="bg-white rounded-[32px] border border-slate-100 shadow-2xl shadow-slate-200/50 overflow-hidden">
+      <div className="bg-white rounded-[32px] border border-slate-100 shadow-2xl shadow-slate-200/50 overflow-hidden">
         {tab === 'reservations' ? (
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
@@ -3500,9 +3623,8 @@ function Dashboard({ siteSettings, onNavigate, schedules }: { siteSettings?: { h
           </div>
         )}
       </div>
-    )}
-  </motion.div>
-);
+    </motion.div>
+  );
 }
 
 function GalleryView({ siteSettings }: { siteSettings: any }) {
@@ -3542,10 +3664,10 @@ function GalleryView({ siteSettings }: { siteSettings: any }) {
   const filteredMedia = filter === 'all' ? media : media.filter(m => m.processedType === filter);
 
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-12 bg-slate-950 p-4 md:p-12 rounded-[40px] border border-white/5 shadow-2xl">
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-12 bg-white p-4 md:p-12 rounded-[40px] border border-slate-100 shadow-2xl">
       <div className="text-center space-y-6">
         <div className="space-y-2">
-          <h2 className="text-4xl font-extrabold tracking-tighter uppercase italic text-white">Galerie Officielle</h2>
+          <h2 className="text-4xl font-extrabold tracking-tighter uppercase italic text-black">Galerie Officielle</h2>
           <p className="text-[10px] uppercase tracking-[0.4em] text-gold font-black">Expérience immersive Mugote</p>
         </div>
 
@@ -3556,7 +3678,7 @@ function GalleryView({ siteSettings }: { siteSettings: any }) {
               onClick={() => setFilter(f as any)}
               className={cn(
                 "px-5 py-2 rounded-full text-[9px] font-black uppercase tracking-widest transition-all",
-                filter === f ? "bg-white text-black scale-110 shadow-xl" : "text-white/40 hover:text-white bg-white/5"
+                filter === f ? "bg-black text-white scale-110 shadow-xl" : "text-slate-400 hover:text-black bg-slate-50"
               )}
             >
               {f === 'all' ? 'Tout' : f === 'video' ? 'Vidéos' : f === 'image' ? 'Photos' : 'Textes'}
@@ -3566,9 +3688,9 @@ function GalleryView({ siteSettings }: { siteSettings: any }) {
       </div>
 
       {loading ? (
-        <div className="text-center py-20 text-white/20 animate-pulse text-[10px] font-black uppercase tracking-widest">Initialisation du flux...</div>
+        <div className="text-center py-20 text-slate-200 animate-pulse text-[10px] font-black uppercase tracking-widest">Initialisation du flux...</div>
       ) : filteredMedia.length === 0 ? (
-        <div className="text-center py-20 text-white/10 text-[10px] font-black uppercase tracking-widest border border-dashed border-white/5 rounded-3xl">Aucun contenu trouvé dans cette catégorie</div>
+        <div className="text-center py-20 text-slate-200 text-[10px] font-black uppercase tracking-widest border border-dashed border-slate-100 rounded-3xl">Aucun contenu trouvé dans cette catégorie</div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
           {filteredMedia.map((m, i) => (
@@ -3577,9 +3699,9 @@ function GalleryView({ siteSettings }: { siteSettings: any }) {
               key={m.id} 
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
-              className="bg-white/5 border border-white/10 shadow-2xl rounded-3xl overflow-hidden flex flex-col group hover:border-gold/50 transition-all duration-500"
+              className="bg-white border border-slate-100 shadow-2xl rounded-3xl overflow-hidden flex flex-col group hover:border-gold/50 transition-all duration-500"
             >
-              <div className="aspect-[16/10] bg-slate-900 relative overflow-hidden">
+              <div className="aspect-[16/10] bg-slate-100 relative overflow-hidden">
                 {m.processedType === 'video' ? (
                   <div className="w-full h-full relative">
                     <video 

@@ -1,4 +1,5 @@
 import express from "express";
+import "dotenv/config";
 import { createServer as createViteServer } from "vite";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -6,15 +7,6 @@ import { GoogleGenAI } from "@google/genai";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-
-const ai = new GoogleGenAI({
-  apiKey: process.env.GEMINI_API_KEY || '',
-  httpOptions: {
-    headers: {
-      'User-Agent': 'aistudio-build',
-    }
-  }
-});
 
 async function startServer() {
   const app = express();
@@ -30,26 +22,16 @@ async function startServer() {
         return res.status(400).json({ error: "Message is required" });
       }
 
-      if (!process.env.GEMINI_API_KEY) {
+      const apiKey = process.env.GEMINI_API_KEY;
+      if (!apiKey) {
         console.error("GEMINI_API_KEY is missing from environment variables");
-        return res.status(500).json({ error: "AI configuration missing. Please check Settings > Secrets." });
+        return res.status(500).json({ error: "Configuration de l'IA manquante." });
       }
 
-      console.log("Chat Request Message:", message);
-      
-      const contents = [
-        ...(history || []).map((h: any) => ({
-          role: h.role === 'AI' ? 'model' : 'user',
-          parts: [{ text: h.text }]
-        })),
-        { role: 'user', parts: [{ text: message }] }
-      ];
-
-      const response = await ai.models.generateContent({ 
-        model: "gemini-3-flash-preview",
-        contents,
-        config: {
-          systemInstruction: `Tu es l'assistant IA expert et officiel de "ETS AMR MUGOTE ET SES FRERES", la plateforme leader du transport lacustre sur le Lac Kivu en République Démocratique du Congo.
+      const genAI = new GoogleGenAI(apiKey);
+      const model = genAI.getGenerativeModel({ 
+        model: "gemini-1.5-flash",
+        systemInstruction: `Tu es l'assistant IA expert et officiel de "ETS AMR MUGOTE ET SES FRERES", la plateforme leader du transport lacustre sur le Lac Kivu en République Démocratique du Congo.
 Ta mission est d'accompagner les voyageurs dans chaque étape de leur expérience, du simple renseignement à la gestion de leurs billets.
 
 CONTEXTE DE L'ENTREPRISE :
@@ -85,15 +67,48 @@ TON ET STYLE :
 - Réponds uniquement en FRANÇAIS.
 - Si une question concerne un sujet hors transport ou hors Mugote, réponds : "Je suis ici spécifiquement pour vous aider avec vos voyages chez Mugote. Comment puis-je vous assister sur nos itinéraires Bukavu-Goma ?"
 - Ne mentionne jamais que tu es un modèle d'IA développé par Google. Tu es "Mugote AI Assistant".`,
-        }
       });
 
-      const responseText = response.text || "Je n'ai pas pu générer une réponse. Veuillez réessayer.";
+      console.log("Chat Request Message:", message);
+      
+      const contents = [];
+      const historyItems = history || [];
+      
+      for (const h of historyItems) {
+        const role = h.role === 'AI' ? 'model' : 'user';
+        if (contents.length > 0 && contents[contents.length - 1].role === role) {
+          contents[contents.length - 1].parts[0].text += "\n" + (h.text || "");
+        } else {
+          contents.push({ role, parts: [{ text: h.text || "" }] });
+        }
+      }
+
+      // Add the latest message
+      if (contents.length > 0 && contents[contents.length - 1].role === 'user') {
+        contents[contents.length - 1].parts[0].text += "\n" + message;
+      } else {
+        contents.push({ role: 'user', parts: [{ text: message }] });
+      }
+
+      // Ensure the first message is from 'user'
+      while (contents.length > 0 && contents[0].role !== 'user') {
+        contents.shift();
+      }
+
+      if (contents.length === 0) {
+        contents.push({ role: 'user', parts: [{ text: message }] });
+      }
+
+      // Standard generateContent takes { contents } or just a string
+      const result = await model.generateContent({ contents });
+      const response = await result.response;
+      const responseText = response.text();
+
       console.log("Chat Response Text:", responseText);
       res.json({ text: responseText });
-    } catch (error) {
-      console.error("Gemini Error:", error);
-      res.status(500).json({ error: "Désolé, l'assistant rencontre une erreur technique." });
+    } catch (error: any) {
+      console.error("Gemini Critical Error:", error);
+      res.status(500).json({ error: error.message || "Désolé, l'assistant rencontre une erreur technique." });
     }
   });
 
