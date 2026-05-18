@@ -1497,27 +1497,27 @@ function Booking({ onReserved, user }: { onReserved: (res: Reservation) => void,
       animate={{ opacity: 1, y: 0 }}
       className="max-w-6xl mx-auto py-12 px-4"
     >
-        <div className="flex flex-col lg:flex-row gap-12 items-start">
+        <div className="flex flex-col lg:flex-row gap-6 lg:gap-12 items-start">
           {/* Form in Tabular Style */}
-          <div className="flex-1 w-full space-y-8">
-            <div className="space-y-2 border-l-4 border-gold pl-6 py-2">
-              <h2 className="text-4xl font-black tracking-tighter text-black uppercase italic leading-none">Embarquement</h2>
-              <div className="text-slate-500 font-bold tracking-[0.2em] text-[9px] uppercase flex items-center gap-2">
-                <div className="w-1.5 h-1.5 bg-maritime rounded-full animate-pulse" /> 
-                Remplissez le tableau pour réserver votre place
+          <div className="flex-1 w-full space-y-2 lg:space-y-8">
+            <div className="space-y-1 lg:space-y-2 border-l-4 border-gold pl-3 lg:pl-6 py-0.5 lg:py-2">
+              <h2 className="text-xl lg:text-4xl font-black tracking-tighter text-black uppercase italic leading-none">Embarquement</h2>
+              <div className="text-slate-500 font-bold tracking-[0.2em] text-[7px] lg:text-[9px] uppercase flex items-center gap-1.5 lg:gap-2">
+                <div className="w-1 h-1 lg:w-1.5 lg:h-1.5 bg-maritime rounded-full animate-pulse" /> 
+                Réservation de place
               </div>
             </div>
 
-            <form onSubmit={handleSubmit} className="bg-white rounded-[24px] sm:rounded-[32px] border border-slate-200 shadow-2xl overflow-hidden">
+            <form onSubmit={handleSubmit} className="bg-white rounded-[16px] sm:rounded-[32px] border border-slate-200 shadow-xl lg:shadow-2xl overflow-hidden">
               {/* Header */}
-              <div className="bg-black text-white p-4 sm:p-6">
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gold/20 rounded-xl flex items-center justify-center text-gold">
-                    <Ship size={18} className="sm:w-5 sm:h-5" />
+              <div className="bg-black text-white p-2.5 lg:p-6">
+                <div className="flex items-center gap-2 lg:gap-3">
+                  <div className="w-7 h-7 sm:w-10 sm:h-10 bg-gold/20 rounded-lg lg:rounded-xl flex items-center justify-center text-gold">
+                    <Ship size={14} className="sm:w-5 sm:h-5" />
                   </div>
                   <div>
-                    <p className="text-[7px] sm:text-[9px] font-black uppercase tracking-widest opacity-60 leading-none mb-1">Navigation</p>
-                    <p className="text-sm sm:text-lg font-black uppercase tracking-tighter italic">Formulaire Officiel Mugote</p>
+                    <p className="text-[6px] sm:text-[9px] font-black uppercase tracking-widest opacity-60 leading-none mb-0.5 lg:mb-1">Navigation</p>
+                    <p className="text-[10px] sm:text-lg font-black uppercase tracking-tighter italic">Formulaire Mugote</p>
                   </div>
                 </div>
               </div>
@@ -1525,23 +1525,21 @@ function Booking({ onReserved, user }: { onReserved: (res: Reservation) => void,
               <div className="divide-y divide-slate-100">
                 {/* Identification */}
                 <div className="flex flex-col sm:flex-row group transition-colors hover:bg-slate-50/50">
-                  <div className="p-4 sm:p-6 sm:border-r border-slate-100 bg-slate-50/30 sm:w-[200px] shrink-0">
-                    <div className="flex flex-col gap-1">
-                      <label className="text-[10px] font-black uppercase text-maritime tracking-widest flex items-center gap-2">
-                        <User size={14} className="text-gold" /> Identité
-                        <Cat size={12} className="text-rose-400 animate-bounce" />
+                  <div className="p-2 lg:p-6 sm:border-r border-slate-100 bg-slate-50/30 sm:w-[150px] lg:w-[200px] shrink-0">
+                    <div className="flex flex-col gap-0.5 lg:gap-1">
+                      <label className="text-[8px] lg:text-[10px] font-black uppercase text-maritime tracking-widest flex items-center gap-1.5 lg:gap-2">
+                        <User size={10} className="text-gold" /> Identité
                       </label>
-                      <p className="text-[8px] text-slate-400 font-bold uppercase">Nom complet du voyageur</p>
                     </div>
                   </div>
-                  <div className="p-4 sm:p-6 flex-1">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                  <div className="p-2.5 lg:p-6 flex-1">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 lg:gap-4">
                       <input 
                         required
                         type="text" 
                         value={formData.fullName}
                         onChange={e => setFormData({ ...formData, fullName: e.target.value })}
-                        className="w-full px-4 py-2.5 sm:px-5 sm:py-3 bg-slate-50 border-2 border-maritime/30 rounded-xl sm:rounded-2xl focus:outline-none focus:ring-4 focus:ring-gold/10 focus:border-gold transition-all font-bold text-sm"
+                        className="w-full px-3 py-1.5 lg:px-5 lg:py-3 bg-slate-50 border-2 border-maritime/30 rounded-lg lg:rounded-2xl focus:outline-none focus:ring-4 focus:ring-gold/10 focus:border-gold transition-all font-bold text-[11px] lg:text-sm"
                         placeholder="NOM"
                       />
                       <input 
@@ -1549,7 +1547,7 @@ function Booking({ onReserved, user }: { onReserved: (res: Reservation) => void,
                         type="text" 
                         value={formData.lastName}
                         onChange={e => setFormData({ ...formData, lastName: e.target.value })}
-                        className="w-full px-4 py-2.5 sm:px-5 sm:py-3 bg-slate-50 border-2 border-maritime/30 rounded-xl sm:rounded-2xl focus:outline-none focus:ring-4 focus:ring-gold/10 focus:border-gold transition-all font-bold text-sm"
+                        className="w-full px-3 py-1.5 lg:px-5 lg:py-3 bg-slate-50 border-2 border-maritime/30 rounded-lg lg:rounded-2xl focus:outline-none focus:ring-4 focus:ring-gold/10 focus:border-gold transition-all font-bold text-[11px] lg:text-sm"
                         placeholder="POST-NOM"
                       />
                     </div>
@@ -1558,21 +1556,20 @@ function Booking({ onReserved, user }: { onReserved: (res: Reservation) => void,
 
                 {/* Contact */}
                 <div className="flex flex-col sm:flex-row group transition-colors hover:bg-slate-50/50">
-                  <div className="p-4 sm:p-6 sm:border-r border-slate-100 bg-slate-50/30 sm:w-[200px] shrink-0">
-                    <div className="flex flex-col gap-1">
-                      <label className="text-[10px] font-black uppercase text-maritime tracking-widest flex items-center gap-2">
-                        <Phone size={14} className="text-gold" /> Contact
+                  <div className="p-2 lg:p-6 sm:border-r border-slate-100 bg-slate-50/30 sm:w-[150px] lg:w-[200px] shrink-0">
+                    <div className="flex flex-col gap-0.5 lg:gap-1">
+                      <label className="text-[8px] lg:text-[10px] font-black uppercase text-maritime tracking-widest flex items-center gap-1.5 lg:gap-2">
+                        <Phone size={10} className="text-gold" /> Contact
                       </label>
-                      <p className="text-[8px] text-slate-400 font-bold uppercase">Numéro de téléphone</p>
                     </div>
                   </div>
-                  <div className="p-4 sm:p-6 flex-1">
+                  <div className="p-2.5 lg:p-6 flex-1">
                     <input 
                       required
                       type="tel" 
                       value={formData.phone}
                       onChange={e => setFormData({ ...formData, phone: e.target.value })}
-                      className="w-full px-4 py-2.5 sm:px-5 sm:py-3 bg-slate-50 border-2 border-maritime/30 rounded-xl sm:rounded-2xl focus:outline-none focus:ring-4 focus:ring-gold/10 focus:border-gold transition-all font-mono font-black text-sm text-maritime"
+                      className="w-full px-3 py-1.5 lg:px-5 lg:py-3 bg-slate-50 border-2 border-maritime/30 rounded-lg lg:rounded-2xl focus:outline-none focus:ring-4 focus:ring-gold/10 focus:border-gold transition-all font-mono font-black text-[11px] lg:text-sm text-maritime"
                       placeholder="+243 999 999 999"
                     />
                   </div>
@@ -1580,19 +1577,18 @@ function Booking({ onReserved, user }: { onReserved: (res: Reservation) => void,
 
                 {/* Destination */}
                 <div className="flex flex-col sm:flex-row group transition-colors hover:bg-slate-50/50">
-                  <div className="p-4 sm:p-6 sm:border-r border-slate-100 bg-slate-50/30 sm:w-[200px] shrink-0">
-                    <div className="flex flex-col gap-1">
-                      <label className="text-[10px] font-black uppercase text-maritime tracking-widest flex items-center gap-2">
-                        <MapPin size={14} className="text-gold" /> Destination
+                  <div className="p-2 lg:p-6 sm:border-r border-slate-100 bg-slate-50/30 sm:w-[150px] lg:w-[200px] shrink-0">
+                    <div className="flex flex-col gap-0.5 lg:gap-1">
+                      <label className="text-[8px] lg:text-[10px] font-black uppercase text-maritime tracking-widest flex items-center gap-1.5 lg:gap-2">
+                        <MapPin size={10} className="text-gold" /> Destination
                       </label>
-                      <p className="text-[8px] text-slate-400 font-bold uppercase">Itinéraire choisi</p>
                     </div>
                   </div>
-                  <div className="p-4 sm:p-6 flex-1">
+                  <div className="p-2.5 lg:p-6 flex-1">
                     <select 
                       value={formData.itinerary}
                       onChange={e => setFormData({ ...formData, itinerary: e.target.value as Itinerary })}
-                      className="w-full px-4 py-3 sm:px-6 sm:py-4 bg-maritime border-4 border-gold/30 text-white rounded-xl sm:rounded-2xl focus:outline-none focus:ring-4 ring-gold/20 transition-all font-black uppercase tracking-widest text-[9px] sm:text-[11px] appearance-none cursor-pointer"
+                      className="w-full px-3 py-2 lg:px-6 lg:py-4 bg-maritime border-2 lg:border-4 border-gold/30 text-white rounded-lg lg:rounded-2xl focus:outline-none focus:ring-4 ring-gold/20 transition-all font-black uppercase tracking-widest text-[7px] lg:text-[11px] appearance-none cursor-pointer"
                     >
                       <option value="Bukavu-Goma">Bukavu (Sud) → Goma (Nord)</option>
                       <option value="Goma-Bukavu">Goma (Nord) → Bukavu (Sud)</option>
@@ -1602,28 +1598,27 @@ function Booking({ onReserved, user }: { onReserved: (res: Reservation) => void,
 
                 {/* Schedule */}
                 <div className="flex flex-col sm:flex-row group transition-colors hover:bg-slate-50/50">
-                  <div className="p-4 sm:p-6 sm:border-r border-slate-100 bg-slate-50/30 sm:w-[200px] shrink-0">
-                    <div className="flex flex-col gap-1">
-                      <label className="text-[10px] font-black uppercase text-maritime tracking-widest flex items-center gap-2">
-                        <Calendar size={14} className="text-gold" /> Calendrier
+                  <div className="p-2 lg:p-6 sm:border-r border-slate-100 bg-slate-50/30 sm:w-[150px] lg:w-[200px] shrink-0">
+                    <div className="flex flex-col gap-0.5 lg:gap-1">
+                      <label className="text-[8px] lg:text-[10px] font-black uppercase text-maritime tracking-widest flex items-center gap-1.5 lg:gap-2">
+                        <Calendar size={10} className="text-gold" /> Calendrier
                       </label>
-                      <p className="text-[8px] text-slate-400 font-bold uppercase">Date & Heure</p>
                     </div>
                   </div>
-                  <div className="p-4 sm:p-6 flex-1 space-y-3 sm:space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+                  <div className="p-2.5 lg:p-6 flex-1 space-y-2 lg:space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-1.5 lg:gap-4">
                       <input 
                         required
                         type="date" 
                         value={formData.travelDate}
                         min={new Date().toISOString().split('T')[0]}
                         onChange={e => setFormData({ ...formData, travelDate: e.target.value })}
-                        className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-4 focus:ring-gold/10 focus:border-gold transition-all font-mono font-black text-xs sm:text-sm"
+                        className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-4 focus:ring-gold/10 focus:border-gold transition-all font-mono font-black text-[10px] lg:text-sm"
                       />
                       <select 
                         value={formData.departureTime}
                         onChange={e => setFormData({ ...formData, departureTime: e.target.value })}
-                        className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-4 focus:ring-gold/10 focus:border-gold transition-all font-mono font-black text-xs sm:text-sm cursor-pointer"
+                        className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-4 focus:ring-gold/10 focus:border-gold transition-all font-mono font-black text-[10px] lg:text-sm cursor-pointer"
                       >
                         <option value="07:30">MATIN (07:30)</option>
                         <option value="18:00">SOIR (18:00)</option>
@@ -1634,30 +1629,28 @@ function Booking({ onReserved, user }: { onReserved: (res: Reservation) => void,
 
                 {/* Ship Selection */}
                 <div className="flex flex-col sm:flex-row group transition-colors hover:bg-slate-50/50">
-                  <div className="p-4 sm:p-6 sm:border-r border-slate-100 bg-slate-50/30 sm:w-[200px] shrink-0">
-                    <div className="flex flex-col gap-1">
-                      <label className="text-[10px] font-black uppercase text-maritime tracking-widest flex items-center gap-2">
-                        <Anchor size={14} className="text-gold" /> Navire
+                  <div className="p-2 lg:p-6 sm:border-r border-slate-100 bg-slate-50/30 sm:w-[150px] lg:w-[200px] shrink-0">
+                    <div className="flex flex-col gap-0.5 lg:gap-1">
+                      <label className="text-[8px] lg:text-[10px] font-black uppercase text-maritime tracking-widest flex items-center gap-1.5 lg:gap-2">
+                        <Anchor size={10} className="text-gold" /> Navire
                       </label>
-                      <p className="text-[8px] text-slate-400 font-bold uppercase">Sélection de la flotte</p>
                     </div>
                   </div>
-                  <div className="p-4 sm:p-6 flex-1">
-                    <div className="grid grid-cols-3 gap-2 sm:gap-3">
+                  <div className="p-2.5 lg:p-6 flex-1">
+                    <div className="grid grid-cols-3 gap-1.5 lg:gap-3">
                       {(['Mugote 1', 'Mugote 2', 'Mugote 3'] as ShipName[]).map(s => (
                         <button
                           key={s}
                           type="button"
                           onClick={() => setFormData({ ...formData, ship: s })}
                           className={cn(
-                            "p-2 sm:p-3 rounded-lg sm:rounded-xl border-2 transition-all font-black uppercase tracking-widest text-[8px] sm:text-[9px] relative",
+                            "p-1.5 lg:p-3 rounded-lg lg:rounded-xl border-2 transition-all font-black uppercase tracking-widest text-[7px] lg:text-[9px] relative",
                             formData.ship === s 
-                              ? "border-black bg-black text-white shadow-xl shadow-black/20" 
+                              ? "border-black bg-black text-white shadow-lg" 
                               : "border-slate-100 bg-slate-50 text-slate-400 hover:border-slate-200"
                           )}
                         >
                           {s}
-                          {formData.ship === s && <div className="absolute -top-1 -right-1 w-3 h-3 sm:w-4 sm:h-4 bg-gold rounded-full flex items-center justify-center text-black font-black text-[6px] sm:text-[8px]">✓</div>}
                         </button>
                       ))}
                     </div>
@@ -1666,17 +1659,15 @@ function Booking({ onReserved, user }: { onReserved: (res: Reservation) => void,
 
                 {/* Travel Class */}
                 <div className="flex flex-col sm:flex-row group transition-colors hover:bg-slate-50/50">
-                  <div className="p-4 sm:p-6 sm:border-r border-slate-100 bg-slate-50/30 sm:w-[200px] shrink-0">
-                    <div className="flex flex-col gap-1">
-                      <label className="text-[10px] font-black uppercase text-maritime tracking-widest flex items-center gap-2">
-                        <CheckCircle size={14} className="text-gold" /> Confort
-                        <Cat size={12} className="text-indigo-400 animate-pulse" />
+                  <div className="p-2 lg:p-6 sm:border-r border-slate-100 bg-slate-50/30 sm:w-[150px] lg:w-[200px] shrink-0">
+                    <div className="flex flex-col gap-0.5 lg:gap-1">
+                      <label className="text-[8px] lg:text-[10px] font-black uppercase text-maritime tracking-widest flex items-center gap-1.5 lg:gap-2">
+                        <CheckCircle size={10} className="text-gold" /> Confort
                       </label>
-                      <p className="text-[8px] text-slate-400 font-bold uppercase">Niveau de service</p>
                     </div>
                   </div>
-                  <div className="p-4 sm:p-6 flex-1">
-                    <div className="grid grid-cols-2 gap-2 sm:gap-3">
+                  <div className="p-2.5 lg:p-6 flex-1">
+                    <div className="grid grid-cols-2 lg:grid-cols-2 gap-1 lg:gap-3">
                       {(['1ère Classe', '2ème Classe', '3ème Classe', 'VIP'] as TravelClass[]).map(c => {
                         const clsColor = CLASS_COLORS[c];
                         const isActive = formData.travelClass === c;
@@ -1687,18 +1678,17 @@ function Booking({ onReserved, user }: { onReserved: (res: Reservation) => void,
                             type="button"
                             onClick={() => setFormData({ ...formData, travelClass: c })}
                             className={cn(
-                              "p-3 sm:p-4 rounded-2xl sm:rounded-3xl border-2 transition-all text-center flex flex-col items-center justify-center group relative overflow-hidden active:scale-95 hover:scale-105",
+                              "p-1.5 lg:p-4 rounded-lg lg:rounded-3xl border-2 transition-all text-center flex flex-col items-center justify-center group relative overflow-hidden active:scale-95",
                               isActive 
-                                ? "border-transparent text-white shadow-lg" 
+                                ? "border-transparent text-white shadow-md lg:shadow-lg" 
                                 : "border-slate-100 bg-slate-50 text-slate-500 hover:border-slate-200"
                             )}
                             style={{ 
                               backgroundColor: isActive ? clsColor.main : undefined,
                             }}
                           >
-                            <p className={cn("text-[7px] sm:text-[8px] font-black uppercase tracking-tighter leading-none mb-1", isActive ? "text-white" : "text-slate-400")}>{c}</p>
-                            <p className={cn("text-xs sm:text-sm font-black font-mono", isActive ? "text-white" : "text-black")}>{PRICES[c]}$</p>
-                            {isActive && <div className="absolute top-0 right-0 p-1 opacity-20"><Ship size={18} /></div>}
+                            <p className={cn("text-[6px] lg:text-[8px] font-black uppercase tracking-tighter leading-none mb-0.5 lg:mb-1", isActive ? "text-white" : "text-slate-400")}>{c}</p>
+                            <p className={cn("text-[10px] lg:text-sm font-black font-mono", isActive ? "text-white" : "text-black")}>{PRICES[c]}$</p>
                           </button>
                         );
                       })}
@@ -1708,49 +1698,37 @@ function Booking({ onReserved, user }: { onReserved: (res: Reservation) => void,
 
                 {/* Passengers */}
                 <div className="flex flex-col sm:flex-row group transition-colors hover:bg-slate-50/50">
-                  <div className="p-4 sm:p-6 sm:border-r border-slate-100 bg-slate-50/30 sm:w-[200px] shrink-0">
-                    <div className="flex flex-col gap-1">
-                      <label className="text-[10px] font-black uppercase text-maritime tracking-widest flex items-center gap-2">
-                        <Users size={14} className="text-gold" /> Billets
+                  <div className="p-2 lg:p-6 sm:border-r border-slate-100 bg-slate-50/30 sm:w-[150px] lg:w-[200px] shrink-0">
+                    <div className="flex flex-col gap-0.5 lg:gap-1">
+                      <label className="text-[8px] lg:text-[10px] font-black uppercase text-maritime tracking-widest flex items-center gap-1.5 lg:gap-2">
+                        <Users size={10} className="text-gold" /> Billets
                       </label>
-                      <p className="text-[8px] text-slate-400 font-bold uppercase">Passagers</p>
                     </div>
                   </div>
-                  <div className="p-4 sm:p-6 flex-2 flex flex-col sm:flex-row items-center gap-4 sm:gap-6">
-                    <div className="bg-slate-100 rounded-xl p-1 flex items-center gap-1 shadow-inner w-full sm:w-auto justify-between">
-                      <button type="button" onClick={() => setFormData(p => ({...p, passengersCount: Math.max(1, p.passengersCount - 1)}))} className="w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center bg-white rounded-lg shadow-sm hover:scale-105 active:scale-95 transition-all font-black text-lg text-maritime">-</button>
-                      <span className="w-10 sm:w-14 text-center text-lg sm:text-xl font-black font-mono text-maritime">{formData.passengersCount}</span>
-                      <button type="button" onClick={() => setFormData(p => ({...p, passengersCount: Math.min(10, p.passengersCount + 1)}))} className="w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center bg-maritime text-white rounded-lg shadow-lg hover:scale-105 active:scale-95 transition-all font-black text-lg">+</button>
-                    </div>
-                    <div className="flex-1 text-center sm:text-right">
-                      <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Capacité Max</p>
-                      <p className="text-[10px] font-black text-maritime">10 PERSONNES / GROUPE</p>
+                  <div className="p-2.5 lg:p-6 flex-2 flex flex-col sm:flex-row items-center gap-2 lg:gap-6">
+                    <div className="bg-slate-100 rounded-lg lg:rounded-xl p-0.5 lg:p-1 flex items-center gap-0.5 lg:gap-1 shadow-inner w-full sm:w-auto justify-between">
+                      <button type="button" onClick={() => setFormData(p => ({...p, passengersCount: Math.max(1, p.passengersCount - 1)}))} className="w-7 h-7 lg:w-12 lg:h-12 flex items-center justify-center bg-white rounded-md shadow-sm active:scale-95 transition-all font-black text-sm lg:text-lg text-maritime">-</button>
+                      <span className="w-8 lg:w-14 text-center text-sm lg:text-xl font-black font-mono text-maritime">{formData.passengersCount}</span>
+                      <button type="button" onClick={() => setFormData(p => ({...p, passengersCount: Math.min(10, p.passengersCount + 1)}))} className="w-7 h-7 lg:w-12 lg:h-12 flex items-center justify-center bg-maritime text-white rounded-md shadow-lg active:scale-95 transition-all font-black text-sm lg:text-lg">+</button>
                     </div>
                   </div>
                 </div>
 
                 {/* Transaction ID */}
                 <div className="flex flex-col sm:flex-row group transition-colors hover:bg-slate-50/50">
-                  <div className="p-4 sm:p-6 sm:border-r border-slate-100 bg-slate-50/30 sm:w-[200px] shrink-0">
-                    <div className="flex flex-col gap-1">
-                      <label className="text-[10px] font-black uppercase text-maritime tracking-widest flex items-center gap-2">
-                        <CheckCircle size={14} className="text-gold" /> Paiement
+                  <div className="p-2 lg:p-6 sm:border-r border-slate-100 bg-slate-50/30 sm:w-[150px] lg:w-[200px] shrink-0">
+                    <div className="flex flex-col gap-0.5 lg:gap-1">
+                      <label className="text-[8px] lg:text-[10px] font-black uppercase text-maritime tracking-widest flex items-center gap-1.5 lg:gap-2">
+                        <CheckCircle size={10} className="text-gold" /> Paiement
                       </label>
-                      <p className="text-[8px] text-slate-400 font-bold uppercase">Preuve de paiement</p>
                     </div>
                   </div>
-                  <div className="p-4 sm:p-6 flex-1">
-                    <div className="space-y-4">
-                      <div className="p-4 bg-maritime/5 border border-maritime/10 rounded-xl space-y-2">
-                        <p className="text-[9px] font-black text-maritime uppercase tracking-widest leading-none">Instructions de paiement :</p>
-                        <p className="text-[11px] font-bold text-slate-700 leading-relaxed uppercase">
-                          Effectuez votre paiement mobile sur le numéro : <br/>
-                          <span className="text-sm font-black text-maritime select-all tracking-wider">+243 994 286 469</span>
-                        </p>
-                      </div>
-                      <div className="p-3 bg-indigo-50 border border-indigo-100 rounded-lg">
-                        <p className="text-[9px] font-bold text-indigo-900 uppercase leading-relaxed tracking-wider">
-                          Une fois le paiement effectué, veuillez saisir l'ID de transaction reçu par SMS ci-dessous.
+                  <div className="p-2.5 lg:p-6 flex-1">
+                    <div className="space-y-2 lg:space-y-4">
+                      <div className="p-2 lg:p-4 bg-maritime/5 border border-maritime/10 rounded-lg lg:rounded-xl space-y-1 lg:space-y-2">
+                        <p className="text-[7px] lg:text-[9px] font-black text-maritime uppercase tracking-widest leading-none">Paiement Mobile :</p>
+                        <p className="text-[9px] lg:text-[11px] font-bold text-slate-700 leading-relaxed uppercase">
+                          <span className="font-black text-maritime tracking-wider">+243 994 286 469</span>
                         </p>
                       </div>
                       <input 
@@ -1758,8 +1736,8 @@ function Booking({ onReserved, user }: { onReserved: (res: Reservation) => void,
                         type="text" 
                         value={formData.transactionId}
                         onChange={e => setFormData({ ...formData, transactionId: e.target.value })}
-                        className="w-full px-4 py-2.5 sm:px-5 sm:py-3 bg-slate-50 border-2 border-maritime/30 rounded-xl sm:rounded-2xl focus:outline-none focus:ring-4 focus:ring-gold/10 focus:border-gold transition-all font-mono font-black text-sm uppercase"
-                        placeholder="ID TRANSACTION (EX: PP2304...)"
+                        className="w-full px-3 py-1.5 lg:px-5 lg:py-3 bg-slate-50 border-2 border-maritime/30 rounded-lg lg:rounded-2xl focus:outline-none focus:ring-4 focus:ring-gold/10 focus:border-gold transition-all font-mono font-black text-[11px] lg:text-sm uppercase"
+                        placeholder="ID TRANSACTION"
                       />
                     </div>
                   </div>
@@ -1767,25 +1745,25 @@ function Booking({ onReserved, user }: { onReserved: (res: Reservation) => void,
               </div>
 
               {/* Submission Row */}
-              <div className="bg-slate-50/80 p-6 sm:p-10 text-center">
-                <div className="max-w-md mx-auto space-y-6">
-                   <div className="space-y-4">
-                      <div className="flex justify-between items-center bg-white p-4 sm:p-6 rounded-2xl sm:rounded-3xl border-2 border-dashed border-maritime/20 shadow-sm relative overflow-hidden group">
+              <div className="bg-slate-50/80 p-4 lg:p-10 text-center">
+                <div className="max-w-md mx-auto space-y-4 lg:space-y-6">
+                   <div className="space-y-3 lg:space-y-4">
+                      <div className="flex justify-between items-center bg-white p-3 lg:p-6 rounded-xl lg:rounded-3xl border-2 border-dashed border-maritime/20 shadow-sm relative overflow-hidden group">
                         <div className="absolute top-0 left-0 w-1 h-full bg-gold" />
                               <div className="text-left">
-                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Résumé de la commande</p>
-                                <p className="text-sm font-black text-maritime font-mono">{formData.passengersCount} Billets x {PRICES[formData.travelClass]}.00$</p>
+                                <p className="text-[8px] lg:text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-0.5">Résumé</p>
+                                <p className="text-[10px] lg:text-sm font-black text-maritime font-mono">{formData.passengersCount}x {PRICES[formData.travelClass]}$</p>
                               </div>
                               <div className="text-right">
-                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">TOTAL</p>
-                                <p className="text-3xl font-black text-maritime font-mono tracking-tighter">{PRICES[formData.travelClass] * formData.passengersCount}.00$</p>
+                                <p className="text-[8px] lg:text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-0.5">TOTAL</p>
+                                <p className="text-xl lg:text-3xl font-black text-maritime font-mono tracking-tighter">{PRICES[formData.travelClass] * formData.passengersCount}$</p>
                               </div>
                             </div>
 
-                            <div className="flex items-start gap-4 p-4 bg-amber-50 rounded-2xl text-left border border-amber-100">
-                              <AlertCircle size={20} className="text-amber-500 flex-shrink-0 mt-0.5" />
-                              <p className="text-[10px] font-bold leading-relaxed text-amber-900 uppercase tracking-[0.05em]">
-                                Votre réservation sera validée après confirmation du paiement mobile sur le numéro <span className="font-black text-black">+243 994 286 469</span>.
+                            <div className="flex items-start gap-3 p-3 bg-amber-50 rounded-xl text-left border border-amber-100">
+                              <AlertCircle size={16} className="text-amber-500 flex-shrink-0 mt-0.5" />
+                              <p className="text-[8px] lg:text-[10px] font-bold leading-relaxed text-amber-900 uppercase tracking-[0.05em]">
+                                Validation après confirmation au <span className="font-black text-black">+243 994 286 469</span>.
                               </p>
                             </div>
                          </div>
@@ -1793,7 +1771,7 @@ function Booking({ onReserved, user }: { onReserved: (res: Reservation) => void,
                          <button 
                             disabled={submitting}
                             type="submit"
-                            className="w-full py-5 bg-maritime text-white text-xs font-black uppercase tracking-[0.3em] shadow-2xl shadow-maritime/30 hover:scale-105 active:scale-95 transition-all disabled:opacity-50 rounded-2xl relative overflow-hidden group"
+                            className="w-full py-4 lg:py-5 bg-maritime text-white text-[10px] lg:text-xs font-black uppercase tracking-[0.2em] shadow-xl hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-50 rounded-xl lg:rounded-2xl relative overflow-hidden group"
                           >
                             <span className="relative z-10">{submitting ? "Traitement..." : `Confirmer & Payer ${PRICES[formData.travelClass] * formData.passengersCount}$`}</span>
                             <div className="absolute inset-0 bg-gradient-to-r from-gold via-transparent to-gold opacity-0 group-hover:opacity-20 transition-opacity" />
@@ -1803,112 +1781,114 @@ function Booking({ onReserved, user }: { onReserved: (res: Reservation) => void,
             </form>
           </div>
 
+
           {/* Right side: Digital Boarding Pass Preview (GLASS VERSION) */}
-          <div className="w-full lg:w-[400px] sticky top-32">
+          <div className="w-full lg:w-[400px] lg:sticky lg:top-32">
             <div className={cn(
-               "relative p-8 shadow-2xl rounded-[40px] overflow-hidden border transition-all duration-700",
+               "relative p-5 lg:p-8 shadow-2xl rounded-[30px] lg:rounded-[40px] overflow-hidden border transition-all duration-700",
                formData.travelClass === '1ère Classe' || formData.travelClass === 'VIP' ? "bg-slate-900 text-white border-gold/30" :
                formData.travelClass === '2ème Classe' ? "bg-maritime text-white border-white/10" :
                "bg-emerald-900 text-white border-emerald-500/30"
             )}>
               {/* Glass Effect Overlays */}
               <div className="absolute inset-0 backdrop-blur-md bg-white/5 z-0" />
-              <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl -mr-32 -mt-32 animate-pulse" />
+              <div className="absolute top-0 right-0 w-32 h-32 lg:w-64 lg:h-64 bg-white/10 rounded-full blur-3xl -mr-16 lg:-mr-32 -mt-16 lg:-mt-32 animate-pulse" />
               <div className="absolute -top-[50%] -left-[50%] w-[200%] h-[200%] bg-gradient-to-br from-white/20 via-transparent to-transparent rotate-12 pointer-events-none" />
               
-              <div className="relative z-10 space-y-10">
+              <div className="relative z-10 space-y-6 lg:space-y-10">
                 <div className="flex justify-between items-start">
                   <div className="space-y-1">
                     <p className={cn(
-                      "text-[10px] font-black uppercase tracking-[0.3em]",
+                      "text-[8px] lg:text-[10px] font-black uppercase tracking-[0.3em]",
                       formData.travelClass === '2ème Classe' ? "text-white/60" : "text-gold"
                     )}>Digital Ticket</p>
-                    <h3 className="text-2xl font-black uppercase tracking-tighter italic">AMR MUGOTE</h3>
+                    <h3 className="text-xl lg:text-2xl font-black uppercase tracking-tighter italic leading-none">AMR MUGOTE</h3>
                   </div>
-                  <div className="w-14 h-14 bg-white/10 rounded-2xl flex items-center justify-center border border-white/20 backdrop-blur-xl">
-                    <Anchor className={formData.travelClass === '3ème Classe' ? "text-emerald-400" : "text-gold"} size={24} />
+                  <div className="w-10 h-10 lg:w-14 lg:h-14 bg-white/10 rounded-xl lg:rounded-2xl flex items-center justify-center border border-white/20 backdrop-blur-xl">
+                    <Anchor className={formData.travelClass === '3ème Classe' ? "text-emerald-400" : "text-gold"} size={18} />
                   </div>
                 </div>
 
-                <div className="space-y-10">
-                  <div className="flex items-center gap-6">
+                <div className="space-y-6 lg:space-y-10">
+                  <div className="flex items-center gap-4 lg:gap-6">
                     <div className="flex-1">
-                      <p className="text-[9px] font-black text-white/40 uppercase tracking-widest mb-1">De / From</p>
-                      <p className="text-xl font-black uppercase tracking-tighter truncate">{formData.itinerary.split('-')[0]}</p>
+                      <p className="text-[7px] lg:text-[9px] font-black text-white/40 uppercase tracking-widest mb-1">De / From</p>
+                      <p className="text-base lg:text-xl font-black uppercase tracking-tighter truncate">{formData.itinerary.split('-')[0]}</p>
                     </div>
-                    <div className="flex flex-col items-center gap-1">
-                      <div className="w-10 h-[2px] bg-white/20" />
-                      <Ship size={14} className="text-gold" />
-                      <div className="w-10 h-[2px] bg-white/20" />
+                    <div className="flex flex-col items-center gap-0.5">
+                      <div className="w-6 lg:w-10 h-[2px] bg-white/20" />
+                      <Ship size={12} className="text-gold" />
+                      <div className="w-6 lg:w-10 h-[2px] bg-white/20" />
                     </div>
                     <div className="flex-1 text-right">
-                      <p className="text-[9px] font-black text-white/40 uppercase tracking-widest mb-1">À / To</p>
-                      <p className="text-xl font-black uppercase tracking-tighter truncate">{formData.itinerary.split('-')[1]}</p>
+                      <p className="text-[7px] lg:text-[9px] font-black text-white/40 uppercase tracking-widest mb-1">À / To</p>
+                      <p className="text-base lg:text-xl font-black uppercase tracking-tighter truncate">{formData.itinerary.split('-')[1]}</p>
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-8 border-y border-white/10 py-8">
+                  <div className="grid grid-cols-2 gap-4 lg:gap-8 border-y border-white/10 py-5 lg:py-8">
                     <div className="space-y-1">
-                      <p className="text-[9px] font-black text-white/40 uppercase tracking-widest">Date</p>
-                      <p className="text-sm font-black font-mono text-gold">{formData.travelDate || '... / ...'}</p>
+                      <p className="text-[7px] lg:text-[9px] font-black text-white/40 uppercase tracking-widest">Date</p>
+                      <p className="text-xs lg:text-sm font-black font-mono text-gold">{formData.travelDate || '... / ...'}</p>
                     </div>
                     <div className="space-y-1 text-right">
-                      <p className="text-[9px] font-black text-white/40 uppercase tracking-widest">Heure</p>
-                      <p className="text-sm font-black font-mono">{formData.departureTime || '...:...'}</p>
+                      <p className="text-[7px] lg:text-[9px] font-black text-white/40 uppercase tracking-widest">Heure</p>
+                      <p className="text-xs lg:text-sm font-black font-mono">{formData.departureTime || '...:...'}</p>
                     </div>
                     <div className="space-y-1">
-                      <p className="text-[9px] font-black text-white/40 uppercase tracking-widest">Bateau</p>
-                      <p className="text-sm font-black italic">{formData.ship}</p>
+                      <p className="text-[7px] lg:text-[9px] font-black text-white/40 uppercase tracking-widest">Bateau</p>
+                      <p className="text-xs lg:text-sm font-black italic">{formData.ship}</p>
                     </div>
                     <div className="space-y-1 text-right">
-                      <p className="text-[9px] font-black text-white/40 uppercase tracking-widest">Classe</p>
+                      <p className="text-[7px] lg:text-[9px] font-black text-white/40 uppercase tracking-widest">Classe</p>
                       <p className={cn(
-                        "text-sm font-black uppercase",
+                        "text-xs lg:text-sm font-black uppercase",
                         formData.travelClass === '1ère Classe' || formData.travelClass === 'VIP' ? "text-gold" :
                         formData.travelClass === '3ème Classe' ? "text-emerald-400" : "text-white"
                       )}>{formData.travelClass.split(' ')[0]}</p>
                     </div>
                   </div>
 
-                  <div className="flex justify-between items-center pt-4">
+                  <div className="flex justify-between items-center pt-2">
                     <div className="space-y-1">
-                        <p className="text-[9px] font-black text-white/40 uppercase tracking-widest">Client</p>
-                        <p className="text-xs font-black uppercase truncate max-w-[150px]">{formData.fullName || 'Passager'}</p>
+                        <p className="text-[7px] lg:text-[9px] font-black text-white/40 uppercase tracking-widest">Client</p>
+                        <p className="text-[10px] lg:text-xs font-black uppercase truncate max-w-[100px] lg:max-w-[150px]">{formData.fullName || 'Passager'}</p>
                     </div>
                     <div className="text-right">
-                      <p className="text-[9px] font-black text-gold uppercase tracking-widest mb-1">Montant Total</p>
-                      <p className="text-4xl font-black font-mono tracking-tighter">
-                        {PRICES[formData.travelClass] * formData.passengersCount}<span className="text-sm opacity-50">$</span>
+                      <p className="text-[7px] lg:text-[9px] font-black text-gold uppercase tracking-widest mb-0.5">Total</p>
+                      <p className="text-2xl lg:text-4xl font-black font-mono tracking-tighter">
+                        {PRICES[formData.travelClass] * formData.passengersCount}<span className="text-[10px] opacity-50">$</span>
                       </p>
                     </div>
                   </div>
                 </div>
 
-                <div className="pt-10 border-t border-dashed border-white/20 flex flex-col items-center gap-4 text-center">
-                  <div className="space-y-2 mb-2">
-                    <p className="text-[8px] font-black text-gold/60 uppercase tracking-[0.2em]">Note Importante</p>
-                    <p className="text-[8px] font-bold text-white/40 leading-relaxed uppercase">
-                      Remboursement 24h avant la date de départ avec une réduction de 25%
+                <div className="pt-6 lg:pt-10 border-t border-dashed border-white/20 flex flex-col items-center gap-3 lg:gap-4 text-center">
+                  <div className="space-y-1 lg:space-y-2 mb-1">
+                    <p className="text-[7px] lg:text-[8px] font-black text-gold/60 uppercase tracking-[0.2em]">Note Importante</p>
+                    <p className="text-[7px] lg:text-[8px] font-bold text-white/40 leading-relaxed uppercase">
+                      Remboursement 24h avant départ (-25%)
                     </p>
                   </div>
-                  <div className="space-y-1 mb-4">
-                    <p className="text-[7px] font-black text-white/30 uppercase tracking-widest">Contact Support</p>
-                    <p className="text-[9px] font-black text-gold/80">{CONTACT_NUMBERS.join(' / ')}</p>
+                  <div className="space-y-0.5 lg:space-y-1">
+                    <p className="text-[6px] lg:text-[7px] font-black text-white/30 uppercase tracking-widest">Support</p>
+                    <p className="text-[8px] lg:text-[9px] font-black text-gold/80">{CONTACT_NUMBERS[0]}</p>
                   </div>
-                  <div className="w-full h-12 bg-white/5 rounded-xl border border-white/5 overflow-hidden flex">
+                  <div className="w-full h-8 lg:h-12 bg-white/5 rounded-lg lg:rounded-xl border border-white/5 overflow-hidden flex">
                     {[...Array(30)].map((_, i) => (
                       <div key={i} className={cn("flex-1 h-full", i % 2 === 0 ? "bg-white/10" : "bg-transparent")} />
                     ))}
                   </div>
-                  <p className="text-[8px] font-black uppercase tracking-[0.5em] text-white/20">ID TICKET #ID-{(formData.fullName?.substring(0,3) || 'MUG').toUpperCase()}-{Math.random().toString(36).substring(2, 6).toUpperCase()}</p>
+                  <p className="text-[6px] lg:text-[8px] font-black uppercase tracking-[0.3em] text-white/20">#MUG-{Math.random().toString(36).substring(2, 6).toUpperCase()}</p>
                 </div>
               </div>
 
               {/* Decorative circles to mimic ticket notches */}
-              <div className="absolute left-0 top-[65%] -translate-x-1/2 w-8 h-8 bg-[#f8fafc] rounded-full" />
-              <div className="absolute right-0 top-[65%] translate-x-1/2 w-8 h-8 bg-[#f8fafc] rounded-full" />
+              <div className="absolute left-0 top-[65%] -translate-x-1/2 w-6 lg:w-8 h-6 lg:h-8 bg-[#f8fafc] rounded-full" />
+              <div className="absolute right-0 top-[65%] translate-x-1/2 w-6 lg:w-8 h-6 lg:h-8 bg-[#f8fafc] rounded-full" />
             </div>
           </div>
+
         </div>
     </motion.div>
   );
