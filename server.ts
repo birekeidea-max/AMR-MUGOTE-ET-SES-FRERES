@@ -62,8 +62,10 @@ async function startServer() {
         contents.push({ role: 'user', parts: [{ text: message }] });
       }
 
-      const modelName = "gemini-3-flash-preview";
+      const modelName = "gemini-flash-latest";
 
+      console.log("Using model:", modelName);
+      
       const result = await client.models.generateContent({
         model: modelName,
         contents: contents,
@@ -99,13 +101,8 @@ TON ET STYLE :
       
       console.log("Gemini API raw result received");
       
-      // Better extraction for the unified SDK
-      let responseText = "Désolé, je n'ai pas pu générer de réponse pour le moment.";
-      if (result.text) {
-        responseText = result.text;
-      } else if (result.candidates?.[0]?.content?.parts?.[0]?.text) {
-        responseText = result.candidates[0].content.parts[0].text;
-      }
+      // Simple and direct extraction as per skill
+      const responseText = result.text || "Désolé, je n'ai pas pu générer de réponse pour le moment.";
 
       console.log("Chat Response Text (first 50 chars):", responseText.substring(0, 50));
       res.json({ text: responseText });

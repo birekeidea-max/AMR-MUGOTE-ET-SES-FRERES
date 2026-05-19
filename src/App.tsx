@@ -271,6 +271,7 @@ export default function App() {
   const [authModal, setAuthModal] = useState<{ isOpen: boolean, mode: 'user' | 'admin' }>({ isOpen: false, mode: 'user' });
   const [user, setUser] = useState<FirebaseUser | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isAdminUnlocked, setIsAdminUnlocked] = useState(false);
   const [loading, setLoading] = useState(true);
   const [verifyId, setVerifyId] = useState<string | null>(null);
   const [currentReservation, setCurrentReservation] = useState<Reservation | null>(null);
@@ -613,6 +614,8 @@ export default function App() {
         <AnimatePresence mode="wait">
           {verifyId ? (
             <VerificationView id={verifyId} onClose={() => { setVerifyId(null); window.history.pushState({}, '', '/'); }} />
+          ) : !user ? (
+            <LandingLogin onLogin={() => setAuthModal({ isOpen: true, mode: 'user' })} siteSettings={siteSettings} />
           ) : (
             <>
               {currentPage === 'home' && <Home onBook={() => setCurrentPage('booking')} onNavigate={setCurrentPage} siteSettings={siteSettings} schedules={schedules} />}
@@ -624,7 +627,7 @@ export default function App() {
                 />
               )}
               {currentPage === 'payment' && <Payment reservation={currentReservation} onComplete={() => setCurrentPage('tickets')} />}
-              {currentPage === 'dashboard' && <Dashboard siteSettings={siteSettings} onNavigate={setCurrentPage} schedules={schedules} isAdmin={isAdmin} />}
+              {currentPage === 'dashboard' && <Dashboard siteSettings={siteSettings} onNavigate={setCurrentPage} schedules={schedules} isAdmin={isAdmin} isAdminUnlocked={isAdminUnlocked} setIsAdminUnlocked={setIsAdminUnlocked} />}
               {currentPage === 'tickets' && <MyTickets user={user} siteSettings={siteSettings} />}
               {currentPage === 'news' && <NewsView />}
               {currentPage === 'gallery' && <GalleryView siteSettings={siteSettings} />}
@@ -713,15 +716,58 @@ export default function App() {
   );
 }
 
+function LandingLogin({ onLogin, siteSettings }: { onLogin: () => void, siteSettings: any }) {
+  return (
+    <motion.div 
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="max-w-xl mx-auto space-y-12 py-12 px-6"
+    >
+      <div className="space-y-6">
+        <div className="w-24 h-24 bg-maritime/5 rounded-[32px] flex items-center justify-center mx-auto border border-maritime/10">
+          <Ship size={40} className="text-maritime" />
+        </div>
+        <div className="space-y-2">
+          <h1 className="text-3xl font-black uppercase tracking-tighter italic">Veuillez vous connecter</h1>
+          <p className="text-slate-500 text-xs font-bold uppercase tracking-widest leading-relaxed max-w-xs mx-auto">
+            L'accès à la plateforme Mugote est strictement réservé aux utilisateurs authentifiés.
+          </p>
+        </div>
+      </div>
+
+      <div className="bg-white p-10 rounded-[40px] border border-slate-100 shadow-2xl shadow-slate-200">
+        <button 
+          onClick={onLogin}
+          className="w-full py-6 bg-maritime text-white rounded-[24px] flex items-center justify-center gap-4 font-black uppercase tracking-widest text-xs hover:bg-black transition-all shadow-xl shadow-maritime/20 active:scale-95 group"
+        >
+          <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-5 h-5 brightness-0 invert" alt="Google" /> 
+          Continuer avec Google
+          <ChevronRight size={18} className="group-hover:translate-x-1 transition-transform" />
+        </button>
+        <p className="mt-8 text-[9px] font-bold text-slate-400 uppercase tracking-widest leading-relaxed">
+          En continuant, vous acceptez nos conditions d'utilisation et notre politique de sécurité maritime.
+        </p>
+      </div>
+
+      <div className="pt-12 grid grid-cols-2 gap-4">
+        <div className="p-6 bg-white/50 backdrop-blur-sm rounded-3xl border border-slate-100">
+          <ShieldCheck className="text-emerald-500 mb-3" size={24} />
+          <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Sécurité</p>
+          <p className="text-[10px] font-bold text-slate-600 mt-1 uppercase">Billets Infalsifiables</p>
+        </div>
+        <div className="p-6 bg-white/50 backdrop-blur-sm rounded-3xl border border-slate-100">
+          <Rocket className="text-gold mb-3" size={24} />
+          <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Rapidité</p>
+          <p className="text-[10px] font-bold text-slate-600 mt-1 uppercase">Validation Instantanée</p>
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
 function AuthForm({ onSuccess }: { onSuccess: () => void }) {
-  const [isSignUp, setIsSignUp] = useState(false);
-  const [showForgotPassword, setShowForgotPassword] = useState(false);
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [name, setName] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
 
   const handleGoogleLogin = async () => {
     setLoading(true);
@@ -742,76 +788,32 @@ function AuthForm({ onSuccess }: { onSuccess: () => void }) {
     }
   };
 
-  const handleForgotPassword = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!email) { setError("Veuillez entrer votre e-mail."); return; }
-    setLoading(true);
-    try {
-      await sendPasswordResetEmail(auth, email);
-      setSuccess("Lien envoyé !");
-      setTimeout(() => setShowForgotPassword(false), 3000);
-    } catch (err) { setError("Erreur d'envoi."); }
-    finally { setLoading(false); }
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setError(null);
-    try {
-      if (isSignUp) {
-        const res = await createUserWithEmailAndPassword(auth, email, password);
-        await updateProfile(res.user, { displayName: name });
-      } else {
-        await signInWithEmailAndPassword(auth, email, password);
-      }
-      onSuccess();
-    } catch (err: any) {
-      setError("Identifiants incorrects ou compte inexistant.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  if (showForgotPassword) {
-    return (
-      <div className="space-y-4">
-        <h3 className="text-sm font-black uppercase text-center">Récupération</h3>
-        <form onSubmit={handleForgotPassword} className="space-y-4">
-          <input type="email" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)} className="w-full p-4 bg-slate-50 border rounded-xl" required />
-          <button type="submit" className="w-full py-4 bg-black text-white font-black rounded-xl uppercase text-xs">Envoyer le lien</button>
-          <button type="button" onClick={() => setShowForgotPassword(false)} className="w-full text-[10px] uppercase font-bold text-slate-400">Retour</button>
-        </form>
-      </div>
-    );
-  }
-
   return (
-    <div className="space-y-6">
-      <div className="flex bg-slate-50 p-1 rounded-xl border">
-        {['Connexion', 'Inscription'].map((label, idx) => (
-          <button key={label} onClick={() => setIsSignUp(idx === 1)} className={cn("flex-1 py-3 text-[10px] font-black uppercase rounded-lg", (isSignUp === (idx === 1)) ? "bg-white shadow-sm" : "text-slate-400")}>{label}</button>
-        ))}
+    <div className="space-y-8">
+      <div className="text-center space-y-4">
+        <p className="text-[11px] font-bold text-slate-500 uppercase tracking-widest leading-relaxed">
+          Pour une sécurité optimale, nous utilisons l'authentification Google pour valider votre identité voyageur.
+        </p>
       </div>
-      <form onSubmit={handleSubmit} className="space-y-4">
-        {isSignUp && <input type="text" placeholder="Nom Complet" value={name} onChange={e => setName(e.target.value)} className="w-full p-4 bg-slate-50 border rounded-xl" required />}
-        <input type="email" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)} className="w-full p-4 bg-slate-50 border rounded-xl" required />
-        <div className="relative">
-          <input type="password" placeholder="Mot de Passe" value={password} onChange={e => setPassword(e.target.value)} className="w-full p-4 bg-slate-50 border rounded-xl" required />
-          {!isSignUp && <button type="button" onClick={() => setShowForgotPassword(true)} className="absolute right-4 top-1/2 -translate-y-1/2 text-[9px] font-bold text-maritime/40 uppercase">Oublié ?</button>}
-        </div>
-        {error && <p className="text-rose-500 text-[10px] font-black uppercase text-center">{error}</p>}
-        {success && <p className="text-emerald-500 text-[10px] font-black uppercase text-center">{success}</p>}
-        <button type="submit" disabled={loading} className="w-full py-4 bg-black text-white font-black rounded-xl uppercase text-xs">{loading ? "..." : isSignUp ? "S'inscrire" : "Se Connecter"}</button>
-      </form>
-      <div className="relative text-center">
-        <span className="bg-white px-4 text-[10px] font-black uppercase text-slate-400">Recommandé</span>
-        <div className="absolute inset-0 -z-10 top-1/2 border-t"></div>
-      </div>
-      <button onClick={handleGoogleLogin} className="w-full py-4 bg-maritime text-white rounded-xl flex items-center justify-center gap-2 font-bold text-sm hover:bg-black transition-all shadow-lg">
-        <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-4 h-4 brightness-0 invert" alt="Google" /> 
-        Se connecter avec Google
+
+      <button 
+        onClick={handleGoogleLogin} 
+        disabled={loading}
+        className="w-full py-5 bg-maritime text-white rounded-[24px] flex items-center justify-center gap-4 font-black uppercase tracking-[0.2em] text-xs hover:bg-black transition-all shadow-xl shadow-maritime/20 active:scale-95 disabled:opacity-50"
+      >
+        <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-5 h-5 brightness-0 invert" alt="Google" /> 
+        {loading ? "Chargement..." : "Se connecter avec Google"}
       </button>
+
+      {error && (
+        <div className="p-4 bg-rose-50 border border-rose-100 rounded-2xl text-center">
+          <p className="text-rose-500 text-[10px] font-black uppercase tracking-widest">{error}</p>
+        </div>
+      )}
+      
+      <div className="pt-4 border-t border-slate-50 text-center">
+        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-[0.3em]">Mugote Maritime Services</p>
+      </div>
     </div>
   );
 }
@@ -2336,7 +2338,7 @@ function Payment({ reservation, onComplete }: { reservation: Reservation | null,
   );
 }
 
-function Dashboard({ siteSettings, onNavigate, schedules, isAdmin }: { siteSettings?: { homeBg: string, homeDetail: string }, onNavigate: (page: string) => void, schedules: any[], isAdmin: boolean }) {
+function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlocked, setIsAdminUnlocked }: { siteSettings?: { homeBg: string, homeDetail: string }, onNavigate: (page: string) => void, schedules: any[], isAdmin: boolean, isAdminUnlocked: boolean, setIsAdminUnlocked: (val: boolean) => void }) {
   const [tab, setTab] = useState<'reservations' | 'users' | 'fleet' | 'media' | 'settings' | 'messages' | 'schedules'>('reservations');
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [usersList, setUsersList] = useState<any[]>([]);
@@ -2344,7 +2346,6 @@ function Dashboard({ siteSettings, onNavigate, schedules, isAdmin }: { siteSetti
   const [scheduleForm, setScheduleForm] = useState({ id: '', from: '', to: '', time: '', ship: '', days: '' });
   const [boatForm, setBoatForm] = useState({ id: '', name: '', capacity: 0, description: '', imageUrl: '' });
   const [editMediaId, setEditMediaId] = useState<string | null>(null);
-  const [isAdminUnlocked, setIsAdminUnlocked] = useState(false);
   const [adminCode, setAdminCode] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [newsList, setNewsList] = useState<any[]>([]);
