@@ -62,7 +62,7 @@ async function startServer() {
         contents.push({ role: 'user', parts: [{ text: message }] });
       }
 
-      const modelName = "gemini-flash-latest";
+      const modelName = "gemini-3-flash-preview";
 
       console.log("Using model:", modelName);
       
@@ -99,15 +99,29 @@ TON ET STYLE :
         }
       });
       
-      console.log("Gemini API raw result received");
+      console.log("Gemini API call successful");
       
-      // Simple and direct extraction as per skill
-      const responseText = result.text || "Désolé, je n'ai pas pu générer de réponse pour le moment.";
+      let responseText = "";
+      try {
+        if (result && result.text) {
+          responseText = result.text;
+        } else if (result && result.candidates?.[0]?.content?.parts?.[0]?.text) {
+          responseText = result.candidates[0].content.parts[0].text;
+        }
+        
+        if (!responseText) {
+          console.warn("Empty response from Gemini API", JSON.stringify(result));
+          responseText = "Désolé, je n'ai pas pu générer de réponse intelligible. Veuillez réessayer.";
+        }
+      } catch (extractError) {
+        console.error("Text extraction failed:", extractError);
+        responseText = "Désolé, une erreur interne est survenue lors du traitement de l'IA.";
+      }
 
       console.log("Chat Response Text (first 50 chars):", responseText.substring(0, 50));
       res.json({ text: responseText });
     } catch (error: any) {
-      console.error("Gemini Critical Error:", error);
+      console.error("Gemini Critical Error in /api/chat:", error);
       res.status(500).json({ error: error.message || "Désolé, l'assistant rencontre une erreur technique." });
     }
   });

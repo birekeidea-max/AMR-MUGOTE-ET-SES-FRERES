@@ -449,9 +449,11 @@ export default function App() {
             </div>
             
             <div className="flex items-center gap-2 sm:gap-3">
-               <button onClick={() => setIsMenuOpen(true)} className="md:hidden p-3 bg-maritime text-white rounded-xl shadow-lg">
-                  <Menu size={18} />
-               </button>
+               {user && (
+                 <button onClick={() => setIsMenuOpen(true)} className="md:hidden p-3 bg-maritime text-white rounded-xl shadow-lg">
+                   <Menu size={18} />
+                 </button>
+               )}
                {user && !user.isAnonymous ? (
                  <div className="flex items-center gap-2 sm:gap-3">
                    <div className="hidden md:block text-right">
@@ -478,7 +480,7 @@ export default function App() {
         <nav className="bg-[#001233] w-full border-b border-white/5">
           <div className="max-w-7xl mx-auto px-2 sm:px-4 py-2 sm:py-3 overflow-x-auto no-scrollbar">
             <div className="flex items-center justify-center gap-1.5 sm:gap-3">
-              {[
+              {user ? [
                 { id: 'home', label: 'ACCUEIL' },
                 { id: 'booking', label: 'RÉSERVER' },
                 { id: 'tickets', label: 'BILLETS' },
@@ -501,7 +503,12 @@ export default function App() {
                     {item.label}
                   </button>
                 );
-              })}
+              }) : (
+                <div className="flex items-center gap-2 py-2">
+                  <Lock size={12} className="text-gold" />
+                  <span className="text-[9px] font-black text-white/50 uppercase tracking-[0.4em]">Authentification Requise</span>
+                </div>
+              )}
             </div>
           </div>
         </nav>
@@ -539,7 +546,7 @@ export default function App() {
             </div>
             
             <div className="flex-1 space-y-4 overflow-y-auto no-scrollbar">
-              {[
+              {user ? [
                 { id: 'home', label: 'ACCUEIL' },
                 { id: 'booking', label: 'RÉSERVER' },
                 { id: 'tickets', label: 'MES BILLETS' },
@@ -582,7 +589,17 @@ export default function App() {
                     <span className="relative z-10">{item.label}</span>
                   </button>
                 );
-              })}
+              }) : (
+                <div className="flex flex-col items-center justify-center h-full gap-6 px-8 text-center">
+                  <div className="w-20 h-20 bg-white/5 rounded-full flex items-center justify-center border border-white/10 mb-4">
+                    <Lock size={32} className="text-gold" />
+                  </div>
+                  <h3 className="text-xl font-black text-white italic uppercase tracking-tighter">Accès Restreint</h3>
+                  <p className="text-white/40 text-xs font-bold uppercase tracking-widest leading-relaxed">
+                    Veuillez vous authentifier sur la page d'accueil pour accéder aux services.
+                  </p>
+                </div>
+              )}
             </div>
 
             <div className="pt-12 space-y-6">
@@ -631,6 +648,7 @@ export default function App() {
               {currentPage === 'tickets' && <MyTickets user={user} siteSettings={siteSettings} />}
               {currentPage === 'news' && <NewsView />}
               {currentPage === 'gallery' && <GalleryView siteSettings={siteSettings} />}
+              <ChatWidget user={user} />
             </>
           )}
         </AnimatePresence>
@@ -706,7 +724,6 @@ export default function App() {
           </div>
         </div>
       </footer>
-      <ChatWidget user={user} />
       <AuthModal 
         isOpen={authModal.isOpen} 
         mode={authModal.mode} 
@@ -773,15 +790,23 @@ function AuthForm({ onSuccess }: { onSuccess: () => void }) {
     setLoading(true);
     setError(null);
     const provider = new GoogleAuthProvider();
+    // Hint for iframe environment
+    provider.setCustomParameters({
+      prompt: 'select_account'
+    });
     try {
       await signInWithPopup(auth, provider);
       onSuccess();
     } catch (err: any) {
-      console.error(err);
+      console.error("Google Login Error:", err);
       if (err.code === 'auth/popup-blocked') {
-        setError("La fenêtre a été bloquée. Veuillez cliquer sur 'Ouvrir dans un nouvel onglet'.");
+        setError("La fenêtre de connexion a été bloquée. Veuillez cliquer sur 'Ouvrir dans un nouvel onglet' en haut à droite pour continuer.");
+      } else if (err.code === 'auth/cancelled-popup-request' || err.code === 'auth/popup-closed-by-user') {
+        setError("La connexion a été annulée. Veuillez réessayer.");
+      } else if (err.code === 'auth/network-request-failed') {
+        setError("Erreur réseau. Vérifiez votre connexion internet.");
       } else {
-        setError("Échec de la connexion avec Google.");
+        setError(`Échec de la connexion Google: ${err.message || err.code}`);
       }
     } finally {
       setLoading(false);
@@ -806,8 +831,13 @@ function AuthForm({ onSuccess }: { onSuccess: () => void }) {
       </button>
 
       {error && (
-        <div className="p-4 bg-rose-50 border border-rose-100 rounded-2xl text-center">
+        <div className="p-4 bg-rose-50 border border-rose-100 rounded-2xl text-center space-y-3">
           <p className="text-rose-500 text-[10px] font-black uppercase tracking-widest">{error}</p>
+          {error.includes("bloquée") && (
+            <p className="text-[9px] font-bold text-slate-500 uppercase leading-relaxed">
+              Pour résoudre ce problème, veuillez cliquer sur l'icône <ExternalLink size={10} className="inline mb-0.5" /> <b>"Ouvrir dans un nouvel onglet"</b> en haut à droite de votre écran avant de réessayer.
+            </p>
+          )}
         </div>
       )}
       
