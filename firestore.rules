@@ -31,7 +31,10 @@ service cloud.firestore {
                data.travelClass in ['1ère Classe', '2ème Classe', '3ème Classe', 'VIP'] &&
                data.passengersCount is number && data.passengersCount > 0 &&
                data.status in ['PENDING', 'VALIDATED', 'REJECTED'] &&
-               data.userId is string && data.userId.size() > 0;
+               data.userId is string && data.userId.size() > 0 &&
+               data.travelDate is string && data.travelDate.size() > 0 &&
+               data.amount is number && data.amount > 0 &&
+               data.createdAt is number;
       }
 
       allow read: if isSignedIn() && (isOwner(existing().userId) || isAdmin());
@@ -114,7 +117,7 @@ service cloud.firestore {
     match /conversations/{convId} {
       function isValidConversation(data) {
         return data.userId is string && data.userId.size() > 0 &&
-               data.userEmail is string && data.userEmail.size() > 0 &&
+               (data.userEmail == null || data.userEmail is string) &&
                data.status in ['OPEN', 'CLOSED'];
       }
 

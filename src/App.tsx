@@ -49,7 +49,6 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { auth, db, handleFirestoreError, OperationType, uploadToStorage } from './lib/firebase';
-import { GoogleGenAI } from "@google/genai";
 import { 
   signInWithPopup, 
   GoogleAuthProvider, 
@@ -326,23 +325,23 @@ export default function App() {
     });
 
     const unsubscribe = onAuthStateChanged(auth, async (u) => {
+      setUser(u);
+      
       if (!u) {
-        try {
-          await signInAnonymously(auth);
-        } catch (err) {
-          console.error("Anonymous auth failed", err);
-          setLoading(false);
-        }
+        setLoading(false);
+        setIsAdmin(false);
         return;
       }
-
-      setUser(u);
       
       // Admin check logic
       if (u.isAnonymous) {
         setIsAdmin(false);
+        setIsAdminUnlocked(false);
       } else {
-        setIsAdmin(u.email === 'birekeidea@gmail.com');
+        const adminEmail = 'birekeidea@gmail.com';
+        const isOwner = u.email?.toLowerCase() === adminEmail.toLowerCase();
+        setIsAdmin(isOwner);
+        if (isOwner) setIsAdminUnlocked(true);
       }
 
       try {
@@ -805,8 +804,14 @@ function AuthForm({ onSuccess }: { onSuccess: () => void }) {
         {success && <p className="text-emerald-500 text-[10px] font-black uppercase text-center">{success}</p>}
         <button type="submit" disabled={loading} className="w-full py-4 bg-black text-white font-black rounded-xl uppercase text-xs">{loading ? "..." : isSignUp ? "S'inscrire" : "Se Connecter"}</button>
       </form>
-      <div className="relative text-center"><span className="bg-white px-4 text-[10px] font-black uppercase text-slate-200">Ou</span><div className="absolute inset-0 -z-10 top-1/2 border-t"></div></div>
-      <button onClick={handleGoogleLogin} className="w-full py-4 border-2 rounded-xl flex items-center justify-center gap-2 font-bold text-sm"><img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-4 h-4" alt="Google" /> Google</button>
+      <div className="relative text-center">
+        <span className="bg-white px-4 text-[10px] font-black uppercase text-slate-400">Recommandé</span>
+        <div className="absolute inset-0 -z-10 top-1/2 border-t"></div>
+      </div>
+      <button onClick={handleGoogleLogin} className="w-full py-4 bg-maritime text-white rounded-xl flex items-center justify-center gap-2 font-bold text-sm hover:bg-black transition-all shadow-lg">
+        <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-4 h-4 brightness-0 invert" alt="Google" /> 
+        Se connecter avec Google
+      </button>
     </div>
   );
 }
@@ -1664,13 +1669,13 @@ function Booking({ onReserved, user, onLoginRequest }: { onReserved: (res: Reser
       return;
     }
 
-    // Validation du numéro congolais (+243 suivi de 9 chiffres)
-    // On retire les espaces pour la validation
+    // Validation du numéro congolais (plus flexible)
+    // On accepte +243..., 08..., 09...
     const cleanPhone = formData.phone.replace(/\s/g, '');
-    const phoneRegex = /^\+243[0-9]{9}$/;
+    const phoneRegex = /^(\+243|0)[89][0-9]{8}$/;
     
     if (!phoneRegex.test(cleanPhone)) {
-      alert("Numéro non valide. Veuillez entrer un numéro congolais au format +243XXXXXXXXX (exemple: +243991234567)");
+      alert("Numéro non valide. Veuillez entrer un numéro congolais (exemple: 0991234567 ou +243991234567)");
       return;
     }
 

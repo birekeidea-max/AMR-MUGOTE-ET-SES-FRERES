@@ -62,8 +62,10 @@ async function startServer() {
         contents.push({ role: 'user', parts: [{ text: message }] });
       }
 
+      const modelName = "gemini-3-flash-preview";
+
       const result = await client.models.generateContent({
-        model: "gemini-flash-latest",
+        model: modelName,
         contents: contents,
         config: {
           systemInstruction: `Tu es l'assistant IA expert et officiel de "ETS AMR MUGOTE ET SES FRERES", la plateforme leader du transport lacustre sur le Lac Kivu en République Démocratique du Congo.
@@ -95,7 +97,15 @@ TON ET STYLE :
         }
       });
       
-      const responseText = result.text || "Désolé, je n'ai pas pu générer de réponse.";
+      console.log("Gemini API raw result received");
+      
+      // Better extraction for the unified SDK
+      let responseText = "Désolé, je n'ai pas pu générer de réponse pour le moment.";
+      if (result.text) {
+        responseText = result.text;
+      } else if (result.candidates?.[0]?.content?.parts?.[0]?.text) {
+        responseText = result.candidates[0].content.parts[0].text;
+      }
 
       console.log("Chat Response Text (first 50 chars):", responseText.substring(0, 50));
       res.json({ text: responseText });
