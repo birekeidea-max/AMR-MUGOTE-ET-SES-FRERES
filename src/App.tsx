@@ -56,6 +56,7 @@ import {
   signOut,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
+  sendPasswordResetEmail,
   updateProfile,
   User as FirebaseUser
 } from 'firebase/auth';
@@ -711,11 +712,13 @@ export default function App() {
 
 function AuthForm({ onSuccess }: { onSuccess: () => void }) {
   const [isSignUp, setIsSignUp] = useState(false);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
 
   const handleGoogleLogin = async () => {
     setLoading(true);
@@ -731,10 +734,8 @@ function AuthForm({ onSuccess }: { onSuccess: () => void }) {
       } else if (err.code === 'auth/operation-not-allowed') {
         setError("La connexion Google n'est pas encore activée dans votre projet Firebase. Veuillez l'activer dans la console Firebase (Authentification > Sign-in method).");
       } else if (err.code === 'auth/popup-closed-by-user') {
-        // Just clear the loading state, no error message needed for cancellation
         setError(null);
       } else if (err.message && (err.message.includes('INTERNAL ASSERTION FAILED') || err.message.includes('Pending promise'))) {
-        // Handle weird Firebase internal errors gracefully
         setError("Un problème technique est survenu avec la fenêtre de connexion Google. Veuillez rafraîchir la page ou cliquer sur 'Ouvrir dans un nouvel onglet' en haut de l'écran.");
       } else {
         setError("Échec de la connexion avec Google.");
@@ -744,10 +745,32 @@ function AuthForm({ onSuccess }: { onSuccess: () => void }) {
     }
   };
 
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email) {
+      setError("Veuillez entrer votre adresse e-mail.");
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      await sendPasswordResetEmail(auth, email);
+      setSuccess("Un e-mail de réinitialisation a été envoyé à " + email);
+      setTimeout(() => setShowForgotPassword(false), 3000);
+    } catch (err: any) {
+      console.error(err);
+      setError("Impossible d'envoyer l'e-mail de réinitialisation. Vérifiez l'adresse.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
+    setSuccess(null);
     try {
       if (isSignUp) {
         const res = await createUserWithEmailAndPassword(auth, email, password);
@@ -762,7 +785,8 @@ function AuthForm({ onSuccess }: { onSuccess: () => void }) {
       if (err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') msg = "Mot de passe ou identifiant incorrect.";
       else if (err.code === 'auth/user-not-found') msg = "Aucun compte trouvé avec cet e-mail.";
       else if (err.code === 'auth/email-already-in-use') msg = "Cet e-mail est déjà utilisé.";
-      else if (err.code === 'auth/weak-password') msg = "Le mot de passe est trop court.";
+      else if (err.code === 'auth/weak-password') msg = "Le mot de passe est trop court (min 6 caractères).";
+      else if (err.code === 'auth/invalid-email') msg = "Format d'e-mail invalide.";
       else if (err.code === 'auth/operation-not-allowed') msg = "L'authentification par e-mail/mot de passe n'est pas activée dans Firebase. Veuillez l'activer dans la console.";
       setError(msg);
     } finally {
@@ -770,11 +794,72 @@ function AuthForm({ onSuccess }: { onSuccess: () => void }) {
     }
   };
 
+  if (showForgotPassword) {
+    return (
+      <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+        <div className="space-y-2">
+          <h3 className="text-lg font-black uppercase tracking-tight">Réinitialisation</h3>
+          <p className="text-[10px] font-bold text-slate-400 uppercase leading-relaxed">Entrez votre e-mail pour recevoir un lien de récupération.</p>
+        </div>
+        <form onSubmit={handleForgotPassword} className="space-y-4">
+          <div>
+            <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1 ml-1">Email</label>
+            <input 
+              required
+              type="email" 
+              value={email} 
+              onChange={e => setEmail(e.target.value)}
+              className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl focus:outline-none focus:ring-2 ring-maritime/5 text-sm font-bold"
+              placeholder="votre@email.com"
+            />
+          </div>
+          {error && <p className="text-rose-500 text-[10px] font-black uppercase text-center bg-rose-50 py-3 rounded-xl border border-rose-100">{error}</p>}
+          {success && <p className="text-emerald-500 text-[10px] font-black uppercase text-center bg-emerald-50 py-3 rounded-xl border border-emerald-100">{success}</p>}
+          <button 
+            type="submit"
+            disabled={loading}
+            className="w-full py-5 bg-black text-white font-black rounded-2xl uppercase tracking-[0.2em] text-xs shadow-xl transform active:scale-95 transition-all disabled:opacity-50"
+          >
+            {loading ? "Envoi..." : "Envoyer le lien"}
+          </button>
+          <button 
+            type="button"
+            onClick={() => { setShowForgotPassword(false); setError(null); setSuccess(null); }}
+            className="w-full text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-maritime transition-colors"
+          >
+            Retour à la connexion
+          </button>
+        </form>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
+      <div className="flex bg-slate-50 p-1.5 rounded-2xl border border-slate-100">
+        <button 
+          onClick={() => { setIsSignUp(false); setError(null); }}
+          className={cn(
+            "flex-1 py-3 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all",
+            !isSignUp ? "bg-white shadow-sm text-black" : "text-slate-400 hover:text-slate-600"
+          )}
+        >
+          Connexion
+        </button>
+        <button 
+          onClick={() => { setIsSignUp(true); setError(null); }}
+          className={cn(
+            "flex-1 py-3 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all",
+            isSignUp ? "bg-white shadow-sm text-black" : "text-slate-400 hover:text-slate-600"
+          )}
+        >
+          Inscription
+        </button>
+      </div>
+
       <form onSubmit={handleSubmit} className="space-y-4">
         {isSignUp && (
-          <div>
+          <div className="animate-in fade-in slide-in-from-left-2 duration-300">
             <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1 ml-1">Nom Complet</label>
             <input 
               required
@@ -794,11 +879,22 @@ function AuthForm({ onSuccess }: { onSuccess: () => void }) {
             value={email} 
             onChange={e => setEmail(e.target.value)}
             className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl focus:outline-none focus:ring-2 ring-maritime/5 text-sm font-bold"
-            placeholder="Ex: passager@email.com"
+            placeholder="passager@email.com"
           />
         </div>
         <div>
-          <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1 ml-1">Mot de Passe</label>
+          <div className="flex justify-between items-center mb-1 ml-1">
+            <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400">Mot de Passe</label>
+            {!isSignUp && (
+              <button 
+                type="button"
+                onClick={() => setShowForgotPassword(true)}
+                className="text-[9px] font-bold text-maritime/60 hover:text-maritime uppercase tracking-widest"
+              >
+                Oublié ?
+              </button>
+            )}
+          </div>
           <input 
             required
             type="password" 
@@ -810,7 +906,7 @@ function AuthForm({ onSuccess }: { onSuccess: () => void }) {
         </div>
 
         {error && (
-          <p className="text-rose-500 text-[10px] font-black uppercase text-center bg-rose-50 py-3 rounded-xl border border-rose-100">
+          <p className="text-rose-500 text-[10px] font-black uppercase text-center bg-rose-50 py-3 rounded-xl border border-rose-100 animate-shake">
             {error}
           </p>
         )}
@@ -820,34 +916,23 @@ function AuthForm({ onSuccess }: { onSuccess: () => void }) {
           disabled={loading}
           className="w-full py-5 bg-black text-white font-black rounded-2xl uppercase tracking-[0.2em] text-xs shadow-xl shadow-black/20 transform active:scale-95 transition-all disabled:opacity-50"
         >
-          {loading ? "Chargement..." : isSignUp ? "S'inscrire" : "Se Connecter"}
+          {loading ? "Chargement..." : isSignUp ? "Créer mon Compte" : "Se Connecter"}
         </button>
       </form>
 
       <div className="relative">
         <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-slate-100"></div></div>
-        <div className="relative flex justify-center text-[10px] font-black uppercase tracking-widest"><span className="bg-white px-4 text-slate-300 italic">Ou continuer avec</span></div>
+        <div className="relative flex justify-center text-[10px] font-black uppercase tracking-widest text-slate-300 italic"><span className="bg-white px-4">Accès Rapide</span></div>
       </div>
 
       <button 
         onClick={handleGoogleLogin}
         disabled={loading}
-        className="w-full py-4 border-2 border-slate-100 text-slate-600 font-bold rounded-2xl flex items-center justify-center gap-3 hover:bg-slate-50 transition-all text-sm shadow-sm"
+        className="w-full py-4 border-2 border-slate-100 text-slate-600 font-bold rounded-2xl flex items-center justify-center gap-3 hover:bg-slate-50 transition-all text-sm shadow-sm group"
       >
-        <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-5 h-5" alt="Google" />
-        Google
+        <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-5 h-5 group-hover:scale-110 transition-transform" alt="Google" />
+        Continuer avec Google
       </button>
-
-      <p className="text-center text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-        {isSignUp ? "Déjà un compte ?" : "Nouveau passager ?"} 
-        <button 
-          type="button"
-          onClick={() => setIsSignUp(!isSignUp)}
-          className="ml-2 text-maritime hover:underline"
-        >
-          {isSignUp ? "Se connecter" : "Créer un compte"}
-        </button>
-      </p>
     </div>
   );
 }
