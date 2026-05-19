@@ -278,6 +278,10 @@ export default function App() {
     logo: '' // Fallback for the "baton" (mugote) image
   });
   const [isFirebaseOffline, setIsFirebaseOffline] = useState(false);
+
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [currentPage]);
   const [schedules, setSchedules] = useState<any[]>([]);
 
   // MANDATORY: Test connection to Firestore on boot
@@ -332,24 +336,24 @@ export default function App() {
             }, { merge: true });
           }
           
-          // Track user list for admin with last login
+          // Official User List for Platform
+          await setDoc(doc(db, 'users', u.uid), {
+            uid: u.uid,
+            email: u.email,
+            displayName: u.displayName || 'Utilisateur Mugote',
+            photoURL: u.photoURL || '',
+            lastLogin: serverTimestamp(),
+            registeredAt: serverTimestamp() // merge: true handles this
+          }, { merge: true });
+
+          // Also update users_list if it's used elsewhere
           await setDoc(doc(db, 'users_list', u.uid), {
             uid: u.uid,
             email: u.email,
             displayName: u.displayName || '',
-            photoURL: u.photoURL || '',
-            lastLogin: serverTimestamp(),
-            emailVerified: u.emailVerified
+            lastLogin: serverTimestamp()
           }, { merge: true });
-
-          // Auto-create user profile if it doesn't exist
-          await setDoc(doc(db, 'users', u.uid), {
-            uid: u.uid,
-            email: u.email,
-            displayName: u.displayName || '',
-            photoURL: u.photoURL || '',
-            updatedAt: serverTimestamp()
-          }, { merge: true });
+          
         } catch (error) {
           console.warn("Background auth-sync failed safely:", error);
         }
@@ -382,10 +386,6 @@ export default function App() {
   const login = () => setShowLoginModal(true);
   const logout = () => signOut(auth);
 
-  useEffect(() => {
-    window.scrollTo({ top: 0, behavior: 'instant' });
-  }, [currentPage]);
-
   if (loading) {
     return (
       <div className="min-h-screen grid place-items-center bg-slate-50">
@@ -400,146 +400,127 @@ export default function App() {
     );
   }
 
+  // AUTH WALL: Only show the app if user is signed in
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-[#001233] flex flex-col items-center justify-center p-6 relative overflow-hidden">
+        <div className="absolute inset-0 grid-pattern opacity-[0.05]"></div>
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="w-full max-w-md bg-white rounded-[40px] p-8 md:p-12 shadow-2xl relative z-10"
+        >
+          <div className="text-center mb-10">
+            <div className="w-24 h-24 bg-maritime/5 rounded-3xl flex items-center justify-center mx-auto mb-6">
+              <Ship className="text-maritime" size={48} />
+            </div>
+            <h2 className="text-3xl font-black uppercase tracking-tight italic">Bienvenue à Bord</h2>
+            <p className="text-slate-500 text-xs font-bold mt-2 uppercase tracking-widest leading-relaxed">
+              Connectez-vous pour accéder à la plateforme officielle <br/> Mugote & Frères
+            </p>
+          </div>
+          
+          <AuthForm onSuccess={() => setShowLoginModal(false)} />
+          
+          <p className="mt-8 text-center text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-relaxed">
+            Seuls les voyageurs authentifiés peuvent <br/> accéder aux services de navigation
+          </p>
+        </motion.div>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-bg flex flex-col font-sans relative overflow-hidden">
+    <div className="bg-bg font-sans relative">
       {isFirebaseOffline && (
-        <div className="bg-red-600 text-white text-[10px] font-black uppercase tracking-[0.2em] py-2 text-center sticky top-0 z-[100] animate-pulse">
+        <div className="bg-red-600 text-white text-[10px] font-black uppercase tracking-[0.2em] py-2 text-center fixed top-0 w-full z-[200] animate-pulse">
           ⚠️ Connexion instable ou hors-ligne. Les modifications risquent de ne pas être enregistrées.
         </div>
       )}
       <div className="absolute inset-0 grid-pattern pointer-events-none opacity-[0.05]"></div>
       
-      <header className="w-full bg-white z-[60] relative">
-        <div className="w-full h-32 md:h-64 relative overflow-hidden">
-          <img 
-            src={siteSettings.homeBg || undefined} 
-            className="w-full h-full object-cover" 
-            alt="Mugote Fleet Background"
-            onError={(e) => {
-              (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1559139225-8216b8e8303e?q=80&w=2070&auto=format&fit=crop';
-            }}
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-white via-transparent to-black/40"></div>
-          <div className="absolute bottom-6 md:bottom-10 left-1/2 -translate-x-1/2 w-full text-center px-4">
-            <p className="text-white text-[10px] md:text-base font-black uppercase tracking-[0.4em] md:tracking-[0.6em] drop-shadow-[0_4px_8px_rgba(0,0,0,0.5)]">
-              L'excellence du transport lacustre au Kivu
-            </p>
+      {/* HEADER + NAV WRAPPER (SCROLLABLE WITH PAGE) */}
+      <div className="relative z-[100] bg-white">
+        <header className="w-full bg-white relative">
+          <div className="w-full h-24 md:h-32 relative overflow-hidden">
+            <img 
+              src={siteSettings.homeBg || undefined} 
+              className="w-full h-full object-cover" 
+              alt="Mugote Fleet Background"
+              onError={(e) => {
+                (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1559139225-8216b8e8303e?q=80&w=2070&auto=format&fit=crop';
+              }}
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-white via-transparent to-black/30"></div>
           </div>
-        </div>
 
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 md:py-10 flex flex-col items-center justify-center relative -mt-12 md:-mt-16 bg-white rounded-t-[32px] md:rounded-t-[50px] shadow-[0_-20px_50px_-15px_rgba(0,0,0,0.15)]">
-          <div className="flex flex-col items-center gap-4 md:gap-6 cursor-pointer group" onClick={() => setCurrentPage('home')}>
-            <div className="w-24 h-24 md:w-48 md:h-48 rounded-full border-[6px] md:border-[8px] border-white shadow-2xl overflow-hidden shadow-black/40 transition-all group-hover:scale-105 mb-2 relative ring-1 ring-slate-100 flex items-center justify-center bg-white">
-              <img 
-                src={siteSettings.logo || siteSettings.homeDetail || "https://images.unsplash.com/photo-1544551763-46a013bb70d5?q=80&w=2070&auto=format&fit=crop"} 
-                className="w-full h-full object-cover" 
-                alt="Logo Mugote"
-                onError={(e) => {
-                  (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1544551763-46a013bb70d5?q=80&w=2070&auto=format&fit=crop';
-                }}
-              />
-            </div>
-            <div className="text-center space-y-2 md:space-y-3">
-              <h1 className="text-xl md:text-4xl font-black tracking-tighter leading-none italic uppercase">
-                <span className="text-maritime">ETS AMR</span> <span className="text-gold">MUGOTE</span> <span className="text-maritime-dark">ET SES FRERES</span>
-              </h1>
-              <div className="flex items-center justify-center gap-3 md:gap-4">
-                <div className="h-[2px] w-8 md:w-24 bg-gold/50"></div>
-                <p className="text-[9px] md:text-sm font-black tracking-[0.2em] md:tracking-[0.3em] text-slate-900 uppercase italic">
-                  VOYAGER EN TOUTE SÉCURITÉ
-                </p>
-                <div className="h-[2px] w-8 md:w-24 bg-gold/50"></div>
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 flex items-center justify-between relative -mt-8 md:-mt-12 pb-4">
+            <div className="flex items-center gap-3 md:gap-4 cursor-pointer group" onClick={() => setCurrentPage('home')}>
+              <div className="w-16 h-16 md:w-24 md:h-24 rounded-full border-4 border-white shadow-xl overflow-hidden transition-all group-hover:scale-105 relative flex items-center justify-center bg-white">
+                <img 
+                  src={siteSettings.logo || siteSettings.homeDetail || "https://images.unsplash.com/photo-1544551763-46a013bb70d5?q=80&w=2070&auto=format&fit=crop"} 
+                  className="w-full h-full object-cover" 
+                  alt="Logo Mugote"
+                />
+              </div>
+              <div className="hidden sm:block">
+                <h1 className="text-sm md:text-xl font-black tracking-tighter italic uppercase text-maritime">
+                  ETS AMR MUGOTE <span className="text-gold">& FRÈRES</span>
+                </h1>
+                <p className="text-[8px] md:text-[10px] font-black tracking-widest text-slate-400 uppercase italic">VOYAGER EN TOUTE SÉCURITÉ</p>
               </div>
             </div>
-          </div>
-          
-          <div className="absolute right-4 md:right-8 top-6 md:top-10 flex items-center gap-2 sm:gap-3">
-             <button 
-               onClick={() => window.location.reload()} 
-               className="p-3 sm:p-4 bg-slate-50 text-slate-400 hover:text-maritime rounded-xl sm:rounded-2xl transition-all border border-slate-100 shadow-md group"
-               title="Actualiser la page"
-             >
-                <RotateCw size={18} className="sm:w-5 sm:h-5 group-active:rotate-180 transition-transform duration-500" />
-             </button>
-             <button onClick={() => setIsMenuOpen(true)} className="md:hidden p-3 sm:p-4 bg-maritime text-white rounded-xl sm:rounded-2xl shadow-xl hover:bg-black transition-all">
-                <Menu size={20} className="sm:w-6 sm:h-6" />
-             </button>
-             {user ? (
-               <div className="flex items-center gap-2 sm:gap-3">
-                 <div className="hidden md:block text-right">
-                   <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Connecté</p>
-                   <p className="text-xs font-black text-maritime">{user.displayName}</p>
+            
+            <div className="flex items-center gap-2 sm:gap-3">
+               <button onClick={() => setIsMenuOpen(true)} className="md:hidden p-3 bg-maritime text-white rounded-xl shadow-lg">
+                  <Menu size={18} />
+               </button>
+               {user && (
+                 <div className="flex items-center gap-2 sm:gap-3">
+                   <div className="hidden md:block text-right">
+                     <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Connecté</p>
+                     <p className="text-xs font-black text-maritime">{user.displayName}</p>
+                   </div>
+                   <button onClick={logout} className="p-3 bg-slate-50 text-slate-400 hover:text-rose-600 rounded-xl transition-all border border-slate-100 shadow-sm" title="Déconnexion">
+                     <LogOut size={18} />
+                   </button>
                  </div>
-                 <button onClick={logout} className="p-3 sm:p-4 bg-slate-50 text-slate-400 hover:text-rose-600 rounded-xl sm:rounded-2xl transition-all border border-slate-100 hover:border-rose-100 shadow-md">
-                   <LogOut size={18} className="sm:w-5 sm:h-5" />
-                 </button>
-               </div>
-            ) : (
-              <button onClick={login} className="px-5 sm:px-8 py-2.5 sm:py-3 bg-maritime text-white rounded-xl sm:rounded-2xl shadow-xl hover:bg-maritime-dark transition-all text-[10px] sm:text-xs font-black uppercase tracking-widest flex items-center gap-2 sm:gap-3 border border-white/20">
-                <User size={16} className="sm:w-[18px] sm:h-[18px]" /> <span className="hidden sm:inline">Connexion</span>
-              </button>
-            )}
+               )}
+            </div>
           </div>
-        </div>
+        </header>
 
-        {/* Decorative separator */}
-        <div className="w-full h-2 bg-gradient-to-r from-transparent via-gold/20 to-transparent"></div>
-      </header>
-
-      <nav className="sticky top-0 z-50 bg-[#001233] w-full border-b border-white/10 shadow-2xl">
-        <div className="max-w-7xl mx-auto px-2 sm:px-4 py-3 sm:py-4">
-          <div className="flex flex-wrap items-center justify-center gap-1.5 sm:gap-3 md:gap-4">
-            {[
-              { id: 'home', label: 'ACCUEIL' },
-              { id: 'booking', label: 'RÉSERVER' },
-              { id: 'tickets', label: 'BILLETS' },
-              { id: 'news', label: 'JOURNAL' },
-              { id: 'gallery', label: 'FLOTTE' },
-              { id: 'tarifs', label: 'TARIFS', anchor: 'prices' },
-              { id: 'horaires', label: 'HORAIRES', anchor: 'routes' },
-              { id: 'dashboard', label: 'ADMINISTRATION', adminOnly: true }
-            ].map(item => {
-              if (item.adminOnly && !isAdmin) return null;
-              
-              const isDashboard = item.id === 'dashboard';
-              
-              return (
-                <button 
-                  key={item.id}
-                  onClick={() => {
-                    if (item.anchor) {
-                      setCurrentPage('home');
-                      setTimeout(() => {
-                        const el = document.getElementById(item.anchor!);
-                        if (el) {
-                          const navHeight = 80;
-                          const top = el.getBoundingClientRect().top + window.pageYOffset - navHeight;
-                          window.scrollTo({ top, behavior: 'smooth' });
-                        }
-                      }, 100);
-                    } else {
-                      setCurrentPage(item.id as Page); 
-                    }
-                  }} 
-                  className={cn(
-                    "rounded-lg sm:rounded-xl font-black uppercase tracking-[0.1em] sm:tracking-[0.2em] transition-all duration-300 border relative group",
-                    isDashboard ? "px-4 sm:px-6 py-2.5 sm:py-3.5 text-[9px] sm:text-[11px] md:text-sm" : "px-2.5 sm:px-4 py-2 sm:py-3 text-[8px] sm:text-[10px] md:text-xs",
-                    currentPage === item.id 
-                      ? isDashboard 
-                        ? "bg-emerald-600 text-white border-emerald-400 shadow-xl shadow-emerald-500/30 ring-2 ring-emerald-500/50"
-                        : "bg-gold text-maritime border-gold shadow-xl shadow-gold/30" 
-                      : isDashboard
-                        ? "bg-emerald-950/60 text-emerald-400 border-emerald-500/50 hover:bg-emerald-600 hover:text-white"
-                        : "bg-white/5 text-white/50 border-white/5 hover:bg-white/10 hover:text-white"
-                  )}
-                >
-                  {item.label}
-                </button>
-              );
-            })}
+        <nav className="bg-[#001233] w-full border-b border-white/5">
+          <div className="max-w-7xl mx-auto px-2 sm:px-4 py-2 sm:py-3 overflow-x-auto no-scrollbar">
+            <div className="flex items-center justify-center gap-1.5 sm:gap-3">
+              {[
+                { id: 'home', label: 'ACCUEIL' },
+                { id: 'booking', label: 'RÉSERVER' },
+                { id: 'tickets', label: 'BILLETS' },
+                { id: 'news', label: 'JOURNAL' },
+                { id: 'gallery', label: 'FLOTTE' },
+                { id: 'dashboard', label: 'ADMIN', adminOnly: true }
+              ].map(item => {
+                if (item.adminOnly && !isAdmin) return null;
+                return (
+                  <button 
+                    key={item.id}
+                    onClick={() => setCurrentPage(item.id as Page)} 
+                    className={cn(
+                      "px-3 sm:px-5 py-2 sm:py-2.5 rounded-lg sm:rounded-xl font-black uppercase tracking-widest transition-all duration-300 text-[8px] sm:text-[10px]",
+                      currentPage === item.id 
+                        ? "bg-gold text-maritime shadow-xl shadow-gold/20" 
+                        : "text-white/40 hover:text-white hover:bg-white/5"
+                    )}
+                  >
+                    {item.label}
+                  </button>
+                );
+              })}
+            </div>
           </div>
-        </div>
-      </nav>
+        </nav>
+      </div>
 
       {/* Mobile Menu */}
       <AnimatePresence>
@@ -640,7 +621,7 @@ export default function App() {
         )}
       </AnimatePresence>
 
-      <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-8 py-4 sm:py-6 relative z-10 text-center">
+      <main className="max-w-7xl mx-auto w-full px-4 sm:px-8 py-4 sm:py-6 relative z-10 text-center">
         <AnimatePresence mode="wait">
           {verifyId ? (
             <VerificationView id={verifyId} onClose={() => { setVerifyId(null); window.history.pushState({}, '', '/'); }} />
@@ -649,7 +630,7 @@ export default function App() {
               {currentPage === 'home' && <Home onBook={() => setCurrentPage('booking')} onNavigate={setCurrentPage} siteSettings={siteSettings} schedules={schedules} />}
               {currentPage === 'booking' && <Booking onReserved={(res) => { setCurrentReservation(res); setCurrentPage('payment'); }} user={user} />}
               {currentPage === 'payment' && <Payment reservation={currentReservation} onComplete={() => setCurrentPage('tickets')} />}
-              {currentPage === 'dashboard' && <Dashboard siteSettings={siteSettings} onNavigate={setCurrentPage} schedules={schedules} />}
+              {currentPage === 'dashboard' && <Dashboard siteSettings={siteSettings} onNavigate={setCurrentPage} schedules={schedules} isAdmin={isAdmin} />}
               {currentPage === 'tickets' && <MyTickets user={user} siteSettings={siteSettings} />}
               {currentPage === 'news' && <NewsView />}
               {currentPage === 'gallery' && <GalleryView siteSettings={siteSettings} />}
@@ -728,7 +709,7 @@ export default function App() {
   );
 }
 
-function LoginModal({ isOpen, onClose }: { isOpen: boolean, onClose: () => void }) {
+function AuthForm({ onSuccess }: { onSuccess: () => void }) {
   const [isSignUp, setIsSignUp] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -742,10 +723,22 @@ function LoginModal({ isOpen, onClose }: { isOpen: boolean, onClose: () => void 
     const provider = new GoogleAuthProvider();
     try {
       await signInWithPopup(auth, provider);
-      onClose();
+      onSuccess();
     } catch (err: any) {
       console.error(err);
-      setError("Échec de la connexion avec Google.");
+      if (err.code === 'auth/popup-blocked') {
+        setError("La fenêtre de connexion a été bloquée. Veuillez cliquer sur 'Ouvrir dans un nouvel onglet' en haut à droite pour vous connecter.");
+      } else if (err.code === 'auth/operation-not-allowed') {
+        setError("La connexion Google n'est pas encore activée dans votre projet Firebase. Veuillez l'activer dans la console Firebase (Authentification > Sign-in method).");
+      } else if (err.code === 'auth/popup-closed-by-user') {
+        // Just clear the loading state, no error message needed for cancellation
+        setError(null);
+      } else if (err.message && (err.message.includes('INTERNAL ASSERTION FAILED') || err.message.includes('Pending promise'))) {
+        // Handle weird Firebase internal errors gracefully
+        setError("Un problème technique est survenu avec la fenêtre de connexion Google. Veuillez rafraîchir la page ou cliquer sur 'Ouvrir dans un nouvel onglet' en haut de l'écran.");
+      } else {
+        setError("Échec de la connexion avec Google.");
+      }
     } finally {
       setLoading(false);
     }
@@ -762,7 +755,7 @@ function LoginModal({ isOpen, onClose }: { isOpen: boolean, onClose: () => void 
       } else {
         await signInWithEmailAndPassword(auth, email, password);
       }
-      onClose();
+      onSuccess();
     } catch (err: any) {
       console.error(err);
       let msg = "Une erreur est survenue.";
@@ -770,16 +763,100 @@ function LoginModal({ isOpen, onClose }: { isOpen: boolean, onClose: () => void 
       else if (err.code === 'auth/user-not-found') msg = "Aucun compte trouvé avec cet e-mail.";
       else if (err.code === 'auth/email-already-in-use') msg = "Cet e-mail est déjà utilisé.";
       else if (err.code === 'auth/weak-password') msg = "Le mot de passe est trop court.";
+      else if (err.code === 'auth/operation-not-allowed') msg = "L'authentification par e-mail/mot de passe n'est pas activée dans Firebase. Veuillez l'activer dans la console.";
       setError(msg);
     } finally {
       setLoading(false);
     }
   };
 
+  return (
+    <div className="space-y-6">
+      <form onSubmit={handleSubmit} className="space-y-4">
+        {isSignUp && (
+          <div>
+            <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1 ml-1">Nom Complet</label>
+            <input 
+              required
+              type="text" 
+              value={name} 
+              onChange={e => setName(e.target.value)}
+              className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl focus:outline-none focus:ring-2 ring-maritime/5 text-sm font-bold"
+              placeholder="Ex: John Doe"
+            />
+          </div>
+        )}
+        <div>
+          <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1 ml-1">Email</label>
+          <input 
+            required
+            type="email" 
+            value={email} 
+            onChange={e => setEmail(e.target.value)}
+            className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl focus:outline-none focus:ring-2 ring-maritime/5 text-sm font-bold"
+            placeholder="Ex: passager@email.com"
+          />
+        </div>
+        <div>
+          <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1 ml-1">Mot de Passe</label>
+          <input 
+            required
+            type="password" 
+            value={password} 
+            onChange={e => setPassword(e.target.value)}
+            className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl focus:outline-none focus:ring-2 ring-maritime/5 text-sm font-bold"
+            placeholder="••••••••"
+          />
+        </div>
+
+        {error && (
+          <p className="text-rose-500 text-[10px] font-black uppercase text-center bg-rose-50 py-3 rounded-xl border border-rose-100">
+            {error}
+          </p>
+        )}
+
+        <button 
+          type="submit"
+          disabled={loading}
+          className="w-full py-5 bg-black text-white font-black rounded-2xl uppercase tracking-[0.2em] text-xs shadow-xl shadow-black/20 transform active:scale-95 transition-all disabled:opacity-50"
+        >
+          {loading ? "Chargement..." : isSignUp ? "S'inscrire" : "Se Connecter"}
+        </button>
+      </form>
+
+      <div className="relative">
+        <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-slate-100"></div></div>
+        <div className="relative flex justify-center text-[10px] font-black uppercase tracking-widest"><span className="bg-white px-4 text-slate-300 italic">Ou continuer avec</span></div>
+      </div>
+
+      <button 
+        onClick={handleGoogleLogin}
+        disabled={loading}
+        className="w-full py-4 border-2 border-slate-100 text-slate-600 font-bold rounded-2xl flex items-center justify-center gap-3 hover:bg-slate-50 transition-all text-sm shadow-sm"
+      >
+        <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-5 h-5" alt="Google" />
+        Google
+      </button>
+
+      <p className="text-center text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+        {isSignUp ? "Déjà un compte ?" : "Nouveau passager ?"} 
+        <button 
+          type="button"
+          onClick={() => setIsSignUp(!isSignUp)}
+          className="ml-2 text-maritime hover:underline"
+        >
+          {isSignUp ? "Se connecter" : "Créer un compte"}
+        </button>
+      </p>
+    </div>
+  );
+}
+
+function LoginModal({ isOpen, onClose }: { isOpen: boolean, onClose: () => void }) {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-[300] flex items-center justify-center p-4">
       <motion.div 
         initial={{ opacity: 0 }} 
         animate={{ opacity: 1 }} 
@@ -800,92 +877,11 @@ function LoginModal({ isOpen, onClose }: { isOpen: boolean, onClose: () => void 
           <div className="w-16 h-16 bg-maritime/5 rounded-2xl flex items-center justify-center mx-auto mb-4">
             <Ship className="text-maritime" size={32} />
           </div>
-          <h2 className="text-2xl font-black uppercase tracking-tight italic">
-            {isSignUp ? "Créer un compte" : "Connexion"}
-          </h2>
-          <p className="text-slate-500 text-sm font-medium mt-1 uppercase tracking-wider text-center">
-            {isSignUp ? "Rejoignez la flotte Mugote" : "Bienvenue à bord"}
-          </p>
+          <h2 className="text-2xl font-black uppercase tracking-tight italic">Profil Voyageur</h2>
+          <p className="text-slate-500 text-[10px] font-medium mt-1 uppercase tracking-widest text-center">Gestion de votre compte Mugote</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {isSignUp && (
-            <div>
-              <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1 ml-1 text-left">Nom Complet</label>
-              <input 
-                required
-                type="text" 
-                value={name} 
-                onChange={e => setName(e.target.value)}
-                className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl focus:outline-none focus:ring-2 ring-maritime/5 text-sm font-bold"
-                placeholder="Ex: John Doe"
-              />
-            </div>
-          )}
-          <div>
-            <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1 ml-1 text-left">Email</label>
-            <input 
-              required
-              type="email" 
-              value={email} 
-              onChange={e => setEmail(e.target.value)}
-              className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl focus:outline-none focus:ring-2 ring-maritime/5 text-sm font-bold"
-              placeholder="Ex: passager@email.com"
-            />
-          </div>
-          <div>
-            <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1 ml-1 text-left">Mot de Passe</label>
-            <input 
-              required
-              type="password" 
-              value={password} 
-              onChange={e => setPassword(e.target.value)}
-              className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl focus:outline-none focus:ring-2 ring-maritime/5 text-sm font-bold"
-              placeholder="••••••••"
-            />
-          </div>
-
-          {error && (
-            <p className="text-rose-500 text-[11px] font-black uppercase text-center bg-rose-50 py-3 rounded-xl border border-rose-100">
-              {error}
-            </p>
-          )}
-
-          <button 
-            type="submit"
-            disabled={loading}
-            className="w-full py-5 bg-black text-white font-black rounded-2xl uppercase tracking-[0.2em] text-xs shadow-xl shadow-black/20 hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-50"
-          >
-            {loading ? "Chargement..." : isSignUp ? "S'inscrire" : "Se Connecter"}
-          </button>
-        </form>
-
-        <div className="mt-8">
-          <div className="relative mb-8">
-            <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-slate-100"></div></div>
-            <div className="relative flex justify-center text-[10px] font-black uppercase tracking-widest"><span className="bg-white px-4 text-slate-300 italic">Ou continuer avec</span></div>
-          </div>
-
-          <button 
-            onClick={handleGoogleLogin}
-            disabled={loading}
-            className="w-full py-4 border-2 border-slate-100 text-slate-600 font-bold rounded-2xl flex items-center justify-center gap-3 hover:bg-slate-50 transition-all text-sm"
-          >
-            <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-5 h-5" alt="Google" />
-            Google
-          </button>
-        </div>
-
-        <p className="mt-8 text-center text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-          {isSignUp ? "Déjà un compte ?" : "Nouveau passager ?"} 
-          <button 
-            type="button"
-            onClick={() => setIsSignUp(!isSignUp)}
-            className="ml-2 text-maritime hover:underline"
-          >
-            {isSignUp ? "Se connecter" : "Créer un compte"}
-          </button>
-        </p>
+        <AuthForm onSuccess={onClose} />
       </motion.div>
     </div>
   );
@@ -935,7 +931,7 @@ function AdminChatView({ conversation }: { conversation: any }) {
   };
 
   return (
-    <div className="flex flex-col h-full bg-white/50 backdrop-blur-xl">
+    <div className="flex flex-col min-h-[600px] bg-white/50 backdrop-blur-xl">
       <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-white/80">
         <div>
           <h4 className="text-[11px] font-black uppercase text-black tracking-widest">{conversation.userName}</h4>
@@ -943,7 +939,7 @@ function AdminChatView({ conversation }: { conversation: any }) {
         </div>
         <div className="px-4 py-1.5 bg-slate-100 rounded-full text-[8px] font-black uppercase text-slate-500 tracking-widest">Connecté</div>
       </div>
-      <div className="flex-1 overflow-y-auto p-10 space-y-4">
+      <div className="p-10 space-y-4">
         {messages.map((m, i) => (
           <div key={i} className={cn(
             "max-w-[75%] p-5 text-[11px] font-bold leading-relaxed shadow-sm",
@@ -1950,7 +1946,7 @@ function Booking({ onReserved, user }: { onReserved: (res: Reservation) => void,
 
 
           {/* Right side: Digital Boarding Pass Preview (GLASS VERSION) */}
-          <div className="w-full lg:w-[400px] lg:sticky lg:top-32">
+          <div className="w-full lg:w-[400px]">
             <div className={cn(
                "relative p-5 lg:p-8 shadow-2xl rounded-[30px] lg:rounded-[40px] overflow-hidden border transition-all duration-700",
                formData.travelClass === '1ère Classe' || formData.travelClass === 'VIP' ? "bg-slate-900 text-white border-gold/30" :
@@ -2287,7 +2283,7 @@ function Payment({ reservation, onComplete }: { reservation: Reservation | null,
   );
 }
 
-function Dashboard({ siteSettings, onNavigate, schedules }: { siteSettings?: { homeBg: string, homeDetail: string }, onNavigate: (page: string) => void, schedules: any[] }) {
+function Dashboard({ siteSettings, onNavigate, schedules, isAdmin }: { siteSettings?: { homeBg: string, homeDetail: string }, onNavigate: (page: string) => void, schedules: any[], isAdmin: boolean }) {
   const [tab, setTab] = useState<'reservations' | 'users' | 'fleet' | 'media' | 'settings' | 'messages' | 'schedules'>('reservations');
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [usersList, setUsersList] = useState<any[]>([]);
@@ -2295,6 +2291,8 @@ function Dashboard({ siteSettings, onNavigate, schedules }: { siteSettings?: { h
   const [scheduleForm, setScheduleForm] = useState({ id: '', from: '', to: '', time: '', ship: '', days: '' });
   const [boatForm, setBoatForm] = useState({ id: '', name: '', capacity: 0, description: '', imageUrl: '' });
   const [editMediaId, setEditMediaId] = useState<string | null>(null);
+  const [isAdminUnlocked, setIsAdminUnlocked] = useState(false);
+  const [adminCode, setAdminCode] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [newsList, setNewsList] = useState<any[]>([]);
   const [conversations, setConversations] = useState<any[]>([]);
@@ -2496,6 +2494,21 @@ function Dashboard({ siteSettings, onNavigate, schedules }: { siteSettings?: { h
     return () => { unsubRes(); unsubUsers(); unsubNews(); unsubConv(); unsubFleet(); };
   }, []);
 
+  useEffect(() => {
+    if (isAdmin && !isAdminUnlocked) {
+      // Logic for unlocking could be here if needed for sync
+    }
+  }, [isAdmin, isAdminUnlocked]);
+
+  const handleCodeSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (adminCode === 'b012000b') {
+      setIsAdminUnlocked(true);
+    } else {
+      alert("Code incorrect.");
+    }
+  };
+
   const copyToClipboard = (type: 'reservations' | 'users') => {
     let text = "";
     if (type === 'users') {
@@ -2691,6 +2704,20 @@ function Dashboard({ siteSettings, onNavigate, schedules }: { siteSettings?: { h
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  const handleCancellationAction = async (reservationId: string, action: 'approved' | 'rejected') => {
+    try {
+      await updateDoc(doc(db, 'reservations', reservationId), {
+        cancellationStatus: action,
+        status: action === 'approved' ? 'ANNULÉ' : 'VALIDATED',
+        cancellationProcessedAt: serverTimestamp()
+      });
+      alert(action === 'approved' ? "Annulation approuvée. Le billet est marqué comme ANNULÉ." : "Demande de remboursement rejetée.");
+    } catch (err) {
+      console.error(err);
+      handleFirestoreError(err, OperationType.UPDATE, 'reservations');
+    }
+  };
+
   const handleAction = async (resId: string, action: 'VALIDATED' | 'REJECTED') => {
     try {
       let ticketId = '';
@@ -2811,9 +2838,32 @@ function Dashboard({ siteSettings, onNavigate, schedules }: { siteSettings?: { h
       </button>
 
       <div className="flex flex-col items-center gap-10 border-b border-slate-200 pb-12 text-center">
-        <div className="space-y-4">
-          <h2 className="text-3xl font-extrabold tracking-tighter uppercase text-black leading-none">Administration</h2>
-          <div className="flex flex-wrap justify-center gap-2">
+        {!isAdminUnlocked ? (
+          <div className="max-w-md w-full p-10 bg-white rounded-[32px] border border-slate-200 shadow-2xl mt-12">
+            <div className="w-20 h-20 bg-emerald-50 text-emerald-600 rounded-3xl flex items-center justify-center mx-auto mb-6">
+              <ShieldCheck size={40} />
+            </div>
+            <h3 className="text-xl font-extrabold uppercase tracking-tighter mb-6 italic text-maritime">Sécurité Administrateur</h3>
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-8 leading-relaxed">Verification en deux étapes : <br/> Entrez le code de la base de données</p>
+            <form onSubmit={handleCodeSubmit} className="space-y-4">
+              <input 
+                type="password"
+                placeholder="••••••••"
+                value={adminCode}
+                onChange={e => setAdminCode(e.target.value)}
+                className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:border-emerald-500 font-mono text-center tracking-[0.5em] font-black"
+                autoFocus
+                required
+              />
+              <button className="w-full py-4 bg-emerald-600 text-white rounded-2xl font-black uppercase tracking-widest text-[10px] shadow-lg shadow-emerald-600/20 hover:scale-105 transition-all">
+                Vérifier
+              </button>
+            </form>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <h2 className="text-3xl font-extrabold tracking-tighter uppercase text-black leading-none">Administration</h2>
+            <div className="flex flex-wrap justify-center gap-2">
               {[
                 { id: 'reservations', label: 'Réservations', icon: Ticket },
                 { id: 'users', label: 'Utilisateurs', icon: Users },
@@ -2836,6 +2886,12 @@ function Dashboard({ siteSettings, onNavigate, schedules }: { siteSettings?: { h
               ))}
             </div>
           </div>
+        )}
+      </div>
+
+      {isAdminUnlocked && (
+        <>
+          <div className="mt-8">
         
         {tab === 'reservations' && (
           <div className="space-y-6 w-full max-w-5xl mx-auto px-4">
@@ -2928,9 +2984,7 @@ function Dashboard({ siteSettings, onNavigate, schedules }: { siteSettings?: { h
             )}
           </div>
         )}
-      </div>
-
-      <div className="bg-white rounded-[32px] border border-slate-100 shadow-2xl shadow-slate-200/50 overflow-hidden">
+        <div className="bg-white rounded-[32px] border border-slate-100 shadow-2xl shadow-slate-200/50 overflow-hidden">
         {tab === 'reservations' ? (
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
@@ -3001,33 +3055,53 @@ function Dashboard({ siteSettings, onNavigate, schedules }: { siteSettings?: { h
                     </td>
                     <td className="px-10 py-8 text-right">
                       <div className="flex justify-end gap-3 flex-wrap">
-                        {res.status === 'PENDING' && (
-                          <>
-                            <button 
-                              onClick={() => handleAction(res.id!, 'VALIDATED')} 
-                              className="px-4 py-2 flex items-center gap-2 bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white transition-all rounded-xl shadow-sm border border-emerald-100 text-[9px] font-black uppercase tracking-widest"
+                        {(res as any).cancellationRequested && (res as any).cancellationStatus === 'pending' ? (
+                          <div className="flex items-center gap-2 bg-rose-50 p-2 rounded-xl border border-rose-100">
+                             <p className="text-[8px] font-black text-rose-600 uppercase px-2 italic">Annulation demandée</p>
+                             <button 
+                              onClick={() => handleCancellationAction(res.id!, 'approved')}
+                              className="px-3 py-1.5 bg-emerald-600 text-white text-[8px] font-black rounded-lg shadow-md hover:bg-emerald-700"
                             >
-                              <CheckCircle2 size={14} /> Valider
+                              APPROUVER
                             </button>
                             <button 
-                              onClick={() => handleAction(res.id!, 'REJECTED')} 
-                              className="px-4 py-2 flex items-center gap-2 bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white transition-all rounded-xl shadow-sm border border-rose-100 text-[9px] font-black uppercase tracking-widest"
+                              onClick={() => handleCancellationAction(res.id!, 'rejected')}
+                              className="px-3 py-1.5 bg-rose-600 text-white text-[8px] font-black rounded-lg shadow-md hover:bg-rose-700"
                             >
-                              <X size={14} /> Rejeter
+                              REJETER
+                            </button>
+                          </div>
+                        ) : (
+                          <>
+                            {res.status === 'PENDING' && (
+                              <>
+                                <button 
+                                  onClick={() => handleAction(res.id!, 'VALIDATED')} 
+                                  className="px-4 py-2 flex items-center gap-2 bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white transition-all rounded-xl shadow-sm border border-emerald-100 text-[9px] font-black uppercase tracking-widest"
+                                >
+                                  <CheckCircle2 size={14} /> Valider
+                                </button>
+                                <button 
+                                  onClick={() => handleAction(res.id!, 'REJECTED')} 
+                                  className="px-4 py-2 flex items-center gap-2 bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white transition-all rounded-xl shadow-sm border border-rose-100 text-[9px] font-black uppercase tracking-widest"
+                                >
+                                  <X size={14} /> Rejeter
+                                </button>
+                              </>
+                            )}
+                            {res.status === 'VALIDATED' && (
+                              <button onClick={() => generatePDF(res)} className="px-6 py-2.5 bg-maritime text-white hover:bg-maritime-dark transition-all rounded-xl text-[9px] font-extrabold uppercase tracking-widest shadow-lg shadow-maritime/20 flex items-center gap-2">
+                                <Printer size={14} /> Imprimer
+                              </button>
+                            )}
+                            <button 
+                              onClick={() => handleDeleteReservation(res.id!)}
+                              className="px-4 py-2 flex items-center gap-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-all rounded-xl border border-transparent hover:border-rose-100 text-[9px] font-black uppercase tracking-widest"
+                            >
+                              <Trash2 size={14} /> Supprimer
                             </button>
                           </>
                         )}
-                        {res.status === 'VALIDATED' && (
-                          <button onClick={() => generatePDF(res)} className="px-6 py-2.5 bg-maritime text-white hover:bg-maritime-dark transition-all rounded-xl text-[9px] font-extrabold uppercase tracking-widest shadow-lg shadow-maritime/20 flex items-center gap-2">
-                            <Printer size={14} /> Imprimer
-                          </button>
-                        )}
-                        <button 
-                          onClick={() => handleDeleteReservation(res.id!)}
-                          className="px-4 py-2 flex items-center gap-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-all rounded-xl border border-transparent hover:border-rose-100 text-[9px] font-black uppercase tracking-widest"
-                        >
-                          <Trash2 size={14} /> Supprimer
-                        </button>
                       </div>
                     </td>
                   </tr>
@@ -3539,8 +3613,8 @@ function Dashboard({ siteSettings, onNavigate, schedules }: { siteSettings?: { h
         </div>
       ) : tab === 'messages' ? (
           <div className="grid grid-cols-1 md:grid-cols-12 min-h-[600px]">
-            <div className="md:col-span-4 border-r border-slate-100 overflow-y-auto max-h-[600px] bg-slate-50/20">
-               <div className="p-6 border-b border-slate-100 bg-white/50 backdrop-blur-md sticky top-0 z-10">
+            <div className="md:col-span-4 border-r border-slate-100 bg-slate-50/20">
+               <div className="p-6 border-b border-slate-100 bg-white/50 backdrop-blur-md">
                  <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400">Conversations Actives</h3>
                </div>
                {conversations.length === 0 ? (
@@ -3623,7 +3697,10 @@ function Dashboard({ siteSettings, onNavigate, schedules }: { siteSettings?: { h
           </div>
         )}
       </div>
-    </motion.div>
+    </div>
+  </>
+)}
+</motion.div>
   );
 }
 
@@ -4041,6 +4118,21 @@ function MyTickets({ user, siteSettings }: { user: FirebaseUser | null, siteSett
     generateTicket(res, siteSettings);
   };
 
+  const handleRequestCancellation = async (resId: string) => {
+    if (!window.confirm("Voulez-vous vraiment demander l'annulation de cette réservation ? Cette demande sera soumise à l'approbation de l'administrateur.")) return;
+    try {
+      await updateDoc(doc(db, 'reservations', resId), {
+        cancellationRequested: true,
+        cancellationStatus: 'pending',
+        cancellationRequestedAt: serverTimestamp()
+      });
+      alert("Demande d'annulation envoyée avec succès.");
+    } catch (err) {
+      console.error(err);
+      handleFirestoreError(err, OperationType.UPDATE, 'reservations');
+    }
+  };
+
   if (!user) return <div className="p-10 sm:p-20 text-center text-slate-400 font-bold uppercase tracking-widest text-[10px] sm:text-xs">Connectez-vous pour voir vos billets.</div>;
 
   return (
@@ -4106,14 +4198,34 @@ function MyTickets({ user, siteSettings }: { user: FirebaseUser | null, siteSett
                     <p className="text-[7px] sm:text-[8px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Total</p>
                     <p className="text-sm sm:text-base font-extrabold text-maritime mono tracking-tighter">{res.amount}$</p>
                   </div>
-                  {res.status === 'VALIDATED' && (
-                    <button 
-                      onClick={() => generateTicketPDF(res)}
-                      className="px-3 sm:px-4 py-1.5 bg-maritime text-white text-[7px] sm:text-[8px] font-bold uppercase tracking-widest rounded-lg hover:bg-maritime-dark transition-all flex-shrink-0"
-                    >
-                      Billet
-                    </button>
-                  )}
+                  <div className="flex flex-col gap-2">
+                    {res.status === 'VALIDATED' && !(res as any).cancellationRequested && (
+                      <button 
+                        onClick={() => generateTicketPDF(res)}
+                        className="px-3 sm:px-4 py-1.5 bg-maritime text-white text-[7px] sm:text-[8px] font-bold uppercase tracking-widest rounded-lg hover:bg-maritime-dark transition-all flex-shrink-0 shadow-md"
+                      >
+                        Billet
+                      </button>
+                    )}
+                    {['VALIDATED', 'PENDING'].includes(res.status) && !(res as any).cancellationRequested && (
+                      <button 
+                        onClick={() => handleRequestCancellation(res.id!)}
+                        className="px-3 sm:px-4 py-1.5 border border-rose-200 text-rose-500 text-[7px] sm:text-[8px] font-bold uppercase tracking-widest rounded-lg hover:bg-rose-50 transition-all flex-shrink-0"
+                      >
+                        Annuler
+                      </button>
+                    )}
+                    {(res as any).cancellationRequested && (res as any).cancellationStatus === 'pending' && (
+                      <span className="px-3 py-1.5 bg-rose-50 text-rose-500 text-[6px] sm:text-[7px] font-black uppercase tracking-widest rounded-lg border border-rose-100 flex items-center gap-1">
+                        <Clock size={8} /> En attente d'annulation
+                      </span>
+                    )}
+                    {(res as any).cancellationStatus === 'approved' && (
+                      <span className="px-3 py-1.5 bg-rose-100 text-rose-700 text-[6px] sm:text-[7px] font-black uppercase tracking-widest rounded-lg border border-rose-200">
+                        Annulation Approuvée
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
