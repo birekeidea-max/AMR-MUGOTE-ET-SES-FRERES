@@ -9,6 +9,7 @@ import {
   LogIn, 
   LogOut,
   ChevronRight,
+  Lock,
   Phone,
   Mail,
   MapPin,
@@ -56,6 +57,7 @@ import {
   signOut,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
+  signInAnonymously,
   sendPasswordResetEmail,
   updateProfile,
   User as FirebaseUser
@@ -324,42 +326,46 @@ export default function App() {
     });
 
     const unsubscribe = onAuthStateChanged(auth, async (u) => {
-      setUser(u);
-      if (u) {
-        setIsAdmin(u.email === 'birekeidea@gmail.com');
+      if (!u) {
         try {
-          // Auto-promote the specific project owner to admin for testing
-          if (u.email === 'birekeidea@gmail.com') {
-            await setDoc(doc(db, 'admins', u.uid), {
-              uid: u.uid,
-              email: u.email,
-              role: 'ADMIN'
-            }, { merge: true });
-          }
-          
-          // Official User List for Platform
-          await setDoc(doc(db, 'users', u.uid), {
-            uid: u.uid,
-            email: u.email,
-            displayName: u.displayName || 'Utilisateur Mugote',
-            photoURL: u.photoURL || '',
-            lastLogin: serverTimestamp(),
-            registeredAt: serverTimestamp() // merge: true handles this
-          }, { merge: true });
-
-          // Also update users_list if it's used elsewhere
-          await setDoc(doc(db, 'users_list', u.uid), {
-            uid: u.uid,
-            email: u.email,
-            displayName: u.displayName || '',
-            lastLogin: serverTimestamp()
-          }, { merge: true });
-          
-        } catch (error) {
-          console.warn("Background auth-sync failed safely:", error);
+          await signInAnonymously(auth);
+        } catch (err) {
+          console.error("Anonymous auth failed", err);
+          setLoading(false);
         }
-      } else {
+        return;
+      }
+
+      setUser(u);
+      
+      // Admin check logic
+      if (u.isAnonymous) {
         setIsAdmin(false);
+      } else {
+        setIsAdmin(u.email === 'birekeidea@gmail.com');
+      }
+
+      try {
+        // Platform User Registry
+        await setDoc(doc(db, 'users', u.uid), {
+          uid: u.uid,
+          email: u.email || 'Anonyme',
+          displayName: u.displayName || (u.isAnonymous ? 'Passager Anonyme' : 'Utilisateur Mugote'),
+          photoURL: u.photoURL || '',
+          isAnonymous: u.isAnonymous,
+          lastLogin: serverTimestamp(),
+        }, { merge: true });
+
+        // Also update users_list if it's used elsewhere
+        await setDoc(doc(db, 'users_list', u.uid), {
+          uid: u.uid,
+          email: u.email || 'Anonyme',
+          displayName: u.displayName || (u.isAnonymous ? 'Anonyme' : (u.displayName || 'Utilisateur')),
+          lastLogin: serverTimestamp()
+        }, { merge: true });
+        
+      } catch (error) {
+        console.warn("Background auth-sync failed safely:", error);
       }
       setLoading(false);
     });
@@ -396,36 +402,6 @@ export default function App() {
           className="text-maritime-600"
         >
           <Ship size={48} />
-        </motion.div>
-      </div>
-    );
-  }
-
-  // AUTH WALL: Only show the app if user is signed in
-  if (!user) {
-    return (
-      <div className="min-h-screen bg-[#001233] flex flex-col items-center justify-center p-6 relative overflow-hidden">
-        <div className="absolute inset-0 grid-pattern opacity-[0.05]"></div>
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="w-full max-w-md bg-white rounded-[40px] p-8 md:p-12 shadow-2xl relative z-10"
-        >
-          <div className="text-center mb-10">
-            <div className="w-24 h-24 bg-maritime/5 rounded-3xl flex items-center justify-center mx-auto mb-6">
-              <Ship className="text-maritime" size={48} />
-            </div>
-            <h2 className="text-3xl font-black uppercase tracking-tight italic">Bienvenue à Bord</h2>
-            <p className="text-slate-500 text-xs font-bold mt-2 uppercase tracking-widest leading-relaxed">
-              Connectez-vous pour accéder à la plateforme officielle <br/> Mugote & Frères
-            </p>
-          </div>
-          
-          <AuthForm onSuccess={() => setShowLoginModal(false)} />
-          
-          <p className="mt-8 text-center text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-relaxed">
-            Seuls les voyageurs authentifiés peuvent <br/> accéder aux services de navigation
-          </p>
         </motion.div>
       </div>
     );
@@ -476,10 +452,10 @@ export default function App() {
                <button onClick={() => setIsMenuOpen(true)} className="md:hidden p-3 bg-maritime text-white rounded-xl shadow-lg">
                   <Menu size={18} />
                </button>
-               {user && (
+               {user && !user.isAnonymous && (
                  <div className="flex items-center gap-2 sm:gap-3">
                    <div className="hidden md:block text-right">
-                     <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Connecté</p>
+                     <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Administrateur</p>
                      <p className="text-xs font-black text-maritime">{user.displayName}</p>
                    </div>
                    <button onClick={logout} className="p-3 bg-slate-50 text-slate-400 hover:text-rose-600 rounded-xl transition-all border border-slate-100 shadow-sm" title="Déconnexion">
@@ -602,20 +578,24 @@ export default function App() {
             </div>
 
             <div className="pt-12 space-y-6">
-              {!user ? (
-                <button onClick={() => { setIsMenuOpen(false); login(); }} className="w-full py-6 bg-gold text-maritime font-black rounded-2xl uppercase tracking-[0.2em] text-xs shadow-xl shadow-gold/20">
-                  CONNEXION CLIENT
-                </button>
-              ) : (
+              {user && !user.isAnonymous && (
                 <div className="p-6 bg-white/5 rounded-2xl flex items-center justify-between border border-white/10">
                   <div>
-                    <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest mb-1">PROFIL ACTIF</p>
+                    <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest mb-1">PROFIL ADMIN</p>
                     <p className="font-bold text-white text-lg">{user.displayName}</p>
                   </div>
                   <button onClick={() => { setIsMenuOpen(false); logout(); }} className="p-4 text-rose-400 bg-rose-400/10 rounded-xl hover:bg-rose-400/20 transition-all">
                     <LogOut size={24} />
                   </button>
                 </div>
+              )}
+              {!isAdmin && (
+                <button 
+                  onClick={() => { setIsMenuOpen(false); setShowLoginModal(true); }}
+                  className="w-full py-4 border border-white/10 text-white/40 font-bold rounded-2xl uppercase tracking-[0.2em] text-[10px] hover:text-white transition-colors"
+                >
+                  Accès Administrateur
+                </button>
               )}
             </div>
           </motion.div>
@@ -698,6 +678,12 @@ export default function App() {
           </div>
 
           <div className="pt-16 border-t border-white/5 w-full flex flex-col items-center gap-4">
+            <button 
+              onClick={() => setShowLoginModal(true)}
+              className="text-[9px] font-bold text-white/20 uppercase tracking-[0.6em] hover:text-white/60 transition-colors mb-2"
+            >
+              ADMINISTRATION
+            </button>
             <p className="text-[9px] font-bold text-white/30 uppercase tracking-[0.6em]">
               © {new Date().getFullYear()} ETS AMR MUGOTE ET SES FRERES • NAVIGATION LACUSTRE
             </p>
@@ -705,196 +691,65 @@ export default function App() {
         </div>
       </footer>
       <ChatWidget user={user} />
-      <LoginModal isOpen={showLoginModal} onClose={() => setShowLoginModal(false)} />
+      <AdminLoginModal isOpen={showLoginModal} onClose={() => setShowLoginModal(false)} />
     </div>
   );
 }
 
-function AuthForm({ onSuccess }: { onSuccess: () => void }) {
-  const [isSignUp, setIsSignUp] = useState(false);
-  const [showForgotPassword, setShowForgotPassword] = useState(false);
+function AdminAuthForm({ onSuccess }: { onSuccess: () => void }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [name, setName] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
-
-  const handleGoogleLogin = async () => {
-    setLoading(true);
-    setError(null);
-    const provider = new GoogleAuthProvider();
-    try {
-      await signInWithPopup(auth, provider);
-      onSuccess();
-    } catch (err: any) {
-      console.error(err);
-      if (err.code === 'auth/popup-blocked') {
-        setError("La fenêtre de connexion a été bloquée. Veuillez cliquer sur 'Ouvrir dans un nouvel onglet' en haut à droite pour vous connecter.");
-      } else if (err.code === 'auth/operation-not-allowed') {
-        setError("La connexion Google n'est pas encore activée dans votre projet Firebase. Veuillez l'activer dans la console Firebase (Authentification > Sign-in method).");
-      } else if (err.code === 'auth/popup-closed-by-user') {
-        setError(null);
-      } else if (err.message && (err.message.includes('INTERNAL ASSERTION FAILED') || err.message.includes('Pending promise'))) {
-        setError("Un problème technique est survenu avec la fenêtre de connexion Google. Veuillez rafraîchir la page ou cliquer sur 'Ouvrir dans un nouvel onglet' en haut de l'écran.");
-      } else {
-        setError("Échec de la connexion avec Google.");
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleForgotPassword = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!email) {
-      setError("Veuillez entrer votre adresse e-mail.");
-      return;
-    }
-    setLoading(true);
-    setError(null);
-    setSuccess(null);
-    try {
-      await sendPasswordResetEmail(auth, email);
-      setSuccess("Un e-mail de réinitialisation a été envoyé à " + email);
-      setTimeout(() => setShowForgotPassword(false), 3000);
-    } catch (err: any) {
-      console.error(err);
-      setError("Impossible d'envoyer l'e-mail de réinitialisation. Vérifiez l'adresse.");
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
-    setSuccess(null);
     try {
-      if (isSignUp) {
-        const res = await createUserWithEmailAndPassword(auth, email, password);
-        await updateProfile(res.user, { displayName: name });
-      } else {
-        await signInWithEmailAndPassword(auth, email, password);
+      // First check if the email corresponds to the authorized admin email
+      if (email !== 'birekeidea@gmail.com') {
+        throw new Error("Accès refusé. Cet e-mail n'est pas autorisé.");
       }
+
+      // Check the "database code" (password)
+      // For simplicity and since Firestore rules will protect data, we use Firebase Auth password as the "database code"
+      await signInWithEmailAndPassword(auth, email, password);
       onSuccess();
     } catch (err: any) {
       console.error(err);
-      let msg = "Une erreur est survenue.";
-      if (err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') msg = "Mot de passe ou identifiant incorrect.";
-      else if (err.code === 'auth/user-not-found') msg = "Aucun compte trouvé avec cet e-mail.";
-      else if (err.code === 'auth/email-already-in-use') msg = "Cet e-mail est déjà utilisé.";
-      else if (err.code === 'auth/weak-password') msg = "Le mot de passe est trop court (min 6 caractères).";
-      else if (err.code === 'auth/invalid-email') msg = "Format d'e-mail invalide.";
-      else if (err.code === 'auth/operation-not-allowed') msg = "L'authentification par e-mail n'est pas activée. Veuillez l'activer dans votre Console Firebase (Authentification > Sign-in method > Email/Password).";
+      let msg = "Identifiants ou Code de base de données incorrect.";
+      if (err.message) msg = err.message;
+      if (err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') msg = "Code de base de données incorrect.";
+      else if (err.code === 'auth/user-not-found') msg = "Compte administrateur introuvable.";
       setError(msg);
     } finally {
       setLoading(false);
     }
   };
 
-  if (showForgotPassword) {
-    return (
-      <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-        <div className="space-y-2">
-          <h3 className="text-lg font-black uppercase tracking-tight">Réinitialisation</h3>
-          <p className="text-[10px] font-bold text-slate-400 uppercase leading-relaxed">Entrez votre e-mail pour recevoir un lien de récupération.</p>
-        </div>
-        <form onSubmit={handleForgotPassword} className="space-y-4">
-          <div>
-            <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1 ml-1">Email</label>
-            <input 
-              required
-              type="email" 
-              value={email} 
-              onChange={e => setEmail(e.target.value)}
-              className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl focus:outline-none focus:ring-2 ring-maritime/5 text-sm font-bold"
-              placeholder="votre@email.com"
-            />
-          </div>
-          {error && <p className="text-rose-500 text-[10px] font-black uppercase text-center bg-rose-50 py-3 rounded-xl border border-rose-100">{error}</p>}
-          {success && <p className="text-emerald-500 text-[10px] font-black uppercase text-center bg-emerald-50 py-3 rounded-xl border border-emerald-100">{success}</p>}
-          <button 
-            type="submit"
-            disabled={loading}
-            className="w-full py-5 bg-black text-white font-black rounded-2xl uppercase tracking-[0.2em] text-xs shadow-xl transform active:scale-95 transition-all disabled:opacity-50"
-          >
-            {loading ? "Envoi..." : "Envoyer le lien"}
-          </button>
-          <button 
-            type="button"
-            onClick={() => { setShowForgotPassword(false); setError(null); setSuccess(null); }}
-            className="w-full text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-maritime transition-colors"
-          >
-            Retour à la connexion
-          </button>
-        </form>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-6">
-      <div className="flex bg-slate-50 p-1.5 rounded-2xl border border-slate-100">
-        <button 
-          onClick={() => { setIsSignUp(false); setError(null); }}
-          className={cn(
-            "flex-1 py-3 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all",
-            !isSignUp ? "bg-white shadow-sm text-black" : "text-slate-400 hover:text-slate-600"
-          )}
-        >
-          Connexion
-        </button>
-        <button 
-          onClick={() => { setIsSignUp(true); setError(null); }}
-          className={cn(
-            "flex-1 py-3 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all",
-            isSignUp ? "bg-white shadow-sm text-black" : "text-slate-400 hover:text-slate-600"
-          )}
-        >
-          Inscription
-        </button>
+      <div className="bg-amber-50 border border-amber-100 p-4 rounded-2xl">
+        <p className="text-[10px] font-bold text-amber-700 uppercase tracking-widest text-center leading-relaxed">
+          Accès restreint aux administrateurs autorisés uniquement.
+        </p>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
-        {isSignUp && (
-          <div className="animate-in fade-in slide-in-from-left-2 duration-300">
-            <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1 ml-1">Nom Complet</label>
-            <input 
-              required
-              type="text" 
-              value={name} 
-              onChange={e => setName(e.target.value)}
-              className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl focus:outline-none focus:ring-2 ring-maritime/5 text-sm font-bold"
-              placeholder="Ex: John Doe"
-            />
-          </div>
-        )}
         <div>
-          <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1 ml-1">Email</label>
+          <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1 ml-1">E-mail Administrateur</label>
           <input 
             required
             type="email" 
             value={email} 
             onChange={e => setEmail(e.target.value)}
             className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl focus:outline-none focus:ring-2 ring-maritime/5 text-sm font-bold"
-            placeholder="passager@email.com"
+            placeholder="admin@mugote.com"
           />
         </div>
         <div>
-          <div className="flex justify-between items-center mb-1 ml-1">
-            <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400">Mot de Passe</label>
-            {!isSignUp && (
-              <button 
-                type="button"
-                onClick={() => setShowForgotPassword(true)}
-                className="text-[9px] font-bold text-maritime/60 hover:text-maritime uppercase tracking-widest"
-              >
-                Oublié ?
-              </button>
-            )}
-          </div>
+          <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1 ml-1">Code Base de Données</label>
           <input 
             required
             type="password" 
@@ -916,28 +771,14 @@ function AuthForm({ onSuccess }: { onSuccess: () => void }) {
           disabled={loading}
           className="w-full py-5 bg-black text-white font-black rounded-2xl uppercase tracking-[0.2em] text-xs shadow-xl shadow-black/20 transform active:scale-95 transition-all disabled:opacity-50"
         >
-          {loading ? "Chargement..." : isSignUp ? "Créer mon Compte" : "Se Connecter"}
+          {loading ? "Authentification..." : "Accéder à la Console"}
         </button>
       </form>
-
-      <div className="relative">
-        <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-slate-100"></div></div>
-        <div className="relative flex justify-center text-[10px] font-black uppercase tracking-widest text-slate-300 italic"><span className="bg-white px-4">Accès Rapide</span></div>
-      </div>
-
-      <button 
-        onClick={handleGoogleLogin}
-        disabled={loading}
-        className="w-full py-4 border-2 border-slate-100 text-slate-600 font-bold rounded-2xl flex items-center justify-center gap-3 hover:bg-slate-50 transition-all text-sm shadow-sm group"
-      >
-        <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-5 h-5 group-hover:scale-110 transition-transform" alt="Google" />
-        Continuer avec Google
-      </button>
     </div>
   );
 }
 
-function LoginModal({ isOpen, onClose }: { isOpen: boolean, onClose: () => void }) {
+function AdminLoginModal({ isOpen, onClose }: { isOpen: boolean, onClose: () => void }) {
   if (!isOpen) return null;
 
   return (
@@ -947,7 +788,7 @@ function LoginModal({ isOpen, onClose }: { isOpen: boolean, onClose: () => void 
         animate={{ opacity: 1 }} 
         exit={{ opacity: 0 }}
         onClick={onClose}
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+        className="absolute inset-0 bg-black/80 backdrop-blur-md"
       />
       <motion.div 
         initial={{ opacity: 0, scale: 0.9, y: 20 }}
@@ -959,14 +800,14 @@ function LoginModal({ isOpen, onClose }: { isOpen: boolean, onClose: () => void 
         </button>
 
         <div className="text-center mb-8">
-          <div className="w-16 h-16 bg-maritime/5 rounded-2xl flex items-center justify-center mx-auto mb-4">
-            <Ship className="text-maritime" size={32} />
+          <div className="w-16 h-16 bg-red-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
+            <Lock className="text-red-600" size={32} />
           </div>
-          <h2 className="text-2xl font-black uppercase tracking-tight italic">Profil Voyageur</h2>
-          <p className="text-slate-500 text-[10px] font-medium mt-1 uppercase tracking-widest text-center">Gestion de votre compte Mugote</p>
+          <h2 className="text-2xl font-black uppercase tracking-tight italic">Espace Admin</h2>
+          <p className="text-slate-500 text-[10px] font-medium mt-1 uppercase tracking-widest text-center">Authentification requise</p>
         </div>
 
-        <AuthForm onSuccess={onClose} />
+        <AdminAuthForm onSuccess={onClose} />
       </motion.div>
     </div>
   );
