@@ -269,7 +269,7 @@ const generateTicket = async (res: Reservation, siteSettings: { homeBg: string }
 export default function App() {
   const [currentPage, setCurrentPage] = useState<Page>('home');
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [showLoginModal, setShowLoginModal] = useState(false);
+  const [authModal, setAuthModal] = useState<{ isOpen: boolean, mode: 'user' | 'admin' }>({ isOpen: false, mode: 'user' });
   const [user, setUser] = useState<FirebaseUser | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -390,7 +390,7 @@ export default function App() {
     return () => unsub();
   }, []);
 
-  const login = () => setShowLoginModal(true);
+  const login = () => setAuthModal({ isOpen: true, mode: 'user' });
   const logout = () => signOut(auth);
 
   if (loading) {
@@ -452,16 +452,24 @@ export default function App() {
                <button onClick={() => setIsMenuOpen(true)} className="md:hidden p-3 bg-maritime text-white rounded-xl shadow-lg">
                   <Menu size={18} />
                </button>
-               {user && !user.isAnonymous && (
+               {user && !user.isAnonymous ? (
                  <div className="flex items-center gap-2 sm:gap-3">
                    <div className="hidden md:block text-right">
-                     <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Administrateur</p>
-                     <p className="text-xs font-black text-maritime">{user.displayName}</p>
+                     <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Connecté</p>
+                     <p className="text-xs font-black text-maritime">{user.displayName || user.email}</p>
                    </div>
                    <button onClick={logout} className="p-3 bg-slate-50 text-slate-400 hover:text-rose-600 rounded-xl transition-all border border-slate-100 shadow-sm" title="Déconnexion">
                      <LogOut size={18} />
                    </button>
                  </div>
+               ) : (
+                 <button 
+                   onClick={() => setAuthModal({ isOpen: true, mode: 'user' })}
+                   className="hidden md:flex items-center gap-3 px-6 py-3 bg-maritime text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-xl shadow-maritime/20 hover:scale-105 active:scale-95 transition-all"
+                 >
+                   <LogIn size={14} />
+                   Connexion
+                 </button>
                )}
             </div>
           </div>
@@ -591,7 +599,7 @@ export default function App() {
               )}
               {!isAdmin && (
                 <button 
-                  onClick={() => { setIsMenuOpen(false); setShowLoginModal(true); }}
+                  onClick={() => { setIsMenuOpen(false); setAuthModal({ isOpen: true, mode: 'admin' }); }}
                   className="w-full py-4 border border-white/10 text-white/40 font-bold rounded-2xl uppercase tracking-[0.2em] text-[10px] hover:text-white transition-colors"
                 >
                   Accès Administrateur
@@ -609,7 +617,13 @@ export default function App() {
           ) : (
             <>
               {currentPage === 'home' && <Home onBook={() => setCurrentPage('booking')} onNavigate={setCurrentPage} siteSettings={siteSettings} schedules={schedules} />}
-              {currentPage === 'booking' && <Booking onReserved={(res) => { setCurrentReservation(res); setCurrentPage('payment'); }} user={user} />}
+              {currentPage === 'booking' && (
+                <Booking 
+                  onReserved={(res) => { setCurrentReservation(res); setCurrentPage('payment'); }} 
+                  user={user} 
+                  onLoginRequest={() => setAuthModal({ isOpen: true, mode: 'user' })}
+                />
+              )}
               {currentPage === 'payment' && <Payment reservation={currentReservation} onComplete={() => setCurrentPage('tickets')} />}
               {currentPage === 'dashboard' && <Dashboard siteSettings={siteSettings} onNavigate={setCurrentPage} schedules={schedules} isAdmin={isAdmin} />}
               {currentPage === 'tickets' && <MyTickets user={user} siteSettings={siteSettings} />}
@@ -679,7 +693,7 @@ export default function App() {
 
           <div className="pt-16 border-t border-white/5 w-full flex flex-col items-center gap-4">
             <button 
-              onClick={() => setShowLoginModal(true)}
+              onClick={() => setAuthModal({ isOpen: true, mode: 'admin' })}
               className="text-[9px] font-bold text-white/20 uppercase tracking-[0.6em] hover:text-white/60 transition-colors mb-2"
             >
               ADMINISTRATION
@@ -691,7 +705,108 @@ export default function App() {
         </div>
       </footer>
       <ChatWidget user={user} />
-      <AdminLoginModal isOpen={showLoginModal} onClose={() => setShowLoginModal(false)} />
+      <AuthModal 
+        isOpen={authModal.isOpen} 
+        mode={authModal.mode} 
+        onClose={() => setAuthModal(prev => ({ ...prev, isOpen: false }))} 
+      />
+    </div>
+  );
+}
+
+function AuthForm({ onSuccess }: { onSuccess: () => void }) {
+  const [isSignUp, setIsSignUp] = useState(false);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [name, setName] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+
+  const handleGoogleLogin = async () => {
+    setLoading(true);
+    setError(null);
+    const provider = new GoogleAuthProvider();
+    try {
+      await signInWithPopup(auth, provider);
+      onSuccess();
+    } catch (err: any) {
+      console.error(err);
+      if (err.code === 'auth/popup-blocked') {
+        setError("La fenêtre a été bloquée. Veuillez cliquer sur 'Ouvrir dans un nouvel onglet'.");
+      } else {
+        setError("Échec de la connexion avec Google.");
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email) { setError("Veuillez entrer votre e-mail."); return; }
+    setLoading(true);
+    try {
+      await sendPasswordResetEmail(auth, email);
+      setSuccess("Lien envoyé !");
+      setTimeout(() => setShowForgotPassword(false), 3000);
+    } catch (err) { setError("Erreur d'envoi."); }
+    finally { setLoading(false); }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+    try {
+      if (isSignUp) {
+        const res = await createUserWithEmailAndPassword(auth, email, password);
+        await updateProfile(res.user, { displayName: name });
+      } else {
+        await signInWithEmailAndPassword(auth, email, password);
+      }
+      onSuccess();
+    } catch (err: any) {
+      setError("Identifiants incorrects ou compte inexistant.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (showForgotPassword) {
+    return (
+      <div className="space-y-4">
+        <h3 className="text-sm font-black uppercase text-center">Récupération</h3>
+        <form onSubmit={handleForgotPassword} className="space-y-4">
+          <input type="email" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)} className="w-full p-4 bg-slate-50 border rounded-xl" required />
+          <button type="submit" className="w-full py-4 bg-black text-white font-black rounded-xl uppercase text-xs">Envoyer le lien</button>
+          <button type="button" onClick={() => setShowForgotPassword(false)} className="w-full text-[10px] uppercase font-bold text-slate-400">Retour</button>
+        </form>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex bg-slate-50 p-1 rounded-xl border">
+        {['Connexion', 'Inscription'].map((label, idx) => (
+          <button key={label} onClick={() => setIsSignUp(idx === 1)} className={cn("flex-1 py-3 text-[10px] font-black uppercase rounded-lg", (isSignUp === (idx === 1)) ? "bg-white shadow-sm" : "text-slate-400")}>{label}</button>
+        ))}
+      </div>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        {isSignUp && <input type="text" placeholder="Nom Complet" value={name} onChange={e => setName(e.target.value)} className="w-full p-4 bg-slate-50 border rounded-xl" required />}
+        <input type="email" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)} className="w-full p-4 bg-slate-50 border rounded-xl" required />
+        <div className="relative">
+          <input type="password" placeholder="Mot de Passe" value={password} onChange={e => setPassword(e.target.value)} className="w-full p-4 bg-slate-50 border rounded-xl" required />
+          {!isSignUp && <button type="button" onClick={() => setShowForgotPassword(true)} className="absolute right-4 top-1/2 -translate-y-1/2 text-[9px] font-bold text-maritime/40 uppercase">Oublié ?</button>}
+        </div>
+        {error && <p className="text-rose-500 text-[10px] font-black uppercase text-center">{error}</p>}
+        {success && <p className="text-emerald-500 text-[10px] font-black uppercase text-center">{success}</p>}
+        <button type="submit" disabled={loading} className="w-full py-4 bg-black text-white font-black rounded-xl uppercase text-xs">{loading ? "..." : isSignUp ? "S'inscrire" : "Se Connecter"}</button>
+      </form>
+      <div className="relative text-center"><span className="bg-white px-4 text-[10px] font-black uppercase text-slate-200">Ou</span><div className="absolute inset-0 -z-10 top-1/2 border-t"></div></div>
+      <button onClick={handleGoogleLogin} className="w-full py-4 border-2 rounded-xl flex items-center justify-center gap-2 font-bold text-sm"><img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-4 h-4" alt="Google" /> Google</button>
     </div>
   );
 }
@@ -778,7 +893,7 @@ function AdminAuthForm({ onSuccess }: { onSuccess: () => void }) {
   );
 }
 
-function AdminLoginModal({ isOpen, onClose }: { isOpen: boolean, onClose: () => void }) {
+function AuthModal({ isOpen, onClose, mode = 'user' }: { isOpen: boolean, onClose: () => void, mode?: 'user' | 'admin' }) {
   if (!isOpen) return null;
 
   return (
@@ -800,14 +915,21 @@ function AdminLoginModal({ isOpen, onClose }: { isOpen: boolean, onClose: () => 
         </button>
 
         <div className="text-center mb-8">
-          <div className="w-16 h-16 bg-red-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
-            <Lock className="text-red-600" size={32} />
+          <div className={cn(
+            "w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4",
+            mode === 'admin' ? "bg-red-50" : "bg-maritime/5"
+          )}>
+            {mode === 'admin' ? <Lock className="text-red-600" size={32} /> : <Ship className="text-maritime" size={32} />}
           </div>
-          <h2 className="text-2xl font-black uppercase tracking-tight italic">Espace Admin</h2>
-          <p className="text-slate-500 text-[10px] font-medium mt-1 uppercase tracking-widest text-center">Authentification requise</p>
+          <h2 className="text-2xl font-black uppercase tracking-tight italic">
+            {mode === 'admin' ? "Espace Admin" : "Profil Voyageur"}
+          </h2>
+          <p className="text-slate-500 text-[10px] font-medium mt-1 uppercase tracking-widest text-center">
+            {mode === 'admin' ? "Authentification requise" : "Gérez vos réservations Mugote"}
+          </p>
         </div>
 
-        <AdminAuthForm onSuccess={onClose} />
+        {mode === 'admin' ? <AdminAuthForm onSuccess={onClose} /> : <AuthForm onSuccess={onClose} />}
       </motion.div>
     </div>
   );
@@ -1493,7 +1615,7 @@ function Home({ onBook, onNavigate, siteSettings, schedules }: { onBook: () => v
   );
 }
 
-function Booking({ onReserved, user }: { onReserved: (res: Reservation) => void, user: FirebaseUser | null }) {
+function Booking({ onReserved, user, onLoginRequest }: { onReserved: (res: Reservation) => void, user: FirebaseUser | null, onLoginRequest: () => void }) {
   const [formData, setFormData] = useState({
     fullName: '',
     lastName: '',
@@ -1552,8 +1674,8 @@ function Booking({ onReserved, user }: { onReserved: (res: Reservation) => void,
       return;
     }
 
-    if (!user) {
-      alert("Veuillez vous connecter pour réserver.");
+    if (!user || user.isAnonymous) {
+      onLoginRequest();
       return;
     }
     setSubmitting(true);
