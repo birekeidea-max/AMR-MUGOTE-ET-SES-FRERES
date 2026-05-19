@@ -432,7 +432,7 @@ export default function App() {
   }
 
   return (
-    <div className="bg-bg font-sans relative">
+    <div className="min-h-screen bg-bg flex flex-col font-sans relative">
       {isFirebaseOffline && (
         <div className="bg-red-600 text-white text-[10px] font-black uppercase tracking-[0.2em] py-2 text-center fixed top-0 w-full z-[200] animate-pulse">
           ⚠️ Connexion instable ou hors-ligne. Les modifications risquent de ne pas être enregistrées.
@@ -622,7 +622,7 @@ export default function App() {
         )}
       </AnimatePresence>
 
-      <main className="max-w-7xl mx-auto w-full px-4 sm:px-8 py-4 sm:py-6 relative z-10 text-center">
+      <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-8 py-4 sm:py-6 relative z-10 text-center">
         <AnimatePresence mode="wait">
           {verifyId ? (
             <VerificationView id={verifyId} onClose={() => { setVerifyId(null); window.history.pushState({}, '', '/'); }} />
@@ -787,7 +787,7 @@ function AuthForm({ onSuccess }: { onSuccess: () => void }) {
       else if (err.code === 'auth/email-already-in-use') msg = "Cet e-mail est déjà utilisé.";
       else if (err.code === 'auth/weak-password') msg = "Le mot de passe est trop court (min 6 caractères).";
       else if (err.code === 'auth/invalid-email') msg = "Format d'e-mail invalide.";
-      else if (err.code === 'auth/operation-not-allowed') msg = "L'authentification par e-mail/mot de passe n'est pas activée dans Firebase. Veuillez l'activer dans la console.";
+      else if (err.code === 'auth/operation-not-allowed') msg = "L'authentification par e-mail n'est pas activée. Veuillez l'activer dans votre Console Firebase (Authentification > Sign-in method > Email/Password).";
       setError(msg);
     } finally {
       setLoading(false);
