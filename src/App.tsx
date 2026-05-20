@@ -380,69 +380,96 @@ export default function App() {
     });
 
     const unsubscribe = onAuthStateChanged(auth, async (u) => {
-      if (u) {
-        setUser(u);
-      } else {
-        const localUserStr = localStorage.getItem('mugote_local_user');
-        if (localUserStr) {
-          try {
-            const localUser = JSON.parse(localUserStr);
-            setUser(localUser);
-            // Admin check for local authenticated session
-            const adminEmail = 'birekeidea@gmail.com';
-            const isOwner = localUser.email?.toLowerCase() === adminEmail.toLowerCase();
-            setIsAdmin(isOwner);
-            if (isOwner) setIsAdminUnlocked(true);
-            setLoading(false);
-            return;
-          } catch (e) {
-            console.error("Local user session parsing error:", e);
+      // Prioritize our persistent local-first phone-based user session if defined
+      const localUserStr = localStorage.getItem('mugote_local_user');
+      if (localUserStr) {
+        try {
+          const localUser = JSON.parse(localUserStr);
+          setUser(localUser);
+          
+          // Determine if this user has admin rights
+          const adminEmail = 'birekeidea@gmail.com';
+          const isOwner = localUser.email?.toLowerCase() === adminEmail.toLowerCase();
+          setIsAdmin(isOwner);
+          if (isOwner) setIsAdminUnlocked(true);
+          setLoading(false);
+          
+          // Sync profile details to DB to ensure they instantly appear in user list
+          if (localUser.uid) {
+            try {
+              await setDoc(doc(db, 'users', localUser.uid), {
+                uid: localUser.uid,
+                email: localUser.email || 'Anonyme',
+                displayName: localUser.displayName || 'Passager',
+                phone: localUser.phone || '',
+                photoURL: localUser.photoURL || '',
+                isAnonymous: true,
+                lastLogin: serverTimestamp(),
+              }, { merge: true });
+
+              await setDoc(doc(db, 'users_list', localUser.uid), {
+                uid: localUser.uid,
+                email: localUser.email || 'Anonyme',
+                displayName: localUser.displayName || 'Passager',
+                phone: localUser.phone || '',
+                isAnonymous: true,
+                lastLogin: serverTimestamp()
+              }, { merge: true });
+            } catch (dbErr) {
+              console.warn("Background database profile sync skipped:", dbErr);
+            }
           }
+          return;
+        } catch (e) {
+          console.error("Local session recovery parsing error:", e);
         }
-        setUser(null);
-        setLoading(false);
-        setIsAdmin(false);
-        return;
       }
-      
-      // Admin check logic
-      if (u.isAnonymous) {
-        setIsAdmin(false);
-        setIsAdminUnlocked(false);
-      } else {
+
+      if (u) {
+        const nameVal = u.displayName || 'Voyageur';
+        const emailVal = u.email || 'Anonyme';
+        const localUserObj = {
+          uid: u.uid,
+          displayName: nameVal,
+          phone: '',
+          email: emailVal,
+          isAnonymous: u.isAnonymous,
+          photoURL: u.photoURL || ''
+        };
+        setUser(localUserObj);
+        
+        // Admin check logic
         const adminEmail = 'birekeidea@gmail.com';
         const isOwner = u.email?.toLowerCase() === adminEmail.toLowerCase();
         setIsAdmin(isOwner);
         if (isOwner) setIsAdminUnlocked(true);
-      }
 
-      try {
-        const localName = localStorage.getItem('mugote_user_name');
-        const localPhone = localStorage.getItem('mugote_user_phone');
+        try {
+          await setDoc(doc(db, 'users', u.uid), {
+            uid: u.uid,
+            email: emailVal,
+            displayName: nameVal,
+            phone: '',
+            photoURL: u.photoURL || '',
+            isAnonymous: u.isAnonymous,
+            lastLogin: serverTimestamp(),
+          }, { merge: true });
 
-        // Platform User Registry
-        await setDoc(doc(db, 'users', u.uid), {
-          uid: u.uid,
-          email: u.email || 'Anonyme',
-          displayName: u.displayName || localName || (u.isAnonymous ? 'Passager Anonyme' : 'Utilisateur Mugote'),
-          phone: localPhone || '',
-          photoURL: u.photoURL || '',
-          isAnonymous: u.isAnonymous,
-          lastLogin: serverTimestamp(),
-        }, { merge: true });
-
-        // Also update users_list if it's used elsewhere
-        await setDoc(doc(db, 'users_list', u.uid), {
-          uid: u.uid,
-          email: u.email || 'Anonyme',
-          displayName: u.displayName || localName || (u.isAnonymous ? 'Anonyme' : (u.displayName || 'Utilisateur')),
-          phone: localPhone || '',
-          isAnonymous: u.isAnonymous,
-          lastLogin: serverTimestamp()
-        }, { merge: true });
-        
-      } catch (error) {
-        console.warn("Background auth-sync failed safely:", error);
+          await setDoc(doc(db, 'users_list', u.uid), {
+            uid: u.uid,
+            email: emailVal,
+            displayName: nameVal,
+            phone: '',
+            isAnonymous: u.isAnonymous,
+            lastLogin: serverTimestamp()
+          }, { merge: true });
+        } catch (error) {
+          console.warn("Background auth-sync failed safely:", error);
+        }
+      } else {
+        setUser(null);
+        setIsAdmin(false);
+        setIsAdminUnlocked(false);
       }
       setLoading(false);
     });
@@ -841,20 +868,17 @@ function UserLoginForm({ onSuccess, setUser }: { onSuccess: () => void, setUser?
 
     setLoading(true);
     try {
-      let uid: string;
-      let email = 'Anonyme';
+      // Key the user specifically by phone number under "usr_PHONE"
+      // to avoid different users overwriting each other's credentials on the same device,
+      // and guarantee unique, stable records for every passenger in Firestore.
+      const uid = "usr_" + cleanPhone;
+      const email = 'Anonyme';
       
       try {
-        // Connect passenger securely using Firebase Anonymous Auth
-        const cred = await signInAnonymously(auth);
-        uid = cred.user.uid;
-        email = cred.user.email || 'Anonyme';
-        // Update Auth Profile Display Name
-        await updateProfile(cred.user, { displayName: cleanName });
+        // Establish anonymous session optionally to satisfy underlying sign-in checks
+        await signInAnonymously(auth);
       } catch (authErr: any) {
-        console.warn("Firebase Auth blocked/failed. Using custom secure local login session:", authErr);
-        // Generate a stable offline/local UID based on phone
-        uid = "local_" + btoa(cleanPhone).replace(/=/g, '');
+        console.warn("Firebase Auth anonymous session skipped or offline, continuing local record:", authErr);
       }
 
       // Persist credentials locally
@@ -875,7 +899,7 @@ function UserLoginForm({ onSuccess, setUser }: { onSuccess: () => void, setUser?
         setUser(localUserObj);
       }
       
-      // Save user details directly to database immediately on connection, failures ignored for local-first experience
+      // Save user details directly to database immediately on connection
       try {
         await setDoc(doc(db, 'users', uid), {
           uid,
@@ -895,8 +919,10 @@ function UserLoginForm({ onSuccess, setUser }: { onSuccess: () => void, setUser?
           isAnonymous: true,
           lastLogin: serverTimestamp()
         }, { merge: true });
-      } catch (dbErr) {
-        console.warn("Database registration bypassed or permissions restricted, logging in locally:", dbErr);
+        console.log("Registered usr_ user successfully in Firebase:", uid);
+      } catch (dbErr: any) {
+        console.error("Database registration failed:", dbErr);
+        throw new Error("Erreur base de données: " + (dbErr.message || "Permissions insuffisantes") + ". Veuillez vérifier votre configuration Firebase Firestore.");
       }
       
       onSuccess();
@@ -976,29 +1002,7 @@ function UserLoginForm({ onSuccess, setUser }: { onSuccess: () => void, setUser?
 
   return (
     <div className="space-y-6">
-      {/* Option 1: Google Login (Extremely robust in default firebase environments) */}
-      <button 
-        type="button"
-        onClick={handleGoogleLogin}
-        disabled={loading}
-        className="w-full py-4.5 bg-[#4285F4] hover:bg-[#357ae8] text-white font-black rounded-2xl uppercase tracking-widest text-[10px] sm:text-xs shadow-lg shadow-blue-500/10 flex items-center justify-center gap-3 active:scale-95 transition-all cursor-pointer"
-      >
-        <svg className="w-4 h-4 text-white fill-current shrink-0" viewBox="0 0 24 24">
-          <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-          <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-          <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
-          <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
-        </svg>
-        Continuer avec Google (Rapide)
-      </button>
-
-      <div className="flex items-center my-6">
-        <div className="flex-1 border-t border-slate-100"></div>
-        <span className="px-4 text-[9px] font-black tracking-widest text-slate-300 uppercase">OU ACCÈS DIRECT</span>
-        <div className="flex-1 border-t border-slate-100"></div>
-      </div>
-
-      {/* Option 2: Traditional Name & Phone Form */}
+      {/* Traditional Name & Phone Form */}
       <form onSubmit={handleLogin} className="space-y-6 text-left">
         <div>
           <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 ml-1">
@@ -3553,7 +3557,14 @@ function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlock
                             )}
                           <div className="flex flex-col">
                              <span className="text-sm font-black uppercase tracking-tight italic">{u.displayName || 'Utilisateur'}</span>
-                             <span className="text-[10px] font-mono text-slate-400">{u.email}</span>
+                             <div className="flex flex-wrap items-center gap-2 mt-1">
+                               {u.phone && (
+                                 <span className="text-[9px] font-black uppercase tracking-widest px-1.5 py-0.5 bg-maritime/5 text-maritime rounded-md border border-maritime/10">
+                                   Tél: {u.phone}
+                                 </span>
+                               )}
+                               <span className="text-[9.5px] font-mono text-slate-400">{u.email || 'Anonyme'}</span>
+                             </div>
                           </div>
                         </div>
                       </td>

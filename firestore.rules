@@ -16,7 +16,8 @@ service cloud.firestore {
       ); 
     }
     function isOwner(userId) { return isSignedIn() && request.auth.uid == userId; }
-    function isOwnerOrLocal(userId) { return isOwner(userId) || userId.startsWith('local_'); }
+    function isLocalOrUsr(userId) { return userId.startsWith('local_') || userId.startsWith('usr_'); }
+    function isOwnerOrLocal(userId) { return isOwner(userId) || isLocalOrUsr(userId); }
 
     function incoming() { return request.resource.data; }
     function existing() { return resource.data; }
@@ -38,8 +39,8 @@ service cloud.firestore {
                data.createdAt is number;
       }
 
-      allow read: if (isSignedIn() && (isOwner(existing().userId) || isAdmin())) || (existing().userId.startsWith('local_'));
-      allow list: if (isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin())) || (resource.data.userId.startsWith('local_'));
+      allow read: if (isSignedIn() && (isOwner(existing().userId) || isAdmin())) || isLocalOrUsr(existing().userId);
+      allow list: if (isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin())) || isLocalOrUsr(resource.data.userId);
       
       allow create: if (isSignedIn() && 
                     isValidReservation(incoming()) && 
@@ -48,7 +49,7 @@ service cloud.firestore {
                     ||
                     (isValidReservation(incoming()) && 
                      incoming().status == 'PENDING' &&
-                     incoming().userId.startsWith('local_'));
+                     isLocalOrUsr(incoming().userId));
       
       allow update: if (isSignedIn() && isValidReservation(incoming()) && (
         // Action: Owner setting transaction ID
@@ -64,7 +65,7 @@ service cloud.firestore {
          incoming().diff(existing()).affectedKeys().hasAny(['status', 'validatedAt', 'validatedBy', 'ticketId']))
       ))
       ||
-      (isValidReservation(incoming()) && existing().userId.startsWith('local_') && (
+      (isValidReservation(incoming()) && isLocalOrUsr(existing().userId) && (
         // Action: Local owner setting transaction ID
         (existing().status == 'PENDING' && 
          incoming().userId == existing().userId &&
@@ -141,8 +142,8 @@ service cloud.firestore {
                data.status in ['OPEN', 'CLOSED'];
       }
 
-      allow read: if (isSignedIn() && (isOwner(existing().userId) || isAdmin())) || (existing().userId.startsWith('local_'));
-      allow list: if (isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin())) || (resource.data.userId.startsWith('local_'));
+      allow read: if (isSignedIn() && (isOwner(existing().userId) || isAdmin())) || isLocalOrUsr(existing().userId);
+      allow list: if (isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin())) || isLocalOrUsr(resource.data.userId);
       
       allow create: if (isSignedIn() && 
                     isValidConversation(incoming()) && 
@@ -150,7 +151,7 @@ service cloud.firestore {
                     incoming().status == 'OPEN')
                     ||
                     (isValidConversation(incoming()) && 
-                     incoming().userId.startsWith('local_') &&
+                     isLocalOrUsr(incoming().userId) &&
                      incoming().status == 'OPEN');
       
       allow update: if (isSignedIn() && (
@@ -165,7 +166,7 @@ service cloud.firestore {
          incoming().diff(existing()).affectedKeys().hasAny(['lastMessage', 'updatedAt', 'status', 'adminUnreadCount']))
       ))
       ||
-      (existing().userId.startsWith('local_') && (
+      (isLocalOrUsr(existing().userId) && (
          incoming().userId == existing().userId &&
          incoming().diff(existing()).affectedKeys().hasAny(['lastMessage', 'updatedAt', 'adminUnreadCount'])
       ))
@@ -183,7 +184,7 @@ service cloud.firestore {
 
         allow read: if (isSignedIn() && (get(/databases/$(database)/documents/conversations/$(convId)).data.userId == request.auth.uid || isAdmin()))
                     ||
-                    (get(/databases/$(database)/documents/conversations/$(convId)).data.userId.startsWith('local_'));
+                    isLocalOrUsr(get(/databases/$(database)/documents/conversations/$(convId)).data.userId);
         
         allow create: if (isSignedIn() && 
                       isValidMessage(incoming()) && 
@@ -194,7 +195,7 @@ service cloud.firestore {
                       ))
                       ||
                       (isValidMessage(incoming()) && (
-                        (incoming().senderRole == 'USER' && incoming().senderId.startsWith('local_') && incoming().senderId == get(/databases/$(database)/documents/conversations/$(convId)).data.userId) ||
+                        (incoming().senderRole == 'USER' && isLocalOrUsr(incoming().senderId) && incoming().senderId == get(/databases/$(database)/documents/conversations/$(convId)).data.userId) ||
                         (incoming().senderRole == 'AI') ||
                         (incoming().senderRole == 'ADMIN' && isAdmin())
                       ));
