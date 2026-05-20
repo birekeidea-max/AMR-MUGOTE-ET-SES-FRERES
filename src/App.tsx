@@ -845,12 +845,23 @@ export default function App() {
 }
 
 function UserLoginForm({ onSuccess, setUser }: { onSuccess: () => void, setUser?: (u: any) => void }) {
+  const [tab, setTab] = useState<'phone' | 'email'>('phone');
+  
+  // Phone/Name State
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
+  
+  // Email State
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [isSignUp, setIsSignUp] = useState(false);
+  const [signUpName, setSignUpName] = useState('');
+  const [signUpPhone, setSignUpPhone] = useState('');
+  
   const [loading, setLoading] = useState(false);
   const [errorCode, setErrorCode] = useState<string | null>(null);
 
-  const handleLogin = async (e: React.FormEvent) => {
+  const handlePhoneLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorCode(null);
     const cleanName = name.trim();
@@ -872,7 +883,7 @@ function UserLoginForm({ onSuccess, setUser }: { onSuccess: () => void, setUser?
       // to avoid different users overwriting each other's credentials on the same device,
       // and guarantee unique, stable records for every passenger in Firestore.
       const uid = "usr_" + cleanPhone;
-      const email = 'Anonyme';
+      const emailVal = 'Anonyme';
       
       try {
         // Establish anonymous session optionally to satisfy underlying sign-in checks
@@ -889,7 +900,7 @@ function UserLoginForm({ onSuccess, setUser }: { onSuccess: () => void, setUser?
         uid,
         displayName: cleanName,
         phone: cleanPhone,
-        email,
+        email: emailVal,
         isAnonymous: true,
         photoURL: ''
       };
@@ -903,7 +914,7 @@ function UserLoginForm({ onSuccess, setUser }: { onSuccess: () => void, setUser?
       try {
         await setDoc(doc(db, 'users', uid), {
           uid,
-          email,
+          email: emailVal,
           displayName: cleanName,
           phone: cleanPhone,
           photoURL: '',
@@ -913,7 +924,7 @@ function UserLoginForm({ onSuccess, setUser }: { onSuccess: () => void, setUser?
 
         await setDoc(doc(db, 'users_list', uid), {
           uid,
-          email,
+          email: emailVal,
           displayName: cleanName,
           phone: cleanPhone,
           isAnonymous: true,
@@ -929,6 +940,121 @@ function UserLoginForm({ onSuccess, setUser }: { onSuccess: () => void, setUser?
     } catch (err: any) {
       console.error("General authentication failure:", err);
       setErrorCode(err.message || "Impossible de se connecter.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleEmailAuth = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorCode(null);
+    const cleanEmail = email.trim();
+    const cleanPassword = password.trim();
+
+    if (!cleanEmail) {
+      setErrorCode("L'adresse e-mail est requise.");
+      return;
+    }
+    if (cleanPassword.length < 6) {
+      setErrorCode("Le mot de passe doit contenir au moins 6 caractères.");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      let cred;
+      let displayNameValue = '';
+      let phoneValue = '';
+
+      if (isSignUp) {
+        const cleanRegisterName = signUpName.trim();
+        const cleanRegisterPhone = signUpPhone.trim().replace(/[\s\-\(\)\.]/g, '');
+
+        if (!cleanRegisterName || cleanRegisterName.length < 2) {
+          setErrorCode("Veuillez entrer un nom valide pour l'inscription.");
+          setLoading(false);
+          return;
+        }
+
+        cred = await createUserWithEmailAndPassword(auth, cleanEmail, cleanPassword);
+        displayNameValue = cleanRegisterName;
+        phoneValue = cleanRegisterPhone;
+        await updateProfile(cred.user, { displayName: displayNameValue });
+      } else {
+        cred = await signInWithEmailAndPassword(auth, cleanEmail, cleanPassword);
+        
+        // Fetch existing database record to get their stored details
+        try {
+          const uDoc = await getDoc(doc(db, 'users', cred.user.uid));
+          if (uDoc.exists()) {
+            displayNameValue = uDoc.data().displayName || cred.user.displayName || 'Voyageur';
+            phoneValue = uDoc.data().phone || '';
+          } else {
+            displayNameValue = cred.user.displayName || 'Voyageur';
+          }
+        } catch (dbErr) {
+          console.warn("Could not retrieve user doc from DB:", dbErr);
+          displayNameValue = cred.user.displayName || 'Voyageur';
+        }
+      }
+
+      const uid = cred.user.uid;
+      const localUserObj = {
+        uid,
+        displayName: displayNameValue,
+        phone: phoneValue,
+        email: cleanEmail,
+        isAnonymous: false,
+        photoURL: cred.user.photoURL || ''
+      };
+
+      localStorage.setItem('mugote_user_name', displayNameValue);
+      if (phoneValue) {
+        localStorage.setItem('mugote_user_phone', phoneValue);
+      }
+      localStorage.setItem('mugote_local_user', JSON.stringify(localUserObj));
+      if (setUser) {
+        setUser(localUserObj);
+      }
+
+      // Live Firestore syncing for both collections to satisfy registration rule
+      try {
+        await setDoc(doc(db, 'users', uid), {
+          uid,
+          email: cleanEmail,
+          displayName: displayNameValue,
+          phone: phoneValue,
+          photoURL: cred.user.photoURL || '',
+          isAnonymous: false,
+          lastLogin: serverTimestamp()
+        }, { merge: true });
+
+        await setDoc(doc(db, 'users_list', uid), {
+          uid: cleanEmail, // keep list key aligned
+          email: cleanEmail,
+          displayName: displayNameValue,
+          phone: phoneValue,
+          isAnonymous: false,
+          lastLogin: serverTimestamp()
+        }, { merge: true });
+        console.log("Registered or logged email user successfully in Firebase:", uid);
+      } catch (dbErr: any) {
+        console.error("Database registration failed for email user:", dbErr);
+        throw new Error("Erreur base de données: " + (dbErr.message || "Permissions insuffisantes") + ". Veuillez vérifier votre configuration Firebase Firestore.");
+      }
+
+      onSuccess();
+    } catch (err: any) {
+      console.error("Email authentication failed:", err);
+      let errMsg = err.message || "Erreur lors de l'authentification.";
+      if (err.code === 'auth/email-already-in-use') {
+        errMsg = "Cette adresse e-mail est déjà utilisée par un autre compte.";
+      } else if (err.code === 'auth/invalid-credential' || err.code === 'auth/wrong-password' || err.code === 'auth/user-not-found') {
+        errMsg = "Adresse e-mail ou mot de passe incorrect.";
+      } else if (err.code === 'auth/weak-password') {
+        errMsg = "Le mot de passe choisi est trop faible (6 caractères minimum).";
+      }
+      setErrorCode(errMsg);
     } finally {
       setLoading(false);
     }
@@ -1002,59 +1128,218 @@ function UserLoginForm({ onSuccess, setUser }: { onSuccess: () => void, setUser?
 
   return (
     <div className="space-y-6">
-      {/* Traditional Name & Phone Form */}
-      <form onSubmit={handleLogin} className="space-y-6 text-left">
-        <div>
-          <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 ml-1">
-            Votre Nom Complet (Nom & Post-nom)
-          </label>
-          <input 
-            required
-            type="text" 
-            value={name} 
-            onChange={e => setName(e.target.value)}
-            className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl focus:outline-none focus:ring-2 ring-maritime/5 text-sm font-bold uppercase tracking-wide placeholder-slate-300"
-            placeholder="Ex: LANDRY MUGOTE"
-          />
-        </div>
-        <div>
-          <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 ml-1">
-            Votre Numéro de Téléphone
-          </label>
-          <input 
-            required
-            type="text" 
-            value={phone} 
-            onChange={e => setPhone(e.target.value)}
-            className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl focus:outline-none focus:ring-2 ring-maritime/5 text-sm font-bold font-mono tracking-wider placeholder-slate-300"
-            placeholder="Ex: 0991234567"
-          />
-        </div>
-
-        {errorCode && (
-          <div className="p-4 bg-rose-50 border border-rose-100 rounded-xl text-center">
-            <p className="text-rose-500 text-[10px] font-bold uppercase tracking-wider leading-relaxed text-left">{errorCode}</p>
-          </div>
-        )}
-
-        <button 
-          type="submit"
-          disabled={loading}
-          className="w-full py-5 bg-maritime text-white font-black rounded-2xl uppercase tracking-[0.25em] text-[10px] sm:text-xs shadow-xl shadow-maritime/20 hover:bg-black transform active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
+      {/* Tab Selector */}
+      <div className="flex bg-slate-100 p-1 rounded-2xl border border-slate-200/50 mb-6">
+        <button
+          type="button"
+          onClick={() => { setTab('phone'); setErrorCode(null); }}
+          className={`flex-1 py-3 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all flex items-center justify-center gap-2 ${
+            tab === 'phone'
+              ? 'bg-white text-maritime shadow-sm font-black'
+              : 'text-slate-500 hover:text-slate-800'
+          }`}
         >
-          {loading ? (
+          <Phone size={12} />
+          Nom & Téléphone
+        </button>
+        <button
+          type="button"
+          onClick={() => { setTab('email'); setErrorCode(null); }}
+          className={`flex-1 py-3 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all flex items-center justify-center gap-2 ${
+            tab === 'email'
+              ? 'bg-white text-maritime shadow-sm font-black'
+              : 'text-slate-500 hover:text-slate-800'
+          }`}
+        >
+          <Mail size={12} />
+          Email & Passe
+        </button>
+      </div>
+
+      {tab === 'phone' ? (
+        /* Traditional Name & Phone Form */
+        <form onSubmit={handlePhoneLogin} className="space-y-6 text-left">
+          <div>
+            <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 ml-1">
+              Votre Nom Complet (Nom & Post-nom)
+            </label>
+            <input 
+              required
+              type="text" 
+              value={name} 
+              onChange={e => setName(e.target.value)}
+              className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl focus:outline-none focus:ring-2 ring-maritime/5 text-sm font-bold uppercase tracking-wide placeholder-slate-300"
+              placeholder="Ex: LANDRY MUGOTE"
+            />
+          </div>
+          <div>
+            <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 ml-1">
+              Votre Numéro de Téléphone
+            </label>
+            <input 
+              required
+              type="text" 
+              value={phone} 
+              onChange={e => setPhone(e.target.value)}
+              className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl focus:outline-none focus:ring-2 ring-maritime/5 text-sm font-bold font-mono tracking-wider placeholder-slate-300"
+              placeholder="Ex: 0991234567"
+            />
+          </div>
+
+          {errorCode && (
+            <div className="p-4 bg-rose-50 border border-rose-100 rounded-xl">
+              <p className="text-rose-500 text-[10px] font-bold uppercase tracking-wider leading-relaxed text-left">{errorCode}</p>
+            </div>
+          )}
+
+          <button 
+            type="submit"
+            disabled={loading}
+            className="w-full py-5 bg-maritime text-white font-black rounded-2xl uppercase tracking-[0.25em] text-[10px] sm:text-xs shadow-xl shadow-maritime/20 hover:bg-black transform active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer animate-fade-in"
+          >
+            {loading ? (
+              <>
+                <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1, ease: 'linear' }} className="border-2 border-white/35 border-t-white w-4 h-4 rounded-full" />
+                Accès en cours...
+              </>
+            ) : (
+              <>
+                Se Connecter par Nom/Tél
+                <ChevronRight size={14} />
+              </>
+            )}
+          </button>
+        </form>
+      ) : (
+        /* Email & Password Form */
+        <form onSubmit={handleEmailAuth} className="space-y-6 text-left">
+          {isSignUp && (
             <>
-              <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1, ease: 'linear' }} className="border-2 border-white/35 border-t-white w-4 h-4 rounded-full" />
-              Accès en cours...
-            </>
-          ) : (
-            <>
-              Se Connecter par Nom/Tél
-              <ChevronRight size={14} />
+              <div>
+                <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 ml-1">
+                  Nom Complet
+                </label>
+                <div className="relative">
+                  <span className="absolute left-5 top-4.5 text-slate-300"><User size={16} /></span>
+                  <input 
+                    required
+                    type="text" 
+                    value={signUpName} 
+                    onChange={e => setSignUpName(e.target.value)}
+                    className="w-full pl-12 pr-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl focus:outline-none focus:ring-2 ring-maritime/5 text-sm font-bold uppercase tracking-wide placeholder-slate-300"
+                    placeholder="Ex: JEAN LOKO"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 ml-1">
+                  Téléphone (Facultatif mais recommandé)
+                </label>
+                <div className="relative">
+                  <span className="absolute left-5 top-4.5 text-slate-300"><Phone size={16} /></span>
+                  <input 
+                    type="text" 
+                    value={signUpPhone} 
+                    onChange={e => setSignUpPhone(e.target.value)}
+                    className="w-full pl-12 pr-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl focus:outline-none focus:ring-2 ring-maritime/5 text-sm font-bold font-mono tracking-wider placeholder-slate-300"
+                    placeholder="Ex: 0991234567"
+                  />
+                </div>
+              </div>
             </>
           )}
-        </button>
-      </form>
+
+          <div>
+            <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 ml-1">
+              Adresse E-mail
+            </label>
+            <div className="relative">
+              <span className="absolute left-5 top-4.5 text-slate-300"><Mail size={16} /></span>
+              <input 
+                required
+                type="email" 
+                value={email} 
+                onChange={e => setEmail(e.target.value)}
+                className="w-full pl-12 pr-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl focus:outline-none focus:ring-2 ring-maritime/5 text-sm font-bold placeholder-slate-300"
+                placeholder="voyageur@compagnie.com"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 ml-1">
+              Mot de passe (Min. 6 caractères)
+            </label>
+            <div className="relative">
+              <span className="absolute left-5 top-4.5 text-slate-300"><Lock size={16} /></span>
+              <input 
+                required
+                type="password" 
+                value={password} 
+                onChange={e => setPassword(e.target.value)}
+                className="w-full pl-12 pr-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl focus:outline-none focus:ring-2 ring-maritime/5 text-sm font-bold placeholder-slate-300"
+                placeholder="••••••"
+              />
+            </div>
+          </div>
+
+          {errorCode && (
+            <div className="p-4 bg-rose-50 border border-rose-100 rounded-xl">
+              <p className="text-rose-500 text-[10px] font-bold uppercase tracking-wider leading-relaxed text-left">{errorCode}</p>
+            </div>
+          )}
+
+          <button 
+            type="submit"
+            disabled={loading}
+            className="w-full py-5 bg-maritime text-white font-black rounded-2xl uppercase tracking-[0.25em] text-[10px] sm:text-xs shadow-xl shadow-maritime/20 hover:bg-black transform active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer animate-fade-in"
+          >
+            {loading ? (
+              <>
+                <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1, ease: 'linear' }} className="border-2 border-white/35 border-t-white w-4 h-4 rounded-full" />
+                Traitement...
+              </>
+            ) : (
+              <>
+                {isSignUp ? "Créer mon Compte" : "Se Connecter par Email"}
+                <ChevronRight size={14} />
+              </>
+            )}
+          </button>
+
+          <div className="text-center pt-2">
+            <button
+              type="button"
+              onClick={() => { setIsSignUp(!isSignUp); setErrorCode(null); }}
+              className="text-[10px] font-black uppercase tracking-widest text-maritime hover:underline"
+            >
+              {isSignUp ? "Déjà inscrit ? Connectez-vous" : "Nouveau passager ? Créez un compte"}
+            </button>
+          </div>
+        </form>
+      )}
+
+      {/* Modern Google Separator & Button */}
+      <div className="flex items-center my-6">
+        <div className="flex-1 border-t border-slate-100"></div>
+        <span className="px-4 text-[9px] font-black tracking-widest text-slate-300 uppercase">OU</span>
+        <div className="flex-1 border-t border-slate-100"></div>
+      </div>
+
+      <button 
+        type="button"
+        onClick={handleGoogleLogin}
+        disabled={loading}
+        className="w-full py-4.5 bg-[#4285F4] hover:bg-[#357ae8] text-white font-black rounded-2xl uppercase tracking-widest text-[10px] sm:text-xs shadow-lg shadow-blue-500/10 flex items-center justify-center gap-3 active:scale-95 transition-all cursor-pointer"
+      >
+        <svg className="w-4 h-4 text-white fill-current shrink-0" viewBox="0 0 24 24">
+          <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+          <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+          <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
+          <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
+        </svg>
+        Continuer avec Google
+      </button>
     </div>
   );
 }
