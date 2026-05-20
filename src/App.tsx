@@ -391,7 +391,8 @@ export default function App() {
           const adminEmail = 'birekeidea@gmail.com';
           const isOwner = localUser.email?.toLowerCase() === adminEmail.toLowerCase();
           setIsAdmin(isOwner);
-          if (isOwner) setIsAdminUnlocked(true);
+          // Auto-unlock disabled to force manual credential verification
+          // if (isOwner) setIsAdminUnlocked(true);
           setLoading(false);
           
           // Sync profile details to DB to ensure they instantly appear in user list
@@ -442,7 +443,8 @@ export default function App() {
         const adminEmail = 'birekeidea@gmail.com';
         const isOwner = u.email?.toLowerCase() === adminEmail.toLowerCase();
         setIsAdmin(isOwner);
-        if (isOwner) setIsAdminUnlocked(true);
+        // Auto-unlock disabled to force manual credential verification
+        // if (isOwner) setIsAdminUnlocked(true);
 
         try {
           await setDoc(doc(db, 'users', u.uid), {
@@ -780,7 +782,7 @@ export default function App() {
                 />
               )}
               {currentPage === 'payment' && <Payment reservation={currentReservation} onComplete={() => setCurrentPage('tickets')} />}
-              {currentPage === 'dashboard' && <Dashboard siteSettings={siteSettings} onNavigate={setCurrentPage} schedules={schedules} isAdmin={isAdmin} isAdminUnlocked={isAdminUnlocked} setIsAdminUnlocked={setIsAdminUnlocked} />}
+              {currentPage === 'dashboard' && <Dashboard siteSettings={siteSettings} onNavigate={setCurrentPage} schedules={schedules} isAdmin={isAdmin} isAdminUnlocked={isAdminUnlocked} setIsAdminUnlocked={setIsAdminUnlocked} setUser={setUser} />}
               {currentPage === 'tickets' && <MyTickets user={user} siteSettings={siteSettings} />}
               {currentPage === 'news' && <NewsView />}
               {currentPage === 'gallery' && <GalleryView siteSettings={siteSettings} />}
@@ -2995,7 +2997,7 @@ function Payment({ reservation, onComplete }: { reservation: Reservation | null,
   );
 }
 
-function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlocked, setIsAdminUnlocked }: { siteSettings?: { homeBg: string, homeDetail: string }, onNavigate: (page: string) => void, schedules: any[], isAdmin: boolean, isAdminUnlocked: boolean, setIsAdminUnlocked: (val: boolean) => void }) {
+function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlocked, setIsAdminUnlocked, setUser }: { siteSettings?: { homeBg: string, homeDetail: string }, onNavigate: (page: string) => void, schedules: any[], isAdmin: boolean, isAdminUnlocked: boolean, setIsAdminUnlocked: (val: boolean) => void, setUser?: (u: any) => void }) {
   const [tab, setTab] = useState<'reservations' | 'users' | 'fleet' | 'media' | 'settings' | 'messages' | 'schedules'>('reservations');
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [usersList, setUsersList] = useState<any[]>([]);
@@ -3004,6 +3006,10 @@ function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlock
   const [boatForm, setBoatForm] = useState({ id: '', name: '', capacity: 0, description: '', imageUrl: '' });
   const [editMediaId, setEditMediaId] = useState<string | null>(null);
   const [adminCode, setAdminCode] = useState('');
+  const [adminEmailInput, setAdminEmailInput] = useState('birekeidea@gmail.com');
+  const [adminPasswordInput, setAdminPasswordInput] = useState('');
+  const [adminAuthError, setAdminAuthError] = useState<string | null>(null);
+  const [adminLoading, setAdminLoading] = useState(false);
   const [newAdminCode, setNewAdminCode] = useState((siteSettings as any)?.adminCode || '');
   const [searchTerm, setSearchTerm] = useState('');
   const [newsList, setNewsList] = useState<any[]>([]);
@@ -3212,13 +3218,56 @@ function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlock
     }
   }, [isAdmin, isAdminUnlocked]);
 
-  const handleCodeSubmit = (e: React.FormEvent) => {
+  const handleAdminUnlockSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const allowedCode = (siteSettings as any)?.adminCode || 'b012000b';
-    if (adminCode === allowedCode) {
+    setAdminAuthError(null);
+    setAdminLoading(true);
+    
+    try {
+      const cleanEmail = adminEmailInput.trim();
+      const cleanPassword = adminPasswordInput;
+
+      if (!cleanEmail) {
+        throw new Error("L'adresse e-mail d'administration est requise.");
+      }
+      if (cleanEmail.toLowerCase() !== 'birekeidea@gmail.com') {
+        throw new Error("Accès refusé. Cet e-mail n'est pas autorisé en tant qu'administrateur.");
+      }
+      if (!cleanPassword) {
+        throw new Error("Le mot de passe d'administration est requis.");
+      }
+
+      // Authenticate with Firebase Authentication
+      const cred = await signInWithEmailAndPassword(auth, cleanEmail, cleanPassword);
+      
+      const localUserObj = {
+        uid: cred.user.uid,
+        displayName: cred.user.displayName || 'Administrateur',
+        phone: '',
+        email: cleanEmail,
+        isAnonymous: false,
+        photoURL: cred.user.photoURL || ''
+      };
+      
+      localStorage.setItem('mugote_local_user', JSON.stringify(localUserObj));
+      if (setUser) {
+        setUser(localUserObj);
+      }
+      
       setIsAdminUnlocked(true);
-    } else {
-      alert("Code incorrect.");
+    } catch (err: any) {
+      console.error("Admin unlock auth failed:", err);
+      let errMsg = "Erreur de connexion. Veuillez vérifier votre adresse mail d'administration et mot de passe.";
+      if (err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
+        errMsg = "Mot de passe d'administration incorrect.";
+      } else if (err.code === 'auth/user-not-found') {
+        errMsg = "Compte administrateur introuvable.";
+      } else if (err.message) {
+        errMsg = err.message;
+      }
+      setAdminAuthError(errMsg);
+    } finally {
+      setAdminLoading(false);
     }
   };
 
@@ -3552,24 +3601,58 @@ function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlock
 
       <div className="flex flex-col items-center gap-10 border-b border-slate-200 pb-12 text-center">
         {!isAdminUnlocked ? (
-          <div className="max-w-md w-full p-10 bg-white rounded-[32px] border border-slate-200 shadow-2xl mt-12">
+          <div className="max-w-md w-full p-10 bg-white rounded-[32px] border border-slate-200 shadow-2xl mt-12 text-left">
             <div className="w-20 h-20 bg-emerald-50 text-emerald-600 rounded-3xl flex items-center justify-center mx-auto mb-6">
               <ShieldCheck size={40} />
             </div>
-            <h3 className="text-xl font-extrabold uppercase tracking-tighter mb-6 italic text-maritime">Sécurité Administrateur</h3>
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-8 leading-relaxed">Verification en deux étapes : <br/> Entrez le code de la base de données</p>
-            <form onSubmit={handleCodeSubmit} className="space-y-4">
-              <input 
-                type="password"
-                placeholder="••••••••"
-                value={adminCode}
-                onChange={e => setAdminCode(e.target.value)}
-                className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:border-emerald-500 font-mono text-center tracking-[0.5em] font-black"
-                autoFocus
-                required
-              />
-              <button className="w-full py-4 bg-emerald-600 text-white rounded-2xl font-black uppercase tracking-widest text-[10px] shadow-lg shadow-emerald-600/20 hover:scale-105 transition-all">
-                Vérifier
+            <h3 className="text-xl font-extrabold uppercase tracking-tighter mb-2 italic text-maritime text-center">Accès Base de Données</h3>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-8 leading-relaxed text-center">
+              Saisissez votre e-mail d'administration et votre mot de passe pour continuer.
+            </p>
+            <form onSubmit={handleAdminUnlockSubmit} className="space-y-4">
+              <div>
+                <label className="block text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1 ml-1">E-mail d'Administration</label>
+                <input 
+                  type="email"
+                  placeholder="admin@mugote.com"
+                  value={adminEmailInput}
+                  onChange={e => setAdminEmailInput(e.target.value)}
+                  className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:border-emerald-500 font-bold text-sm"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1 ml-1">Mot de Passe d'Administration</label>
+                <input 
+                  type="password"
+                  placeholder="••••••••"
+                  value={adminPasswordInput}
+                  onChange={e => setAdminPasswordInput(e.target.value)}
+                  className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:border-emerald-500 text-sm font-bold"
+                  autoFocus
+                  required
+                />
+              </div>
+
+              {adminAuthError && (
+                <p className="text-rose-500 text-[10px] font-black uppercase text-center bg-rose-50 py-3 rounded-xl border border-rose-100 animate-shake">
+                  {adminAuthError}
+                </p>
+              )}
+
+              <button 
+                type="submit"
+                disabled={adminLoading}
+                className="w-full py-4.5 bg-emerald-600 disabled:opacity-50 text-white rounded-2xl font-black uppercase tracking-widest text-[10px] shadow-lg shadow-emerald-600/20 active:scale-95 hover:bg-emerald-700 transition-all cursor-pointer flex items-center justify-center gap-2"
+              >
+                {adminLoading ? (
+                  <>
+                    <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1, ease: 'linear' }} className="border-2 border-white/33 border-t-white w-4 h-4 rounded-full" />
+                    Connexion en cours...
+                  </>
+                ) : (
+                  "Valider mes identifiants"
+                )}
               </button>
             </form>
           </div>
