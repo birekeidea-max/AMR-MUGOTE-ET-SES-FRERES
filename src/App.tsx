@@ -514,6 +514,33 @@ export default function App() {
     );
   }
 
+  if (!user && !verifyId) {
+    return (
+      <div className="min-h-screen bg-[#001233] flex flex-col justify-between font-sans relative overflow-hidden">
+        {/* Subtle grid pattern first */}
+        <div className="absolute inset-0 grid-pattern pointer-events-none opacity-[0.05]"></div>
+        
+        {isFirebaseOffline && (
+          <div className="bg-red-600 text-white text-[10px] font-black uppercase tracking-[0.15em] py-2 text-center fixed top-0 w-full z-[200] animate-pulse">
+            ⚠️ Connexion instable ou hors-ligne. Les modifications risquent de ne pas être enregistrées.
+          </div>
+        )}
+        
+        {/* Centered content box */}
+        <div className="flex-1 flex items-center justify-center p-4 sm:p-8 relative z-10 w-full animate-fade-in">
+          <div className="w-full max-w-xl">
+            <LandingLogin siteSettings={siteSettings} onLoginSuccess={() => setCurrentPage('home')} setUser={setUser} />
+          </div>
+        </div>
+
+        {/* Minimal elegant footer for login screen */}
+        <div className="py-6 border-t border-white/5 relative z-10 text-center text-[10px] font-black tracking-widest text-slate-500 uppercase">
+          Mugote Portage &copy; {new Date().getFullYear()} &bull; Tous droits réservés
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-bg flex flex-col font-sans relative">
       {isFirebaseOffline && (
