@@ -397,28 +397,24 @@ export default function App() {
           
           // Sync profile details to DB to ensure they instantly appear in user list
           if (localUser.uid) {
-            try {
-              await setDoc(doc(db, 'users', localUser.uid), {
-                uid: localUser.uid,
-                email: localUser.email || 'Anonyme',
-                displayName: localUser.displayName || 'Passager',
-                phone: localUser.phone || '',
-                photoURL: localUser.photoURL || '',
-                isAnonymous: true,
-                lastLogin: serverTimestamp(),
-              }, { merge: true });
+            setDoc(doc(db, 'users', localUser.uid), {
+              uid: localUser.uid,
+              email: localUser.email || 'Anonyme',
+              displayName: localUser.displayName || 'Passager',
+              phone: localUser.phone || '',
+              photoURL: localUser.photoURL || '',
+              isAnonymous: true,
+              lastLogin: serverTimestamp(),
+            }, { merge: true }).catch((err) => console.warn("Background user sync skipped:", err));
 
-              await setDoc(doc(db, 'users_list', localUser.uid), {
-                uid: localUser.uid,
-                email: localUser.email || 'Anonyme',
-                displayName: localUser.displayName || 'Passager',
-                phone: localUser.phone || '',
-                isAnonymous: true,
-                lastLogin: serverTimestamp()
-              }, { merge: true });
-            } catch (dbErr) {
-              console.warn("Background database profile sync skipped:", dbErr);
-            }
+            setDoc(doc(db, 'users_list', localUser.uid), {
+              uid: localUser.uid,
+              email: localUser.email || 'Anonyme',
+              displayName: localUser.displayName || 'Passager',
+              phone: localUser.phone || '',
+              isAnonymous: true,
+              lastLogin: serverTimestamp()
+            }, { merge: true }).catch((err) => console.warn("Background users_list sync skipped:", err));
           }
           return;
         } catch (e) {
@@ -446,28 +442,24 @@ export default function App() {
         // Auto-unlock disabled to force manual credential verification
         // if (isOwner) setIsAdminUnlocked(true);
 
-        try {
-          await setDoc(doc(db, 'users', u.uid), {
-            uid: u.uid,
-            email: emailVal,
-            displayName: nameVal,
-            phone: '',
-            photoURL: u.photoURL || '',
-            isAnonymous: u.isAnonymous,
-            lastLogin: serverTimestamp(),
-          }, { merge: true });
+        setDoc(doc(db, 'users', u.uid), {
+          uid: u.uid,
+          email: emailVal,
+          displayName: nameVal,
+          phone: '',
+          photoURL: u.photoURL || '',
+          isAnonymous: u.isAnonymous,
+          lastLogin: serverTimestamp(),
+        }, { merge: true }).catch((err) => console.warn("Background auth-sync users failed safely:", err));
 
-          await setDoc(doc(db, 'users_list', u.uid), {
-            uid: u.uid,
-            email: emailVal,
-            displayName: nameVal,
-            phone: '',
-            isAnonymous: u.isAnonymous,
-            lastLogin: serverTimestamp()
-          }, { merge: true });
-        } catch (error) {
-          console.warn("Background auth-sync failed safely:", error);
-        }
+        setDoc(doc(db, 'users_list', u.uid), {
+          uid: u.uid,
+          email: emailVal,
+          displayName: nameVal,
+          phone: '',
+          isAnonymous: u.isAnonymous,
+          lastLogin: serverTimestamp()
+        }, { merge: true }).catch((err) => console.warn("Background auth-sync users_list failed safely:", err));
       } else {
         setUser(null);
         setIsAdmin(false);
@@ -939,32 +931,27 @@ function UserLoginForm({ onSuccess, setUser }: { onSuccess: () => void, setUser?
         setUser(localUserObj);
       }
       
-      // Save user details directly to database immediately on connection
-      try {
-        await setDoc(doc(db, 'users', uid), {
-          uid,
-          email: emailVal,
-          displayName: cleanName,
-          phone: cleanPhone,
-          photoURL: '',
-          isAnonymous: true,
-          lastLogin: serverTimestamp()
-        }, { merge: true });
+      // Save user details directly to database asynchronously in background
+      setDoc(doc(db, 'users', uid), {
+        uid,
+        email: emailVal,
+        displayName: cleanName,
+        phone: cleanPhone,
+        photoURL: '',
+        isAnonymous: true,
+        lastLogin: serverTimestamp()
+      }, { merge: true }).catch(err => console.error("Database users sync failed:", err));
 
-        await setDoc(doc(db, 'users_list', uid), {
-          uid,
-          email: emailVal,
-          displayName: cleanName,
-          phone: cleanPhone,
-          isAnonymous: true,
-          lastLogin: serverTimestamp()
-        }, { merge: true });
-        console.log("Registered usr_ user successfully in Firebase:", uid);
-      } catch (dbErr: any) {
-        console.error("Database registration failed:", dbErr);
-        throw new Error("Erreur base de données: " + (dbErr.message || "Permissions insuffisantes") + ". Veuillez vérifier votre configuration Firebase Firestore.");
-      }
+      setDoc(doc(db, 'users_list', uid), {
+        uid,
+        email: emailVal,
+        displayName: cleanName,
+        phone: cleanPhone,
+        isAnonymous: true,
+        lastLogin: serverTimestamp()
+      }, { merge: true }).catch(err => console.error("Database users_list sync failed:", err));
       
+      console.log("Registered usr_ user successfully in background:", uid);
       onSuccess();
     } catch (err: any) {
       console.error("General authentication failure:", err);
@@ -1046,32 +1033,27 @@ function UserLoginForm({ onSuccess, setUser }: { onSuccess: () => void, setUser?
         setUser(localUserObj);
       }
 
-      // Live Firestore syncing for both collections to satisfy registration rule
-      try {
-        await setDoc(doc(db, 'users', uid), {
-          uid,
-          email: cleanEmail,
-          displayName: displayNameValue,
-          phone: phoneValue,
-          photoURL: cred.user.photoURL || '',
-          isAnonymous: false,
-          lastLogin: serverTimestamp()
-        }, { merge: true });
+      // Live Firestore syncing for both collections asynchronously in background
+      setDoc(doc(db, 'users', uid), {
+        uid,
+        email: cleanEmail,
+        displayName: displayNameValue,
+        phone: phoneValue,
+        photoURL: cred.user.photoURL || '',
+        isAnonymous: false,
+        lastLogin: serverTimestamp()
+      }, { merge: true }).catch(err => console.error("Database users sync failed:", err));
 
-        await setDoc(doc(db, 'users_list', uid), {
-          uid: cleanEmail, // keep list key aligned
-          email: cleanEmail,
-          displayName: displayNameValue,
-          phone: phoneValue,
-          isAnonymous: false,
-          lastLogin: serverTimestamp()
-        }, { merge: true });
-        console.log("Registered or logged email user successfully in Firebase:", uid);
-      } catch (dbErr: any) {
-        console.error("Database registration failed for email user:", dbErr);
-        throw new Error("Erreur base de données: " + (dbErr.message || "Permissions insuffisantes") + ". Veuillez vérifier votre configuration Firebase Firestore.");
-      }
+      setDoc(doc(db, 'users_list', uid), {
+        uid: cleanEmail, // keep list key aligned
+        email: cleanEmail,
+        displayName: displayNameValue,
+        phone: phoneValue,
+        isAnonymous: false,
+        lastLogin: serverTimestamp()
+      }, { merge: true }).catch(err => console.error("Database users_list sync failed:", err));
 
+      console.log("Registered or logged email user successfully in background:", uid);
       onSuccess();
     } catch (err: any) {
       console.error("Email authentication failed:", err);
@@ -1118,29 +1100,25 @@ function UserLoginForm({ onSuccess, setUser }: { onSuccess: () => void, setUser?
         setUser(localUserObj);
       }
       
-      // Attempt background Firestore registration
-      try {
-        await setDoc(doc(db, 'users', cred.user.uid), {
-          uid: cred.user.uid,
-          email: emailVal,
-          displayName: nameVal,
-          phone: '',
-          photoURL: cred.user.photoURL || '',
-          isAnonymous: false,
-          lastLogin: serverTimestamp()
-        }, { merge: true });
+      // Attempt background Firestore registration asynchronously
+      setDoc(doc(db, 'users', cred.user.uid), {
+        uid: cred.user.uid,
+        email: emailVal,
+        displayName: nameVal,
+        phone: '',
+        photoURL: cred.user.photoURL || '',
+        isAnonymous: false,
+        lastLogin: serverTimestamp()
+      }, { merge: true }).catch(err => console.warn("Database Google session syncing users error:", err));
 
-        await setDoc(doc(db, 'users_list', cred.user.uid), {
-          uid: cred.user.uid,
-          email: emailVal,
-          displayName: nameVal,
-          phone: '',
-          isAnonymous: false,
-          lastLogin: serverTimestamp()
-        }, { merge: true });
-      } catch (dbErr) {
-        console.warn("Database Google session syncing error:", dbErr);
-      }
+      setDoc(doc(db, 'users_list', cred.user.uid), {
+        uid: cred.user.uid,
+        email: emailVal,
+        displayName: nameVal,
+        phone: '',
+        isAnonymous: false,
+        lastLogin: serverTimestamp()
+      }, { merge: true }).catch(err => console.warn("Database Google session syncing users_list error:", err));
       
       onSuccess();
     } catch (err: any) {
