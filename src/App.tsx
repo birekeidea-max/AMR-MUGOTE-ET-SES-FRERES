@@ -45,7 +45,8 @@ import {
   RotateCw,
   Rocket,
   Camera,
-  Check
+  Check,
+  ExternalLink
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { auth, db, handleFirestoreError, OperationType, uploadToStorage } from './lib/firebase';
@@ -1668,6 +1669,7 @@ function Booking({ onReserved, user, onLoginRequest }: { onReserved: (res: Reser
     transactionId: ''
   });
   const [submitting, setSubmitting] = useState(false);
+  const [errorLocal, setErrorLocal] = useState<string | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -1677,37 +1679,57 @@ function Booking({ onReserved, user, onLoginRequest }: { onReserved: (res: Reser
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setErrorLocal(null);
 
     // Validations
     if (!formData.fullName.trim() || formData.fullName.trim().length < 2) {
-      alert("Veuillez entrer un nom valide.");
+      setErrorLocal("Veuillez entrer un nom valide (au moins 2 lettres).");
       return;
     }
     if (!formData.lastName.trim() || formData.lastName.trim().length < 2) {
-      alert("Veuillez entrer un post-nom valide.");
+      setErrorLocal("Veuillez entrer un post-nom valide (au moins 2 lettres).");
       return;
     }
 
-    const selectedDate = new Date(formData.travelDate);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    if (!formData.travelDate || selectedDate < today) {
-      alert("La date de voyage ne peut pas être passée.");
+    const cleanTravelDate = formData.travelDate.trim();
+    if (!cleanTravelDate) {
+      setErrorLocal("Veuillez sélectionner une date de voyage.");
+      return;
+    }
+
+    // Extraction components locally to verify correctly under any local/UTC shift
+    const [year, month, day] = cleanTravelDate.split('-').map(Number);
+    const selectedDateMidnight = new Date(year, month - 1, day);
+    const todayMidnight = new Date();
+    todayMidnight.setHours(0, 0, 0, 0);
+
+    if (selectedDateMidnight < todayMidnight) {
+      setErrorLocal("La date de voyage ne peut pas être passée. Veuillez choisir la date d'aujourd'hui ou une date future.");
       return;
     }
 
     if (formData.passengersCount < 1) {
-      alert("Le nombre de passagers doit être au moins 1.");
+      setErrorLocal("Le nombre de passagers doit être au moins de 1.");
       return;
     }
 
-    // Validation du numéro congolais (plus flexible)
-    // On accepte +243..., 08..., 09...
-    const cleanPhone = formData.phone.replace(/\s/g, '');
+    // Validation du numéro congolais ou international (plus flexible)
+    const cleanPhone = formData.phone.replace(/[\s\-\(\)\.]/g, '');
     const phoneRegex = /^(\+243|0)[89][0-9]{8}$/;
+    const generalPhoneRegex = /^\+?[0-9]{9,15}$/;
     
-    if (!phoneRegex.test(cleanPhone)) {
-      alert("Numéro non valide. Veuillez entrer un numéro congolais (exemple: 0991234567 ou +243991234567)");
+    if (!cleanPhone) {
+      setErrorLocal("Un numéro de téléphone est obligatoire.");
+      return;
+    }
+
+    if (!phoneRegex.test(cleanPhone) && !generalPhoneRegex.test(cleanPhone)) {
+      setErrorLocal("Le numéro de téléphone n'est pas valide. Exemple de format valide: 0991234567 ou +243991234567");
+      return;
+    }
+
+    if (!formData.transactionId.trim()) {
+      setErrorLocal("ID de transaction requis. Veuillez d'abord payer votre place par Mobile Money puis renseigner l'identifiant de la transaction.");
       return;
     }
 
@@ -1732,8 +1754,9 @@ function Booking({ onReserved, user, onLoginRequest }: { onReserved: (res: Reser
     try {
       const docRef = await addDoc(collection(db, 'reservations'), resData);
       onReserved({ ...resData, id: docRef.id });
-    } catch (error) {
-      handleFirestoreError(error, OperationType.CREATE, 'reservations');
+    } catch (error: any) {
+      console.error("Firestore reservation error:", error);
+      setErrorLocal(error.message || "Échec de l'enregistrement de votre réservation. Veuillez réessayer.");
     } finally {
       setSubmitting(false);
     }
@@ -1769,6 +1792,16 @@ function Booking({ onReserved, user, onLoginRequest }: { onReserved: (res: Reser
                   </div>
                 </div>
               </div>
+
+              {errorLocal && (
+                <div className="mx-4 lg:mx-8 mt-4 lg:mt-8 p-4 lg:p-6 bg-rose-50 border border-rose-100 rounded-xl sm:rounded-2xl flex items-start gap-3 text-left">
+                  <AlertCircle size={20} className="text-rose-500 flex-shrink-0 mt-0.5" />
+                  <div className="space-y-1">
+                    <p className="text-rose-600 text-[10px] lg:text-xs font-black uppercase tracking-[0.15em]">Validation Rejetée</p>
+                    <p className="text-rose-500 text-[10px] lg:text-xs font-bold uppercase leading-relaxed tracking-wide">{errorLocal}</p>
+                  </div>
+                </div>
+              )}
 
               <div className="divide-y divide-slate-100">
                 {/* Identification */}
@@ -2146,13 +2179,15 @@ function Payment({ reservation, onComplete }: { reservation: Reservation | null,
   const [step, setStep] = useState<'init' | 'processing' | 'success'>('init');
   const [submitting, setSubmitting] = useState(false);
   const [transactionId, setTransactionId] = useState('');
+  const [errorLocal, setErrorLocal] = useState<string | null>(null);
 
   if (!reservation) return null;
 
   const handleManualConfirm = async (id: string) => {
     const cleanId = id.trim();
+    setErrorLocal(null);
     if (!cleanId) {
-      alert("Veuillez saisir l'ID de transaction pour confirmer votre billet.");
+      setErrorLocal("Veuillez saisir l'ID de transaction pour confirmer votre billet.");
       return;
     }
 
@@ -2166,7 +2201,7 @@ function Payment({ reservation, onComplete }: { reservation: Reservation | null,
       const alreadyExists = querySnapshot.docs.some(d => d.id !== reservation.id);
       
       if (alreadyExists) {
-        alert("Cet ID de transaction a déjà été utilisé. Un ID de transaction doit être unique pour chaque billet.");
+        setErrorLocal("Cet ID de transaction a déjà été utilisé sur un autre billet. Veuillez entrer un ID valide et unique.");
         setSubmitting(false);
         return;
       }
@@ -2176,14 +2211,16 @@ function Payment({ reservation, onComplete }: { reservation: Reservation | null,
         status: 'PENDING'
       });
       onComplete();
-    } catch (error) {
-      handleFirestoreError(error, OperationType.UPDATE, `reservations/${reservation.id}`);
+    } catch (error: any) {
+      console.error("Firestore update error:", error);
+      setErrorLocal(error.message || "Une erreur réseau est survenue. Veuillez vérifier votre connexion et réessayer.");
     } finally {
       setSubmitting(false);
     }
   };
 
   const startStkPush = () => {
+    setErrorLocal(null);
     setStep('processing');
     // Simulate real STK Push timing
     setTimeout(() => {
@@ -2257,6 +2294,14 @@ function Payment({ reservation, onComplete }: { reservation: Reservation | null,
                 </div>
 
                   <div className="space-y-4">
+                  {errorLocal && (
+                    <div className="p-4 bg-rose-50 border border-rose-100 rounded-2xl text-left space-y-1">
+                      <p className="text-rose-600 text-[10px] font-black uppercase tracking-[0.15em] flex items-center gap-1.5">
+                        <AlertCircle size={14} /> Confirmation Rejetée
+                      </p>
+                      <p className="text-rose-500 text-[10px] font-bold uppercase leading-relaxed tracking-wide">{errorLocal}</p>
+                    </div>
+                  )}
                   <div className="space-y-2">
                     <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1">Code reçu par SMS après paiement (ID Unique)</p>
                     <input 
