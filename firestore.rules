@@ -10,7 +10,7 @@ service cloud.firestore {
     function isSignedIn() { return request.auth != null; }
     function isVerified() { return isSignedIn() && request.auth.token.email_verified == true; }
     function isAdmin() { 
-      return isVerified() && (
+      return isSignedIn() && (
         exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
         request.auth.token.email == 'birekeidea@gmail.com'
       ); 
@@ -216,6 +216,11 @@ service cloud.firestore {
       }
       allow read: if true;
       allow write: if isAdmin() && isValidSchedule(incoming());
+    }
+
+    // Connection Test
+    match /test/connection {
+      allow read: if true;
     }
   }
 }

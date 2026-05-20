@@ -1064,6 +1064,8 @@ function UserLoginForm({ onSuccess, setUser }: { onSuccess: () => void, setUser?
         errMsg = "Adresse e-mail ou mot de passe incorrect.";
       } else if (err.code === 'auth/weak-password') {
         errMsg = "Le mot de passe choisi est trop faible (6 caractères minimum).";
+      } else if (err.code === 'auth/operation-not-allowed') {
+        errMsg = "L'authentification par e-mail/mot de passe n'est pas activée sur la console Firebase de ce projet (Authentication > Sign-in method). Veuillez contacter l'administrateur.";
       }
       setErrorCode(errMsg);
     } finally {
@@ -1437,6 +1439,7 @@ function AdminAuthForm({ onSuccess }: { onSuccess: () => void }) {
       if (err.message) msg = err.message;
       if (err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') msg = "Code de base de données incorrect.";
       else if (err.code === 'auth/user-not-found') msg = "Compte administrateur introuvable.";
+      else if (err.code === 'auth/operation-not-allowed') msg = "L'authentification par e-mail/mot de passe n'est pas activée sur votre console Firebase. Veuillez l'activer dans Authentication > Sign-in method.";
       setError(msg);
     } finally {
       setLoading(false);
@@ -3113,6 +3116,8 @@ function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlock
   };
 
   useEffect(() => {
+    if (!isAdminUnlocked) return;
+
     // Reservations Listener
     const qRes = query(collection(db, 'reservations'));
     const unsubRes = onSnapshot(qRes, (snapshot) => {
@@ -3188,7 +3193,7 @@ function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlock
     });
 
     return () => { unsubRes(); unsubUsers(); unsubNews(); unsubConv(); unsubFleet(); };
-  }, []);
+  }, [isAdminUnlocked]);
 
   useEffect(() => {
     if (isAdmin && !isAdminUnlocked) {
@@ -3240,6 +3245,8 @@ function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlock
         errMsg = "Mot de passe d'administration incorrect.";
       } else if (err.code === 'auth/user-not-found') {
         errMsg = "Compte administrateur introuvable.";
+      } else if (err.code === 'auth/operation-not-allowed') {
+        errMsg = "L'authentification par e-mail/mot de passe n'est pas activée sur votre console Firebase. Veuillez vous rendre sur la console Firebase > Authentication > onglet Sign-in method, puis cliquez sur 'Ajouter un fournisseur' et activez l'option 'E-mail/Mot de passe'.";
       } else if (err.message) {
         errMsg = err.message;
       }
