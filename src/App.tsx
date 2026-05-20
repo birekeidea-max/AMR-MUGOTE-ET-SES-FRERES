@@ -534,7 +534,7 @@ export default function App() {
                    <Menu size={18} />
                  </button>
                )}
-               {user && !user.isAnonymous ? (
+               {user ? (
                  <div className="flex items-center gap-2 sm:gap-3">
                    <div className="hidden md:block text-right">
                      <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Connecté</p>
@@ -685,11 +685,11 @@ export default function App() {
             </div>
 
             <div className="pt-12 space-y-6">
-              {user && !user.isAnonymous && (
+              {user && (
                 <div className="p-6 bg-white/5 rounded-2xl flex items-center justify-between border border-white/10">
                   <div>
-                    <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest mb-1">PROFIL ADMIN</p>
-                    <p className="font-bold text-white text-lg">{user.displayName}</p>
+                    <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest mb-1">{isAdmin ? "PROFIL ADMIN" : "PROFIL PASSAGER"}</p>
+                    <p className="font-bold text-white text-lg">{user.displayName || "Passager"}</p>
                   </div>
                   <button onClick={() => { setIsMenuOpen(false); logout(); }} className="p-4 text-rose-400 bg-rose-400/10 rounded-xl hover:bg-rose-400/20 transition-all">
                     <LogOut size={24} />
@@ -714,7 +714,7 @@ export default function App() {
           {verifyId ? (
             <VerificationView id={verifyId} onClose={() => { setVerifyId(null); window.history.pushState({}, '', '/'); }} />
           ) : !user ? (
-            <LandingLogin siteSettings={siteSettings} onLoginSuccess={() => setCurrentPage('users')} setUser={setUser} />
+            <LandingLogin siteSettings={siteSettings} onLoginSuccess={() => setCurrentPage('home')} setUser={setUser} />
           ) : (
             <>
               {currentPage === 'home' && <Home onBook={() => setCurrentPage('booking')} onNavigate={setCurrentPage} siteSettings={siteSettings} schedules={schedules} />}
@@ -1999,7 +1999,7 @@ function Booking({ onReserved, user, onLoginRequest }: { onReserved: (res: Reser
       return;
     }
 
-    if (!user || user.isAnonymous) {
+    if (!user) {
       onLoginRequest();
       return;
     }

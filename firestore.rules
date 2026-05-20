@@ -16,6 +16,7 @@ service cloud.firestore {
       ); 
     }
     function isOwner(userId) { return isSignedIn() && request.auth.uid == userId; }
+    function isOwnerOrLocal(userId) { return isOwner(userId) || userId.startsWith('local_'); }
 
     function incoming() { return request.resource.data; }
     function existing() { return resource.data; }
@@ -37,15 +38,19 @@ service cloud.firestore {
                data.createdAt is number;
       }
 
-      allow read: if isSignedIn() && (isOwner(existing().userId) || isAdmin());
-      allow list: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow read: if (isSignedIn() && (isOwner(existing().userId) || isAdmin())) || (existing().userId.startsWith('local_'));
+      allow list: if (isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin())) || (resource.data.userId.startsWith('local_'));
       
-      allow create: if isSignedIn() && 
+      allow create: if (isSignedIn() && 
                     isValidReservation(incoming()) && 
                     incoming().status == 'PENDING' &&
-                    incoming().userId == request.auth.uid;
+                    incoming().userId == request.auth.uid)
+                    ||
+                    (isValidReservation(incoming()) && 
+                     incoming().status == 'PENDING' &&
+                     incoming().userId.startsWith('local_'));
       
-      allow update: if isSignedIn() && isValidReservation(incoming()) && (
+      allow update: if (isSignedIn() && isValidReservation(incoming()) && (
         // Action: Owner setting transaction ID
         (isOwner(existing().userId) && 
          existing().status == 'PENDING' && 
@@ -57,15 +62,28 @@ service cloud.firestore {
         (isAdmin() && 
          incoming().userId == existing().userId &&
          incoming().diff(existing()).affectedKeys().hasAny(['status', 'validatedAt', 'validatedBy', 'ticketId']))
-      );
+      ))
+      ||
+      (isValidReservation(incoming()) && existing().userId.startsWith('local_') && (
+        // Action: Local owner setting transaction ID
+        (existing().status == 'PENDING' && 
+         incoming().userId == existing().userId &&
+         incoming().diff(existing()).affectedKeys().hasOnly(['transactionId', 'status']) &&
+         incoming().status == 'PENDING')
+        ||
+        // Action: Admin validating for local user
+         (isAdmin() && 
+          incoming().userId == existing().userId &&
+          incoming().diff(existing()).affectedKeys().hasAny(['status', 'validatedAt', 'validatedBy', 'ticketId']))
+      ));
       
       allow delete: if isAdmin();
     }
 
     // Users (Split collection strategy)
     match /users/{userId} {
-      allow read: if isOwner(userId) || isAdmin();
-      allow write: if isOwner(userId) && (!incoming().keys().hasAny(['role']));
+      allow read: if isOwnerOrLocal(userId) || isAdmin();
+      allow write: if (isOwnerOrLocal(userId) && (!incoming().keys().hasAny(['role']))) || isAdmin();
     }
 
     // News (Public Read)
@@ -86,8 +104,10 @@ service cloud.firestore {
                  data.text.size() < 1000;
         }
         allow read: if true;
-        allow create: if isSignedIn() && isValidComment(incoming()) && incoming().userId == request.auth.uid;
-        allow delete: if isAdmin() || isOwner(existing().userId);
+        allow create: if (isSignedIn() && isValidComment(incoming()) && incoming().userId == request.auth.uid)
+                      ||
+                      (isValidComment(incoming()) && incoming().userId.startsWith('local_'));
+        allow delete: if isAdmin() || isOwnerOrLocal(existing().userId);
       }
     }
 
@@ -121,15 +141,19 @@ service cloud.firestore {
                data.status in ['OPEN', 'CLOSED'];
       }
 
-      allow read: if isSignedIn() && (isOwner(existing().userId) || isAdmin());
-      allow list: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow read: if (isSignedIn() && (isOwner(existing().userId) || isAdmin())) || (existing().userId.startsWith('local_'));
+      allow list: if (isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin())) || (resource.data.userId.startsWith('local_'));
       
-      allow create: if isSignedIn() && 
+      allow create: if (isSignedIn() && 
                     isValidConversation(incoming()) && 
                     incoming().userId == request.auth.uid &&
-                    incoming().status == 'OPEN';
+                    incoming().status == 'OPEN')
+                    ||
+                    (isValidConversation(incoming()) && 
+                     incoming().userId.startsWith('local_') &&
+                     incoming().status == 'OPEN');
       
-      allow update: if isSignedIn() && (
+      allow update: if (isSignedIn() && (
         // User adding a message (lastMessage info)
         (isOwner(existing().userId) && 
          incoming().userId == existing().userId &&
@@ -139,7 +163,16 @@ service cloud.firestore {
         (isAdmin() && 
          incoming().userId == existing().userId &&
          incoming().diff(existing()).affectedKeys().hasAny(['lastMessage', 'updatedAt', 'status', 'adminUnreadCount']))
-      );
+      ))
+      ||
+      (existing().userId.startsWith('local_') && (
+         incoming().userId == existing().userId &&
+         incoming().diff(existing()).affectedKeys().hasAny(['lastMessage', 'updatedAt', 'adminUnreadCount'])
+      ))
+      ||
+      (isAdmin() && 
+       incoming().userId == existing().userId &&
+       incoming().diff(existing()).affectedKeys().hasAny(['lastMessage', 'updatedAt', 'status', 'adminUnreadCount']));
 
       // Messages Subcollection
       match /messages/{msgId} {
@@ -148,20 +181,29 @@ service cloud.firestore {
                  data.senderRole in ['USER', 'ADMIN', 'AI'];
         }
 
-        allow read: if isSignedIn() && (get(/databases/$(database)/documents/conversations/$(convId)).data.userId == request.auth.uid || isAdmin());
+        allow read: if (isSignedIn() && (get(/databases/$(database)/documents/conversations/$(convId)).data.userId == request.auth.uid || isAdmin()))
+                    ||
+                    (get(/databases/$(database)/documents/conversations/$(convId)).data.userId.startsWith('local_'));
         
-        allow create: if isSignedIn() && 
+        allow create: if (isSignedIn() && 
                       isValidMessage(incoming()) && 
                       (
                         (incoming().senderRole == 'USER' && incoming().senderId == request.auth.uid) ||
                         (incoming().senderRole == 'AI') || // AI responses are triggered by client session
                         (incoming().senderRole == 'ADMIN' && isAdmin())
-                      );
+                      ))
+                      ||
+                      (isValidMessage(incoming()) && (
+                        (incoming().senderRole == 'USER' && incoming().senderId.startsWith('local_') && incoming().senderId == get(/databases/$(database)/documents/conversations/$(convId)).data.userId) ||
+                        (incoming().senderRole == 'AI') ||
+                        (incoming().senderRole == 'ADMIN' && isAdmin())
+                      ));
       }
     }
+
     match /users_list/{userId} {
       allow read: if isAdmin();
-      allow write: if isOwner(userId) || isAdmin();
+      allow write: if isOwnerOrLocal(userId) || isAdmin();
     }
 
     // Schedules (Public Read, Admin Write)
