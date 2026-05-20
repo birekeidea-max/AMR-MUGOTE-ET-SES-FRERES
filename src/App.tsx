@@ -85,9 +85,10 @@ import { cn, formatDate, formatPrice } from './lib/utils';
 import { QRCodeSVG } from 'qrcode.react';
 import QRCode from 'qrcode';
 import { jsPDF } from 'jspdf';
+import UsersListView from './components/UsersListView';
 
 // --- Types ---
-type Page = 'home' | 'booking' | 'payment' | 'dashboard' | 'tickets' | 'news' | 'gallery';
+type Page = 'home' | 'booking' | 'payment' | 'dashboard' | 'tickets' | 'news' | 'gallery' | 'users';
 
 // --- Constants ---
 const MERCHANT_PHONE = "+243 994 286 469";
@@ -109,7 +110,7 @@ const CLASS_COLORS: Record<TravelClass, { main: string, rgb: [number, number, nu
 const SYSTEM_PROMPT = `Tu es l'assistant IA officiel de ETS AMR MUGOTE ET SES FRERES...`; // Keep definition but we will use the server version
 
 // --- Shared PDF Generator ---
-const generateTicket = async (res: Reservation, siteSettings: { homeBg: string }) => {
+const generateTicket = async (res: Reservation, siteSettings: any) => {
   const qrDataUrl = await QRCode.toDataURL(`https://${window.location.host}/?verify=${res.id}`, {
     margin: 1,
     width: 250,
@@ -131,9 +132,9 @@ const generateTicket = async (res: Reservation, siteSettings: { homeBg: string }
       img.crossOrigin = "Anonymous";
       img.onload = () => resolve(img);
       img.onerror = () => {
-        // Fallback to a placeholder if image fails to load
+        // Fallback to a placeholder if image fails to load (lake house & hills image of Goma)
         const fallback = new Image();
-        fallback.src = "https://images.unsplash.com/photo-1559139225-8216b8e8303e?q=80&w=2070&auto=format&fit=crop";
+        fallback.src = "https://images.unsplash.com/photo-1544551763-46a013bb70d5?q=80&w=2070&auto=format&fit=crop";
         resolve(fallback);
       };
       img.src = url;
@@ -141,44 +142,89 @@ const generateTicket = async (res: Reservation, siteSettings: { homeBg: string }
   };
 
   try {
-    const bgImg = await loadImage(siteSettings.homeBg);
+    // We load the requested lake and houses background image (homeDetail)
+    const detailImgUrl = siteSettings?.homeDetail || "https://images.unsplash.com/photo-1544551763-46a013bb70d5?q=80&w=2070&auto=format&fit=crop";
+    const headerImg = await loadImage(detailImgUrl);
     
-    // Background Image
-    pdf.setGState(new (pdf as any).GState({ opacity: 0.15 }));
-    pdf.addImage(bgImg, 'JPEG', 0, 0, w, h);
+    // Choose custom background styling and color scheme based on travelClass
+    let ticketBgColor: [number, number, number] = [255, 255, 255]; // Standard Clean white
+    if (res.travelClass === 'VIP') {
+      ticketBgColor = [253, 244, 225]; // Warm gold-champagne shimmer tint
+    } else if (res.travelClass === '1ère Classe') {
+      ticketBgColor = [240, 244, 255]; // Regal soft blue tint
+    } else if (res.travelClass === '2ème Classe') {
+      ticketBgColor = [240, 253, 250]; // Oceanic soft teal/cyan tint
+    } else {
+      ticketBgColor = [250, 250, 250]; // Cool gray tint for 3ème classe
+    }
+
+    const color = CLASS_COLORS[res.travelClass] || CLASS_COLORS['2ème Classe'];
+
+    // Fill page with class-specific background styling
+    pdf.setFillColor(ticketBgColor[0], ticketBgColor[1], ticketBgColor[2]);
+    pdf.rect(0, 0, w, h, 'F');
+
+    // Add faint background watermark using the lake houses cover image (opacity 5%)
+    pdf.setGState(new (pdf as any).GState({ opacity: 0.05 }));
+    pdf.addImage(headerImg, 'JPEG', 5, 52, w - 10, h - 60);
     pdf.setGState(new (pdf as any).GState({ opacity: 1 }));
 
-    // Header
-    pdf.setFillColor(0, 18, 51);
-    pdf.rect(0, 0, w, 40, 'F');
-    
-    // Logo / Name
-    pdf.setTextColor(255, 195, 0); // Gold
+    // Drawn Header section: beautiful cover photo with houses and lake
+    pdf.addImage(headerImg, 'JPEG', 0, 0, w, 48);
+
+    // Apply color overlay strictly matching traveler class design with 0.8 opacity over background header image
+    pdf.setGState(new (pdf as any).GState({ opacity: 0.82 }));
+    pdf.setFillColor(color.rgb[0], color.rgb[1], color.rgb[2]);
+    pdf.rect(0, 0, w, 48, 'F');
+    pdf.setGState(new (pdf as any).GState({ opacity: 1 }));
+
+    // Logo / Name on top of covered header image
+    pdf.setTextColor(255, 255, 255);
     pdf.setFont("helvetica", "bolditalic");
-    pdf.setFontSize(18);
-    pdf.text("ETS AMR MUGOTE ET SES FRERES", w / 2, 20, { align: 'center' });
+    pdf.setFontSize(15);
+    pdf.text("ETS AMR MUGOTE ET SES FRERES", w / 2, 14, { align: 'center' });
+    
+    pdf.setFontSize(7);
+    pdf.setFont("helvetica", "normal");
+    pdf.setTextColor(255, 195, 0); // Gold tagline
+    pdf.text("SERVICES DE NAVIGATION LACUSTRE & LOGISTIQUE", w / 2, 19, { align: 'center' });
+
+    // Elegant separator line
+    pdf.setDrawColor(255, 255, 255);
+    pdf.setLineWidth(0.3);
+    pdf.line(20, 23, w - 20, 23);
+
+    // Billet Class Info inside Header
+    pdf.setTextColor(255, 255, 255);
+    pdf.setFontSize(11);
+    pdf.setFont("helvetica", "bold");
+    pdf.text(`${res.travelClass.toUpperCase()} - BILLET OFFICIEL`, w / 2, 31, { align: 'center' });
+    
     pdf.setFontSize(8);
     pdf.setFont("helvetica", "normal");
-    pdf.text("SERVICES DE NAVIGATION LACUSTRE & LOGISTIQUE", w / 2, 26, { align: 'center' });
-    
-    // CLASS BRANDING SECTION (Dynamic color based on travel class)
-    const color = CLASS_COLORS[res.travelClass] || CLASS_COLORS['2ème Classe'];
-    pdf.setFillColor(color.rgb[0], color.rgb[1], color.rgb[2]);
-    pdf.rect(0, 40, w, 15, 'F');
-    pdf.setTextColor(255, 255, 255);
-    pdf.setFontSize(10);
-    pdf.setFont("helvetica", "bold");
-    pdf.text(`${res.travelClass.toUpperCase()} - BILLET OFFICIEL`, w / 2, 50, { align: 'center' });
+    pdf.text(`N° BILLET: #${res.ticketId}`, w / 2, 37, { align: 'center' });
 
-    // Ticket ID Badge with dynamic color background
+    // Ticket ID Badge on ticket background
     pdf.setFillColor(color.rgb[0], color.rgb[1], color.rgb[2]);
-    pdf.roundedRect(w - 60, 60, 50, 10, 2, 2, 'F');
+    pdf.roundedRect(w - 55, 54, 45, 9, 2, 2, 'F');
     pdf.setTextColor(255, 255, 255);
-    pdf.setFontSize(8);
+    pdf.setFontSize(7.5);
     pdf.setFont("helvetica", "bold");
-    pdf.text(`#${res.ticketId}`, w - 35, 66.5, { align: 'center' });
+    pdf.text(`#${res.ticketId}`, w - 32.5, 60, { align: 'center' });
 
-    // Main Details
+    // Outer framing boundary
+    pdf.setDrawColor(color.rgb[0], color.rgb[1], color.rgb[2]);
+    pdf.setLineWidth(0.8);
+    pdf.rect(4, 4, w - 8, h - 8);
+
+    // Secondary elegant frame for VIP class
+    if (res.travelClass === 'VIP') {
+      pdf.setDrawColor(217, 119, 6); // Warm Amber
+      pdf.setLineWidth(0.3);
+      pdf.rect(5.5, 5.5, w - 11, h - 11);
+    }
+
+    // Main Details Styling
     pdf.setTextColor(0, 18, 51);
     pdf.setFontSize(11);
     
@@ -191,47 +237,47 @@ const generateTicket = async (res: Reservation, siteSettings: { homeBg: string }
     const drawField = (label: string, value: string, x: number, y: number) => {
       pdf.setFont("helvetica", "bold");
       pdf.setFontSize(7);
-      pdf.setTextColor(100, 100, 100);
+      pdf.setTextColor(110, 110, 110);
       pdf.text(label.toUpperCase(), x, y);
       
       pdf.setFont("helvetica", "bold");
-      pdf.setFontSize(10);
-      pdf.setTextColor(color.rgb[0], color.rgb[1], color.rgb[2]); // Using class color
-      pdf.text(String(value).toUpperCase(), x, y + 5);
+      pdf.setFontSize(10.5);
+      pdf.setTextColor(color.rgb[0], color.rgb[1], color.rgb[2]); // Dynamic category color coloring
+      pdf.text(String(value).toUpperCase(), x, y + 5.5);
     }
 
     // Row 1: Nom & Post-nom
-    drawField("Nom", res.fullName, 20, 75);
-    drawField("Post-nom", res.lastName || '-', 70, 75);
-    drawDivider(85);
+    drawField("Nom", res.fullName, 20, 72);
+    drawField("Post-nom", res.lastName || '-', 70, 72);
+    drawDivider(83);
 
     // Row 2: Bateau & Classe
-    drawField("Bateau", res.ship, 20, 92);
-    drawField("Classe Choisie", res.travelClass, 70, 92);
-    drawDivider(102);
+    drawField("Bateau", res.ship, 20, 90);
+    drawField("Classe Choisie", res.travelClass, 70, 90);
+    drawDivider(101);
 
     // Row 3: Itinéraire
-    drawField("Itinérance (Route)", res.itinerary.replace('-', ' > '), 20, 109);
+    drawField("Itinérance (Route)", res.itinerary.replace('-', ' > '), 20, 108);
     drawDivider(119);
 
     // Row 4: Date & Heure
     drawField("Date", res.travelDate, 20, 126);
     drawField("Heure de Départ", res.departureTime || '07:30', 70, 126);
-    drawDivider(136);
+    drawDivider(137);
 
     // Row 5: Montant
-    drawField("Montant Payé", `${res.amount}.00 USD`, 20, 143);
-    drawField("ID Transaction", res.transactionId || 'A VALIDER', 70, 143);
+    drawField("Montant Payé", `${res.amount}.00 USD`, 20, 144);
+    drawField("ID Transaction", res.transactionId || 'A VALIDER', 70, 144);
     
     if (res.validatedAt) {
       pdf.setFontSize(6);
       pdf.setFont("helvetica", "normal");
       pdf.setTextColor(150, 150, 150);
       const valDate = new Date(res.validatedAt).toLocaleString('fr-FR');
-      pdf.text(`Validé le: ${valDate}`, 70, 152);
+      pdf.text(`Validé le: ${valDate}`, 70, 153);
     }
     
-    drawDivider(153);
+    drawDivider(154);
 
     // QR Code Section
     pdf.setTextColor(0, 18, 51);
@@ -347,11 +393,15 @@ export default function App() {
       }
 
       try {
+        const localName = localStorage.getItem('mugote_user_name');
+        const localPhone = localStorage.getItem('mugote_user_phone');
+
         // Platform User Registry
         await setDoc(doc(db, 'users', u.uid), {
           uid: u.uid,
           email: u.email || 'Anonyme',
-          displayName: u.displayName || (u.isAnonymous ? 'Passager Anonyme' : 'Utilisateur Mugote'),
+          displayName: u.displayName || localName || (u.isAnonymous ? 'Passager Anonyme' : 'Utilisateur Mugote'),
+          phone: localPhone || '',
           photoURL: u.photoURL || '',
           isAnonymous: u.isAnonymous,
           lastLogin: serverTimestamp(),
@@ -361,7 +411,9 @@ export default function App() {
         await setDoc(doc(db, 'users_list', u.uid), {
           uid: u.uid,
           email: u.email || 'Anonyme',
-          displayName: u.displayName || (u.isAnonymous ? 'Anonyme' : (u.displayName || 'Utilisateur')),
+          displayName: u.displayName || localName || (u.isAnonymous ? 'Anonyme' : (u.displayName || 'Utilisateur')),
+          phone: localPhone || '',
+          isAnonymous: u.isAnonymous,
           lastLogin: serverTimestamp()
         }, { merge: true });
         
@@ -485,6 +537,7 @@ export default function App() {
                 { id: 'home', label: 'ACCUEIL' },
                 { id: 'booking', label: 'RÉSERVER' },
                 { id: 'tickets', label: 'BILLETS' },
+                { id: 'users', label: 'UTILISATEURS' },
                 { id: 'news', label: 'JOURNAL' },
                 { id: 'gallery', label: 'FLOTTE' },
                 { id: 'dashboard', label: 'ADMIN', adminOnly: true }
@@ -551,6 +604,7 @@ export default function App() {
                 { id: 'home', label: 'ACCUEIL' },
                 { id: 'booking', label: 'RÉSERVER' },
                 { id: 'tickets', label: 'MES BILLETS' },
+                { id: 'users', label: 'UTILISATEURS' },
                 { id: 'news', label: 'JOURNAL', anchor: 'news-feed' },
                 { id: 'gallery', label: 'FLOTTE', anchor: 'fleet-gallery' },
                 { id: 'tarifs', label: 'TARIFS', anchor: 'prices' },
@@ -633,7 +687,7 @@ export default function App() {
           {verifyId ? (
             <VerificationView id={verifyId} onClose={() => { setVerifyId(null); window.history.pushState({}, '', '/'); }} />
           ) : !user ? (
-            <LandingLogin onLogin={() => setAuthModal({ isOpen: true, mode: 'user' })} siteSettings={siteSettings} />
+            <LandingLogin siteSettings={siteSettings} />
           ) : (
             <>
               {currentPage === 'home' && <Home onBook={() => setCurrentPage('booking')} onNavigate={setCurrentPage} siteSettings={siteSettings} schedules={schedules} />}
@@ -649,6 +703,7 @@ export default function App() {
               {currentPage === 'tickets' && <MyTickets user={user} siteSettings={siteSettings} />}
               {currentPage === 'news' && <NewsView />}
               {currentPage === 'gallery' && <GalleryView siteSettings={siteSettings} />}
+              {currentPage === 'users' && <UsersListView />}
               <ChatWidget user={user} />
             </>
           )}
@@ -734,7 +789,133 @@ export default function App() {
   );
 }
 
-function LandingLogin({ onLogin, siteSettings }: { onLogin: () => void, siteSettings: any }) {
+function UserLoginForm({ onSuccess }: { onSuccess: () => void }) {
+  const [name, setName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [errorCode, setErrorCode] = useState<string | null>(null);
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorCode(null);
+    const cleanName = name.trim();
+    const cleanPhone = phone.trim().replace(/[\s\-\(\)\.]/g, '');
+
+    if (!cleanName || cleanName.length < 2) {
+      setErrorCode("Veuillez entrer un nom valide (au moins 2 lettres).");
+      return;
+    }
+
+    const phoneRegex = /^(\+243|0)[89][0-9]{8}$/;
+    const generalPhoneRegex = /^\+?[0-9]{9,15}$/;
+
+    if (!cleanPhone) {
+      setErrorCode("Un numéro de téléphone valide est requis.");
+      return;
+    }
+
+    if (!phoneRegex.test(cleanPhone) && !generalPhoneRegex.test(cleanPhone)) {
+      setErrorCode("Format de numéro invalide. Exemple: 0991234567 ou +243...");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      // Connect passenger securely using Firebase Anonymous Auth
+      const cred = await signInAnonymously(auth);
+      // Update Auth Profile Display Name
+      await updateProfile(cred.user, { displayName: cleanName });
+      
+      // Persist credentials locally
+      localStorage.setItem('mugote_user_name', cleanName);
+      localStorage.setItem('mugote_user_phone', cleanPhone);
+      
+      // Save user details directly to database immediately on connection
+      await setDoc(doc(db, 'users', cred.user.uid), {
+        uid: cred.user.uid,
+        email: cred.user.email || 'Anonyme',
+        displayName: cleanName,
+        phone: cleanPhone,
+        photoURL: cred.user.photoURL || '',
+        isAnonymous: true,
+        lastLogin: serverTimestamp()
+      }, { merge: true });
+
+      await setDoc(doc(db, 'users_list', cred.user.uid), {
+        uid: cred.user.uid,
+        email: cred.user.email || 'Anonyme',
+        displayName: cleanName,
+        phone: cleanPhone,
+        isAnonymous: true,
+        lastLogin: serverTimestamp()
+      }, { merge: true });
+      
+      onSuccess();
+    } catch (err: any) {
+      console.error("Authentication failed safely:", err);
+      setErrorCode(err.message || "Impossible de se connecter. Veuillez vérifier votre connexion.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <form onSubmit={handleLogin} className="space-y-6 text-left">
+      <div>
+        <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 ml-1">
+          Votre Nom Complet (Nom & Post-nom)
+        </label>
+        <input 
+          required
+          type="text" 
+          value={name} 
+          onChange={e => setName(e.target.value)}
+          className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl focus:outline-none focus:ring-2 ring-maritime/5 text-sm font-bold uppercase tracking-wide placeholder-slate-300"
+          placeholder="Ex: LANDRY MUGOTE"
+        />
+      </div>
+      <div>
+        <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 ml-1">
+          Votre Numéro de Téléphone
+        </label>
+        <input 
+          required
+          type="text" 
+          value={phone} 
+          onChange={e => setPhone(e.target.value)}
+          className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl focus:outline-none focus:ring-2 ring-maritime/5 text-sm font-bold font-mono tracking-wider placeholder-slate-300"
+          placeholder="Ex: 0991234567"
+        />
+      </div>
+
+      {errorCode && (
+        <div className="p-4 bg-rose-50 border border-rose-100 rounded-xl text-center">
+          <p className="text-rose-500 text-[10px] font-black uppercase tracking-wider leading-relaxed">{errorCode}</p>
+        </div>
+      )}
+
+      <button 
+        type="submit"
+        disabled={loading}
+        className="w-full py-5 bg-maritime text-white font-black rounded-2xl uppercase tracking-[0.25em] text-[10px] sm:text-xs shadow-xl shadow-maritime/20 hover:bg-black transform active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
+      >
+        {loading ? (
+          <>
+            <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1, ease: 'linear' }} className="border-2 border-white/35 border-t-white w-4 h-4 rounded-full" />
+            Accès en cours...
+          </>
+        ) : (
+          <>
+            Se Connecter Maintenant
+            <ChevronRight size={14} />
+          </>
+        )}
+      </button>
+    </form>
+  );
+}
+
+function LandingLogin({ siteSettings }: { siteSettings: any }) {
   return (
     <motion.div 
       initial={{ opacity: 0, y: 20 }}
@@ -746,24 +927,17 @@ function LandingLogin({ onLogin, siteSettings }: { onLogin: () => void, siteSett
           <Ship size={40} className="text-maritime" />
         </div>
         <div className="space-y-2">
-          <h1 className="text-3xl font-black uppercase tracking-tighter italic">Veuillez vous connecter</h1>
+          <h1 className="text-3xl font-black uppercase tracking-tighter italic text-maritime">Connexion Portage</h1>
           <p className="text-slate-500 text-xs font-bold uppercase tracking-widest leading-relaxed max-w-xs mx-auto">
-            L'accès à la plateforme Mugote est strictement réservé aux utilisateurs authentifiés.
+            Accédez instantanément à la plateforme Mugote avec votre nom complet & numéro.
           </p>
         </div>
       </div>
 
-      <div className="bg-white p-10 rounded-[40px] border border-slate-100 shadow-2xl shadow-slate-200">
-        <button 
-          onClick={onLogin}
-          className="w-full py-6 bg-maritime text-white rounded-[24px] flex items-center justify-center gap-4 font-black uppercase tracking-widest text-xs hover:bg-black transition-all shadow-xl shadow-maritime/20 active:scale-95 group"
-        >
-          <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-5 h-5 brightness-0 invert" alt="Google" /> 
-          Continuer avec Google
-          <ChevronRight size={18} className="group-hover:translate-x-1 transition-transform" />
-        </button>
+      <div className="bg-white p-10 rounded-[32px] border border-slate-100 shadow-2xl shadow-slate-200">
+        <UserLoginForm onSuccess={() => {}} />
         <p className="mt-8 text-[9px] font-bold text-slate-400 uppercase tracking-widest leading-relaxed">
-          En continuant, vous acceptez nos conditions d'utilisation et notre politique de sécurité maritime.
+          En vous connectant, vous acceptez nos conditions de navigation des Ets AMR MUGOTE.
         </p>
       </div>
 
@@ -784,63 +958,15 @@ function LandingLogin({ onLogin, siteSettings }: { onLogin: () => void, siteSett
 }
 
 function AuthForm({ onSuccess }: { onSuccess: () => void }) {
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const handleGoogleLogin = async () => {
-    setLoading(true);
-    setError(null);
-    const provider = new GoogleAuthProvider();
-    // Hint for iframe environment
-    provider.setCustomParameters({
-      prompt: 'select_account'
-    });
-    try {
-      await signInWithPopup(auth, provider);
-      onSuccess();
-    } catch (err: any) {
-      console.error("Google Login Error:", err);
-      if (err.code === 'auth/popup-blocked') {
-        setError("La fenêtre de connexion a été bloquée. Veuillez cliquer sur 'Ouvrir dans un nouvel onglet' en haut à droite pour continuer.");
-      } else if (err.code === 'auth/cancelled-popup-request' || err.code === 'auth/popup-closed-by-user') {
-        setError("La connexion a été annulée. Veuillez réessayer.");
-      } else if (err.code === 'auth/network-request-failed') {
-        setError("Erreur réseau. Vérifiez votre connexion internet.");
-      } else {
-        setError(`Échec de la connexion Google: ${err.message || err.code}`);
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
-
   return (
     <div className="space-y-8">
-      <div className="text-center space-y-4">
-        <p className="text-[11px] font-bold text-slate-500 uppercase tracking-widest leading-relaxed">
-          Pour une sécurité optimale, nous utilisons l'authentification Google pour valider votre identité voyageur.
+      <div className="text-center">
+        <p className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest leading-relaxed">
+          Saisissez vos identifiants pour vous connecter
         </p>
       </div>
 
-      <button 
-        onClick={handleGoogleLogin} 
-        disabled={loading}
-        className="w-full py-5 bg-maritime text-white rounded-[24px] flex items-center justify-center gap-4 font-black uppercase tracking-[0.2em] text-xs hover:bg-black transition-all shadow-xl shadow-maritime/20 active:scale-95 disabled:opacity-50"
-      >
-        <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-5 h-5 brightness-0 invert" alt="Google" /> 
-        {loading ? "Chargement..." : "Se connecter avec Google"}
-      </button>
-
-      {error && (
-        <div className="p-4 bg-rose-50 border border-rose-100 rounded-2xl text-center space-y-3">
-          <p className="text-rose-500 text-[10px] font-black uppercase tracking-widest">{error}</p>
-          {error.includes("bloquée") && (
-            <p className="text-[9px] font-bold text-slate-500 uppercase leading-relaxed">
-              Pour résoudre ce problème, veuillez cliquer sur l'icône <ExternalLink size={10} className="inline mb-0.5" /> <b>"Ouvrir dans un nouvel onglet"</b> en haut à droite de votre écran avant de réessayer.
-            </p>
-          )}
-        </div>
-      )}
+      <UserLoginForm onSuccess={onSuccess} />
       
       <div className="pt-4 border-t border-slate-50 text-center">
         <p className="text-[9px] font-bold text-slate-400 uppercase tracking-[0.3em]">Mugote Maritime Services</p>
@@ -2422,6 +2548,7 @@ function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlock
   const [boatForm, setBoatForm] = useState({ id: '', name: '', capacity: 0, description: '', imageUrl: '' });
   const [editMediaId, setEditMediaId] = useState<string | null>(null);
   const [adminCode, setAdminCode] = useState('');
+  const [newAdminCode, setNewAdminCode] = useState((siteSettings as any)?.adminCode || '');
   const [searchTerm, setSearchTerm] = useState('');
   const [newsList, setNewsList] = useState<any[]>([]);
   const [conversations, setConversations] = useState<any[]>([]);
@@ -2631,7 +2758,8 @@ function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlock
 
   const handleCodeSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (adminCode === 'b012000b') {
+    const allowedCode = (siteSettings as any)?.adminCode || 'b012000b';
+    if (adminCode === allowedCode) {
       setIsAdminUnlocked(true);
     } else {
       alert("Code incorrect.");
@@ -3822,6 +3950,44 @@ function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlock
                   </div>
                 </div>
               </div>
+
+              {/* Security Admin Code Update Section */}
+              <div className="pt-8 border-t border-slate-100 flex flex-col gap-6">
+                <div>
+                  <h4 className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-3">Code de Sécurité Administrateur</h4>
+                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wide leading-relaxed max-w-sm mb-4">
+                    Ce code protège l'accès aux panels de validation et de gestion de la flotte de la console d'administration.
+                  </p>
+                  <form onSubmit={async (e) => {
+                    e.preventDefault();
+                    try {
+                      if (!newAdminCode.trim()) {
+                        alert("Le code ne peut pas être vide.");
+                        return;
+                      }
+                      await updateDoc(doc(db, 'settings', 'site'), {
+                        adminCode: newAdminCode.trim()
+                      });
+                      alert("Code de sécurité mis à jour avec succès !");
+                    } catch (error) {
+                      console.error("Error updating admin code:", error);
+                      alert("Erreur lors de la mise à jour du code de sécurité.");
+                    }
+                  }} className="flex gap-4 max-w-md">
+                    <input 
+                      required
+                      type="text"
+                      className="flex-1 px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-xl font-mono text-xs uppercase tracking-widest font-black text-center focus:outline-none focus:border-black"
+                      placeholder="Nouveau Code Sécu"
+                      value={newAdminCode}
+                      onChange={e => setNewAdminCode(e.target.value)}
+                    />
+                    <button type="submit" className="px-6 py-3.5 bg-black text-white hover:bg-slate-800 text-[10px] font-bold uppercase tracking-widest rounded-xl transition-all font-sans cursor-pointer">
+                      Mettre à Jour
+                    </button>
+                  </form>
+                </div>
+              </div>
             </div>
           </div>
         )}
@@ -4277,47 +4443,77 @@ function MyTickets({ user, siteSettings }: { user: FirebaseUser | null, siteSett
         ) : tickets.length === 0 ? (
           <div className="col-span-2 text-center py-10 sm:py-16 text-slate-400 uppercase text-[8px] sm:text-[10px] font-bold tracking-widest border border-dashed border-slate-200 rounded-xl mx-4">Aucun billet trouvé.</div>
         ) : (
-          tickets.map(res => (
-            <div key={res.id} className="bg-white border border-slate-100 shadow-sm rounded-xl overflow-hidden flex flex-col sm:flex-row hover:border-maritime transition-all group mx-0 sm:mx-0">
-              <div className="w-full sm:w-28 bg-slate-50 flex flex-row sm:flex-col items-center justify-center p-4 border-b sm:border-b-0 sm:border-r border-slate-100 gap-4 sm:gap-0">
-                {res.status === 'VALIDATED' ? (
-                  <QRCodeSVG value={`https://ais-pre-esphb55wsxkem3z7oxg5he-830128486045.europe-west2.run.app/?verify=${res.id}`} size={64} className="sm:size-16" />
-                ) : (
-                  <div className="w-12 h-12 sm:w-16 sm:h-16 bg-slate-100 flex items-center justify-center text-slate-300 rounded-lg">
-                    <QrCode size={24} className="sm:w-8 sm:h-8" />
-                  </div>
-                )}
-                <p className="text-[7px] font-bold uppercase tracking-widest text-slate-400 sm:mt-3 text-center">DGM Verify</p>
-              </div>
-              <div className="flex-1 p-4 sm:p-6 space-y-4">
-                <div className="flex justify-between items-start">
-                  <div className="min-w-0 flex-1 pr-2">
-                    <div className="flex flex-wrap items-center gap-2">
-                       <h3 className="text-xs sm:text-sm font-extrabold tracking-tighter uppercase truncate">{res.fullName} {res.lastName}</h3>
-                       <span className="text-[8px] sm:text-[9px] font-mono text-slate-300">#{res.ticketId || 'ID-'+res.id?.substring(0,6).toUpperCase()}</span>
+          tickets.map(res => {
+            let classCardStyle = "bg-white border-slate-100 shadow-sm";
+            let classStubStyle = "bg-slate-50 border-slate-100";
+            
+            if (res.travelClass === 'VIP') {
+              classCardStyle = "bg-gradient-to-br from-amber-500/10 via-yellow-500/5 to-amber-500/10 border-amber-300 shadow-amber-500/5 hover:border-amber-400";
+              classStubStyle = "bg-amber-600/10 border-amber-200/55";
+            } else if (res.travelClass === '1ère Classe') {
+              classCardStyle = "bg-gradient-to-br from-blue-600/5 via-indigo-600/2 to-indigo-600/5 border-blue-200 shadow-sm hover:border-blue-400";
+              classStubStyle = "bg-blue-600/10 border-blue-200/55";
+            } else if (res.travelClass === '2ème Classe') {
+              classCardStyle = "bg-gradient-to-br from-cyan-600/5 via-teal-600/2 to-teal-600/5 border-teal-200 shadow-sm hover:border-teal-400";
+              classStubStyle = "bg-cyan-600/10 border-teal-200/55";
+            } else {
+              classCardStyle = "bg-gradient-to-br from-slate-100/50 via-zinc-50/10 to-slate-100/50 border-slate-200 shadow-sm hover:border-slate-350";
+              classStubStyle = "bg-slate-100/60 border-slate-200/55";
+            }
+
+            return (
+              <div key={res.id} className={cn("border rounded-xl overflow-hidden flex flex-col sm:flex-row transition-all hover:shadow-md group mx-0 sm:mx-0 relative", classCardStyle)}>
+                <div className={cn("w-full sm:w-28 flex flex-row sm:flex-col items-center justify-center p-4 border-b sm:border-b-0 sm:border-r gap-4 sm:gap-0", classStubStyle)}>
+                  {res.status === 'VALIDATED' ? (
+                    <QRCodeSVG value={`https://${window.location.host}/?verify=${res.id}`} size={64} className="sm:size-16" />
+                  ) : (
+                    <div className="w-12 h-12 sm:w-16 sm:h-16 bg-slate-100 flex items-center justify-center text-slate-300 rounded-lg border border-slate-200">
+                      <QrCode size={24} className="sm:w-8 sm:h-8" />
                     </div>
-                    <div className="mt-2 space-y-1.5">
-                      <div className="inline-block">
-                        <span className="text-[7px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-full text-white" 
-                              style={{ backgroundColor: CLASS_COLORS[res.travelClass]?.main || '#ccc' }}>
-                          {res.travelClass}
-                        </span>
-                      </div>
-                      <p className="text-[8px] sm:text-[9px] text-slate-400 font-bold uppercase tracking-widest leading-tight">{res.travelDate} • {res.departureTime} • {res.ship}</p>
-                      {res.transactionId && (
-                        <p className="text-[7px] text-slate-300 font-mono italic">TX: {res.transactionId}</p>
-                      )}
-                    </div>
-                  </div>
-                  <span className={cn(
-                    "text-[7px] font-extrabold uppercase tracking-widest px-1.5 py-0.5 border rounded-sm flex-shrink-0",
-                    res.status === 'VALIDATED' ? "bg-emerald-50 text-emerald-600 border-emerald-200" : 
-                    res.status === 'PENDING' ? "bg-amber-50 text-amber-600 border-amber-200" : 
-                    "bg-red-50 text-red-600 border-red-200"
-                  )}>
-                    {res.status}
-                  </span>
+                  )}
+                  <p className="text-[7px] font-bold uppercase tracking-widest text-slate-500 sm:mt-3 text-center">DGM Verify</p>
                 </div>
+                <div className="flex-1 p-4 sm:p-6 space-y-4">
+                  <div className="flex justify-between items-start">
+                    <div className="min-w-0 flex-1 pr-2">
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-full border-2 border-white bg-slate-100 overflow-hidden shrink-0 shadow-sm">
+                          <img 
+                            referrerPolicy="no-referrer"
+                            src={(siteSettings as any)?.homeDetail || "https://images.unsplash.com/photo-1544551763-46a013bb70d5?q=80&w=2070&auto=format&fit=crop"} 
+                            className="w-full h-full object-cover" 
+                            alt="Mugote Lac"
+                          />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-1.5">
+                             <h3 className="text-xs sm:text-sm font-extrabold tracking-tighter uppercase truncate text-slate-800">{res.fullName} {res.lastName}</h3>
+                             <span className="text-[8px] sm:text-[9px] font-mono text-slate-400">#{res.ticketId || 'ID-'+res.id?.substring(0,6).toUpperCase()}</span>
+                          </div>
+                          <div className="mt-1">
+                            <span className="text-[7px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-full text-white" 
+                                  style={{ backgroundColor: CLASS_COLORS[res.travelClass]?.main || '#ccc' }}>
+                              {res.travelClass}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="mt-3.5 space-y-1">
+                        <p className="text-[8px] sm:text-[9px] text-slate-500 font-bold uppercase tracking-widest leading-tight">{res.travelDate} • {res.departureTime} • {res.ship}</p>
+                        {res.transactionId && (
+                          <p className="text-[7px] text-slate-400 font-mono italic">TX: {res.transactionId}</p>
+                        )}
+                      </div>
+                    </div>
+                    <span className={cn(
+                      "text-[7px] font-extrabold uppercase tracking-widest px-1.5 py-0.5 border rounded-sm flex-shrink-0",
+                      res.status === 'VALIDATED' ? "bg-emerald-50 text-emerald-600 border-emerald-200" : 
+                      res.status === 'PENDING' ? "bg-amber-50 text-amber-600 border-amber-200" : 
+                      "bg-red-50 text-red-600 border-red-200"
+                    )}>
+                      {res.status}
+                    </span>
+                  </div>
                 <div className="flex items-end justify-between pt-3 sm:pt-4 border-t border-slate-50 gap-2">
                   <div className="text-left min-w-0">
                     <p className="text-[7px] sm:text-[8px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Itinéraire</p>
@@ -4358,7 +4554,8 @@ function MyTickets({ user, siteSettings }: { user: FirebaseUser | null, siteSett
                 </div>
               </div>
             </div>
-          ))
+          );
+        })
         )}
       </div>
     </motion.div>
