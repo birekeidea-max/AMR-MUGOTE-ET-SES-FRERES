@@ -16,7 +16,7 @@ service cloud.firestore {
       ); 
     }
     function isOwner(userId) { return isSignedIn() && request.auth.uid == userId; }
-    function isLocalOrUsr(userId) { return userId.startsWith('local_') || userId.startsWith('usr_'); }
+    function isLocalOrUsr(userId) { return userId.matches('^local_.*') || userId.matches('^usr_.*'); }
     function isOwnerOrLocal(userId) { return isOwner(userId) || isLocalOrUsr(userId); }
 
     function incoming() { return request.resource.data; }
@@ -107,7 +107,7 @@ service cloud.firestore {
         allow read: if true;
         allow create: if (isSignedIn() && isValidComment(incoming()) && incoming().userId == request.auth.uid)
                       ||
-                      (isValidComment(incoming()) && incoming().userId.startsWith('local_'));
+                      (isValidComment(incoming()) && incoming().userId.matches('^local_.*'));
         allow delete: if isAdmin() || isOwnerOrLocal(existing().userId);
       }
     }

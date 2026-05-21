@@ -523,13 +523,26 @@ export default function App() {
         {/* Centered content box */}
         <div className="flex-1 flex items-center justify-center p-4 sm:p-8 relative z-10 w-full animate-fade-in">
           <div className="w-full max-w-xl">
-            <LandingLogin siteSettings={siteSettings} onLoginSuccess={() => setCurrentPage('home')} setUser={setUser} />
+            <LandingLogin 
+              siteSettings={siteSettings} 
+              onLoginSuccess={() => setCurrentPage('home')} 
+              setUser={setUser} 
+              onAdminClick={() => setAuthModal({ isOpen: true, mode: 'admin' })}
+            />
           </div>
         </div>
 
         {/* Minimal elegant footer for login screen */}
-        <div className="py-6 border-t border-white/5 relative z-10 text-center text-[10px] font-black tracking-widest text-slate-500 uppercase">
-          Mugote Portage &copy; {new Date().getFullYear()} &bull; Tous droits réservés
+        <div className="py-6 border-t border-white/5 relative z-10 text-center text-[10px] font-black tracking-widest text-slate-500 uppercase flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-4">
+          <span>Mugote Portage &copy; {new Date().getFullYear()} &bull; Tous droits réservés</span>
+          <span className="hidden sm:inline text-white/10">&bull;</span>
+          <button 
+            type="button" 
+            onClick={() => setAuthModal({ isOpen: true, mode: 'admin' })} 
+            className="text-gold hover:text-white transition-all cursor-pointer underline hover:no-underline font-black text-[10px] uppercase tracking-widest"
+          >
+            Accès Base de Données (Admin)
+          </button>
         </div>
       </div>
     );
@@ -612,10 +625,9 @@ export default function App() {
                 { id: 'home', label: 'ACCUEIL' },
                 { id: 'booking', label: 'RÉSERVER' },
                 { id: 'tickets', label: 'BILLETS' },
-                { id: 'users', label: 'UTILISATEURS' },
                 { id: 'news', label: 'JOURNAL' },
                 { id: 'gallery', label: 'FLOTTE' },
-                { id: 'dashboard', label: 'ADMIN', adminOnly: true }
+                { id: 'dashboard', label: '⚙️ ADMINISTRATION COMITÉ', adminOnly: true }
               ].map(item => {
                 if (item.adminOnly && !isAdmin) return null;
                 return (
@@ -625,8 +637,12 @@ export default function App() {
                     className={cn(
                       "px-3 sm:px-5 py-2 sm:py-2.5 rounded-lg sm:rounded-xl font-black uppercase tracking-widest transition-all duration-300 text-[8px] sm:text-[10px]",
                       currentPage === item.id 
-                        ? "bg-gold text-maritime shadow-xl shadow-gold/20" 
-                        : "text-white/40 hover:text-white hover:bg-white/5"
+                        ? item.id === 'dashboard'
+                          ? "bg-emerald-600 text-white shadow-xl shadow-emerald-500/20 font-black"
+                          : "bg-gold text-maritime shadow-xl shadow-gold/20" 
+                        : item.id === 'dashboard'
+                          ? "text-emerald-400 border border-emerald-500/30 bg-emerald-950/40 hover:bg-emerald-900/40 font-black flex items-center gap-1"
+                          : "text-white/40 hover:text-white hover:bg-white/5"
                     )}
                   >
                     {item.label}
@@ -679,7 +695,6 @@ export default function App() {
                 { id: 'home', label: 'ACCUEIL' },
                 { id: 'booking', label: 'RÉSERVER' },
                 { id: 'tickets', label: 'MES BILLETS' },
-                { id: 'users', label: 'UTILISATEURS' },
                 { id: 'news', label: 'JOURNAL', anchor: 'news-feed' },
                 { id: 'gallery', label: 'FLOTTE', anchor: 'fleet-gallery' },
                 { id: 'tarifs', label: 'TARIFS', anchor: 'prices' },
@@ -762,7 +777,12 @@ export default function App() {
           {verifyId ? (
             <VerificationView id={verifyId} onClose={() => { setVerifyId(null); window.history.pushState({}, '', '/'); }} />
           ) : !user ? (
-            <LandingLogin siteSettings={siteSettings} onLoginSuccess={() => setCurrentPage('home')} setUser={setUser} />
+            <LandingLogin 
+              siteSettings={siteSettings} 
+              onLoginSuccess={() => setCurrentPage('home')} 
+              setUser={setUser} 
+              onAdminClick={() => setAuthModal({ isOpen: true, mode: 'admin' })}
+            />
           ) : (
             <>
               {currentPage === 'home' && <Home onBook={() => setCurrentPage('booking')} onNavigate={setCurrentPage} siteSettings={siteSettings} schedules={schedules} />}
@@ -931,8 +951,8 @@ function UserLoginForm({ onSuccess, setUser }: { onSuccess: () => void, setUser?
         setUser(localUserObj);
       }
       
-      // Save user details directly to database asynchronously in background
-      setDoc(doc(db, 'users', uid), {
+      // Save user details directly to database synchronously to confirm it works
+      await setDoc(doc(db, 'users', uid), {
         uid,
         email: emailVal,
         displayName: cleanName,
@@ -940,18 +960,18 @@ function UserLoginForm({ onSuccess, setUser }: { onSuccess: () => void, setUser?
         photoURL: '',
         isAnonymous: true,
         lastLogin: serverTimestamp()
-      }, { merge: true }).catch(err => console.error("Database users sync failed:", err));
+      }, { merge: true });
 
-      setDoc(doc(db, 'users_list', uid), {
+      await setDoc(doc(db, 'users_list', uid), {
         uid,
         email: emailVal,
         displayName: cleanName,
         phone: cleanPhone,
         isAnonymous: true,
         lastLogin: serverTimestamp()
-      }, { merge: true }).catch(err => console.error("Database users_list sync failed:", err));
+      }, { merge: true });
       
-      console.log("Registered usr_ user successfully in background:", uid);
+      console.log("Registered usr_ user successfully in Firestore database:", uid);
       onSuccess();
     } catch (err: any) {
       console.error("General authentication failure:", err);
@@ -1353,7 +1373,7 @@ function UserLoginForm({ onSuccess, setUser }: { onSuccess: () => void, setUser?
   );
 }
 
-function LandingLogin({ siteSettings, onLoginSuccess, setUser }: { siteSettings: any, onLoginSuccess?: () => void, setUser?: (u: any) => void }) {
+function LandingLogin({ siteSettings, onLoginSuccess, setUser, onAdminClick }: { siteSettings: any, onLoginSuccess?: () => void, setUser?: (u: any) => void, onAdminClick?: () => void }) {
   return (
     <motion.div 
       initial={{ opacity: 0, y: 20 }}
@@ -1378,6 +1398,18 @@ function LandingLogin({ siteSettings, onLoginSuccess, setUser }: { siteSettings:
           En vous connectant, vous acceptez nos conditions de navigation des Ets AMR MUGOTE.
         </p>
       </div>
+
+      {onAdminClick && (
+        <div className="flex flex-col items-center justify-center py-2">
+          <button 
+            type="button"
+            onClick={onAdminClick}
+            className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-[#d4af37] bg-amber-500/10 hover:bg-gold hover:text-maritime px-8 py-4.5 rounded-2xl border-2 border-dashed border-[#d4af37]/45 transition-all duration-300 cursor-pointer shadow-lg shadow-amber-500/5 hover:scale-[1.02] active:scale-95"
+          >
+            <span>🔐 ACCÈS BASE DE DONNÉES / ESPACE ADMIN</span>
+          </button>
+        </div>
+      )}
 
       <div className="pt-12 grid grid-cols-2 gap-4">
         <div className="p-6 bg-white/50 backdrop-blur-sm rounded-3xl border border-slate-100">
@@ -1414,7 +1446,7 @@ function AuthForm({ onSuccess, setUser }: { onSuccess: () => void, setUser?: (u:
 }
 
 function AdminAuthForm({ onSuccess }: { onSuccess: () => void }) {
-  const [email, setEmail] = useState('');
+  const [email] = useState('birekeidea@gmail.com');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -1424,18 +1456,13 @@ function AdminAuthForm({ onSuccess }: { onSuccess: () => void }) {
     setLoading(true);
     setError(null);
     try {
-      // First check if the email corresponds to the authorized admin email
-      if (email !== 'birekeidea@gmail.com') {
-        throw new Error("Accès refusé. Cet e-mail n'est pas autorisé.");
-      }
-
       // Check the "database code" (password)
       // For simplicity and since Firestore rules will protect data, we use Firebase Auth password as the "database code"
       await signInWithEmailAndPassword(auth, email, password);
       onSuccess();
     } catch (err: any) {
       console.error(err);
-      let msg = "Identifiants ou Code de base de données incorrect.";
+      let msg = "Code de base de données incorrect.";
       if (err.message) msg = err.message;
       if (err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') msg = "Code de base de données incorrect.";
       else if (err.code === 'auth/user-not-found') msg = "Compte administrateur introuvable.";
@@ -1448,26 +1475,15 @@ function AdminAuthForm({ onSuccess }: { onSuccess: () => void }) {
 
   return (
     <div className="space-y-6">
-      <div className="bg-amber-50 border border-amber-100 p-4 rounded-2xl">
-        <p className="text-[10px] font-bold text-amber-700 uppercase tracking-widest text-center leading-relaxed">
-          Accès restreint aux administrateurs autorisés uniquement.
+      <div className="bg-emerald-50 border border-emerald-100 p-4 rounded-2xl">
+        <p className="text-[10px] font-bold text-emerald-700 uppercase tracking-widest text-center leading-relaxed">
+          Accès Base de Données — Entrez votre Code d'accés
         </p>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1 ml-1">E-mail Administrateur</label>
-          <input 
-            required
-            type="email" 
-            value={email} 
-            onChange={e => setEmail(e.target.value)}
-            className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl focus:outline-none focus:ring-2 ring-maritime/5 text-sm font-bold"
-            placeholder="admin@mugote.com"
-          />
-        </div>
-        <div>
-          <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1 ml-1">Code Base de Données</label>
+          <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1 ml-1">Code / Mot de passe de la Base de Données</label>
           <input 
             required
             type="password" 
@@ -1475,6 +1491,7 @@ function AdminAuthForm({ onSuccess }: { onSuccess: () => void }) {
             onChange={e => setPassword(e.target.value)}
             className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl focus:outline-none focus:ring-2 ring-maritime/5 text-sm font-bold"
             placeholder="••••••••"
+            autoFocus
           />
         </div>
 
@@ -3592,20 +3609,9 @@ function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlock
             </div>
             <h3 className="text-xl font-extrabold uppercase tracking-tighter mb-2 italic text-maritime text-center">Accès Base de Données</h3>
             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-8 leading-relaxed text-center">
-              Saisissez votre e-mail d'administration et votre mot de passe pour continuer.
+              Saisissez votre Mot de Passe d'Administration pour continuer.
             </p>
             <form onSubmit={handleAdminUnlockSubmit} className="space-y-4">
-              <div>
-                <label className="block text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1 ml-1">E-mail d'Administration</label>
-                <input 
-                  type="email"
-                  placeholder="admin@mugote.com"
-                  value={adminEmailInput}
-                  onChange={e => setAdminEmailInput(e.target.value)}
-                  className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:border-emerald-500 font-bold text-sm"
-                  required
-                />
-              </div>
               <div>
                 <label className="block text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1 ml-1">Mot de Passe d'Administration</label>
                 <input 
@@ -3920,40 +3926,59 @@ function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlock
                   <tr className="bg-slate-50 border-b border-slate-100">
                     <th className="px-8 py-5 text-[10px] font-black uppercase text-slate-400 text-left">Utilisateur</th>
                     <th className="px-8 py-5 text-[10px] font-black uppercase text-slate-400 text-left">Dernière Connexion</th>
+                    <th className="px-8 py-5 text-[10px] font-black uppercase text-slate-400 text-left">Activité / Billets</th>
                     <th className="px-8 py-5 text-[10px] font-black uppercase text-slate-400 text-left">Vérifié</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
-                  {usersList.map((u, i) => (
-                    <tr key={u.id} className="hover:bg-slate-50/50 transition-colors">
-                      <td className="px-8 py-5">
-                        <div className="flex items-center gap-3">
-                            {u.photoURL ? (
-                              <img src={u.photoURL || undefined} alt="" className="w-9 h-9 rounded-full object-cover border border-slate-100 shadow-sm" referrerPolicy="no-referrer" />
-                            ) : (
-                              <div className="w-9 h-9 rounded-full bg-maritime/5 flex items-center justify-center text-maritime">
-                                <User size={16} />
-                              </div>
-                            )}
-                          <div className="flex flex-col">
-                             <span className="text-sm font-black uppercase tracking-tight italic">{u.displayName || 'Utilisateur'}</span>
-                             <div className="flex flex-wrap items-center gap-2 mt-1">
-                               {u.phone && (
-                                 <span className="text-[9px] font-black uppercase tracking-widest px-1.5 py-0.5 bg-maritime/5 text-maritime rounded-md border border-maritime/10">
-                                   Tél: {u.phone}
-                                 </span>
-                               )}
-                               <span className="text-[9.5px] font-mono text-slate-400">{u.email || 'Anonyme'}</span>
-                             </div>
+                  {usersList.map((u, i) => {
+                    const userReservations = reservations.filter(r => r.userId === u.uid || (u.phone && r.phone === u.phone));
+                    const totalRes = userReservations.length;
+                    const validatedResCount = userReservations.filter(r => r.status === 'VALIDATED').length;
+                    const pendingResCount = userReservations.filter(r => r.status === 'PENDING').length;
+
+                    return (
+                      <tr key={u.id} className="hover:bg-slate-50/50 transition-colors">
+                        <td className="px-8 py-5">
+                          <div className="flex items-center gap-3">
+                              {u.photoURL ? (
+                                <img src={u.photoURL || undefined} alt="" className="w-9 h-9 rounded-full object-cover border border-slate-100 shadow-sm" referrerPolicy="no-referrer" />
+                              ) : (
+                                <div className="w-9 h-9 rounded-full bg-maritime/5 flex items-center justify-center text-maritime">
+                                  <User size={16} />
+                                </div>
+                              )}
+                            <div className="flex flex-col">
+                               <span className="text-sm font-black uppercase tracking-tight italic">{u.displayName || 'Utilisateur'}</span>
+                               <div className="flex flex-wrap items-center gap-2 mt-1">
+                                 {u.phone && (
+                                   <span className="text-[9px] font-black uppercase tracking-widest px-1.5 py-0.5 bg-maritime/5 text-maritime rounded-md border border-maritime/10">
+                                     Tél: {u.phone}
+                                   </span>
+                                 )}
+                                 <span className="text-[9.5px] font-mono text-slate-400">{u.email || 'Anonyme'}</span>
+                               </div>
+                            </div>
                           </div>
-                        </div>
-                      </td>
-                      <td className="px-8 py-5">
-                        <span className="text-[10px] font-bold text-slate-500 uppercase">
-                          {u.lastLogin ? (u.lastLogin.seconds ? new Date(u.lastLogin.seconds * 1000).toLocaleString() : new Date(u.lastLogin).toLocaleString()) : 'N/A'}
-                        </span>
-                      </td>
-                      <td className="px-8 py-5">
+                        </td>
+                        <td className="px-8 py-5">
+                          <span className="text-[10px] font-bold text-slate-500 uppercase">
+                            {u.lastLogin ? (u.lastLogin.seconds ? new Date(u.lastLogin.seconds * 1000).toLocaleString() : new Date(u.lastLogin).toLocaleString()) : 'N/A'}
+                          </span>
+                        </td>
+                        <td className="px-8 py-5">
+                          <div className="flex flex-col gap-1">
+                            <span className="text-[10.5px] font-black px-2 py-0.5 bg-sky-50 text-maritime rounded-md border border-slate-150 self-start">
+                              {totalRes} billet{totalRes > 1 || totalRes === 0 ? 's' : ''}
+                            </span>
+                            {totalRes > 0 && (
+                              <span className="text-[8.5px] font-bold text-slate-400 uppercase tracking-widest pl-1">
+                                {validatedResCount} validé(s) | {pendingResCount} en attente
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-8 py-5">
                         {u.emailVerified ? (
                           <span className="text-[8px] font-black uppercase px-2 py-1 bg-emerald-50 text-emerald-600 rounded-md border border-emerald-100">OUI</span>
                         ) : (
@@ -3961,7 +3986,8 @@ function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlock
                         )}
                       </td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
               {usersList.length === 0 && <div className="p-20 text-center text-slate-400 font-bold uppercase tracking-widest text-[10px]">Aucun utilisateur enregistré.</div>}

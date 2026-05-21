@@ -62,7 +62,7 @@ async function startServer() {
         contents.push({ role: 'user', parts: [{ text: message }] });
       }
 
-      const modelName = "gemini-3-flash-preview";
+      const modelName = "gemini-3.5-flash";
 
       console.log("Using model:", modelName);
       
