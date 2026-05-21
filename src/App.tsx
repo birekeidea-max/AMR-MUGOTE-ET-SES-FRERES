@@ -324,8 +324,20 @@ export default function App() {
       return null;
     }
   });
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [isAdminUnlocked, setIsAdminUnlocked] = useState(false);
+   const [isAdmin, setIsAdmin] = useState(() => {
+     try {
+       return localStorage.getItem('mugote_admin_session') === 'true';
+     } catch {
+       return false;
+     }
+   });
+   const [isAdminUnlocked, setIsAdminUnlocked] = useState(() => {
+     try {
+       return localStorage.getItem('mugote_admin_session') === 'true';
+     } catch {
+       return false;
+     }
+   });
   const [loading, setLoading] = useState(true);
   const [verifyId, setVerifyId] = useState<string | null>(null);
   const [currentReservation, setCurrentReservation] = useState<Reservation | null>(null);
@@ -380,6 +392,22 @@ export default function App() {
     });
 
     const unsubscribe = onAuthStateChanged(auth, async (u) => {
+      if (localStorage.getItem('mugote_admin_session') === 'true') {
+        const adminUser = {
+          uid: 'admin_mugote',
+          displayName: 'Administrateur Mugote',
+          email: 'birekeidea@gmail.com',
+          phone: '0000000000',
+          isAnonymous: false,
+          photoURL: ''
+        };
+        setUser(adminUser);
+        setIsAdmin(true);
+        setIsAdminUnlocked(true);
+        setLoading(false);
+        return;
+      }
+
       // Prioritize our persistent local-first phone-based user session if defined
       const localUserStr = localStorage.getItem('mugote_local_user');
       if (localUserStr) {
@@ -491,6 +519,9 @@ export default function App() {
   const login = () => setAuthModal({ isOpen: true, mode: 'user' });
   const logout = () => {
     localStorage.removeItem('mugote_local_user');
+    localStorage.removeItem('mugote_admin_session');
+    setIsAdmin(false);
+    setIsAdminUnlocked(false);
     signOut(auth);
   };
 
@@ -880,6 +911,11 @@ export default function App() {
         mode={authModal.mode} 
         onClose={() => setAuthModal(prev => ({ ...prev, isOpen: false }))} 
         setUser={setUser}
+        setIsAdmin={setIsAdmin}
+        setIsAdminUnlocked={setIsAdminUnlocked}
+        onAdminSuccess={() => {
+          setCurrentPage('dashboard');
+        }}
       />
     </div>
   );
@@ -1445,8 +1481,7 @@ function AuthForm({ onSuccess, setUser }: { onSuccess: () => void, setUser?: (u:
   );
 }
 
-function AdminAuthForm({ onSuccess }: { onSuccess: () => void }) {
-  const [email] = useState('birekeidea@gmail.com');
+function AdminAuthForm({ onSuccess, setIsAdmin, setIsAdminUnlocked, setUser }: { onSuccess: () => void, setIsAdmin?: (val: boolean) => void, setIsAdminUnlocked?: (val: boolean) => void, setUser?: (u: any) => void }) {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -1456,18 +1491,29 @@ function AdminAuthForm({ onSuccess }: { onSuccess: () => void }) {
     setLoading(true);
     setError(null);
     try {
-      // Check the "database code" (password)
-      // For simplicity and since Firestore rules will protect data, we use Firebase Auth password as the "database code"
-      await signInWithEmailAndPassword(auth, email, password);
-      onSuccess();
+      if (password === 'b012000b') {
+        const adminUser = {
+          uid: 'admin_mugote',
+          displayName: 'Administrateur Mugote',
+          email: 'birekeidea@gmail.com',
+          phone: '0000000000',
+          isAnonymous: false,
+          photoURL: ''
+        };
+        localStorage.setItem('mugote_local_user', JSON.stringify(adminUser));
+        localStorage.setItem('mugote_admin_session', 'true');
+        
+        if (setIsAdmin) setIsAdmin(true);
+        if (setIsAdminUnlocked) setIsAdminUnlocked(true);
+        if (setUser) setUser(adminUser);
+        
+        onSuccess();
+      } else {
+        setError("Mot de passe incorrect.");
+      }
     } catch (err: any) {
       console.error(err);
-      let msg = "Code de base de données incorrect.";
-      if (err.message) msg = err.message;
-      if (err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') msg = "Code de base de données incorrect.";
-      else if (err.code === 'auth/user-not-found') msg = "Compte administrateur introuvable.";
-      else if (err.code === 'auth/operation-not-allowed') msg = "L'authentification par e-mail/mot de passe n'est pas activée sur votre console Firebase. Veuillez l'activer dans Authentication > Sign-in method.";
-      setError(msg);
+      setError("Erreur d'authentification.");
     } finally {
       setLoading(false);
     }
@@ -1483,7 +1529,7 @@ function AdminAuthForm({ onSuccess }: { onSuccess: () => void }) {
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1 ml-1">Code / Mot de passe de la Base de Données</label>
+          <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1 ml-1">Code de la Base de Données</label>
           <input 
             required
             type="password" 
@@ -1504,16 +1550,16 @@ function AdminAuthForm({ onSuccess }: { onSuccess: () => void }) {
         <button 
           type="submit"
           disabled={loading}
-          className="w-full py-5 bg-black text-white font-black rounded-2xl uppercase tracking-[0.2em] text-xs shadow-xl shadow-black/20 transform active:scale-95 transition-all disabled:opacity-50"
+          className="w-full py-5 bg-black text-white font-black rounded-2xl uppercase tracking-[0.2em] text-xs shadow-xl shadow-black/20 transform active:scale-95 transition-all disabled:opacity-50 cursor-pointer"
         >
-          {loading ? "Authentification..." : "Accéder à la Console"}
+          {loading ? "Vérification..." : "Accéder à la Console"}
         </button>
       </form>
     </div>
   );
 }
 
-function AuthModal({ isOpen, onClose, mode = 'user', setUser }: { isOpen: boolean, onClose: () => void, mode?: 'user' | 'admin', setUser?: (u: any) => void }) {
+function AuthModal({ isOpen, onClose, mode = 'user', setUser, setIsAdmin, setIsAdminUnlocked, onAdminSuccess }: { isOpen: boolean, onClose: () => void, mode?: 'user' | 'admin', setUser?: (u: any) => void, setIsAdmin?: (val: boolean) => void, setIsAdminUnlocked?: (val: boolean) => void, onAdminSuccess?: () => void }) {
   if (!isOpen) return null;
 
   return (
@@ -1549,7 +1595,19 @@ function AuthModal({ isOpen, onClose, mode = 'user', setUser }: { isOpen: boolea
           </p>
         </div>
 
-        {mode === 'admin' ? <AdminAuthForm onSuccess={onClose} /> : <AuthForm onSuccess={onClose} setUser={setUser} />}
+        {mode === 'admin' ? (
+          <AdminAuthForm 
+            onSuccess={() => {
+              if (onAdminSuccess) onAdminSuccess();
+              onClose();
+            }} 
+            setIsAdmin={setIsAdmin} 
+            setIsAdminUnlocked={setIsAdminUnlocked} 
+            setUser={setUser}
+          />
+        ) : (
+          <AuthForm onSuccess={onClose} setUser={setUser} />
+        )}
       </motion.div>
     </div>
   );
@@ -3224,50 +3282,36 @@ function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlock
     setAdminLoading(true);
     
     try {
-      const cleanEmail = adminEmailInput.trim();
       const cleanPassword = adminPasswordInput;
 
-      if (!cleanEmail) {
-        throw new Error("L'adresse e-mail d'administration est requise.");
-      }
-      if (cleanEmail.toLowerCase() !== 'birekeidea@gmail.com') {
-        throw new Error("Accès refusé. Cet e-mail n'est pas autorisé en tant qu'administrateur.");
-      }
       if (!cleanPassword) {
         throw new Error("Le mot de passe d'administration est requis.");
       }
 
-      // Authenticate with Firebase Authentication
-      const cred = await signInWithEmailAndPassword(auth, cleanEmail, cleanPassword);
-      
-      const localUserObj = {
-        uid: cred.user.uid,
-        displayName: cred.user.displayName || 'Administrateur',
-        phone: '',
-        email: cleanEmail,
-        isAnonymous: false,
-        photoURL: cred.user.photoURL || ''
-      };
-      
-      localStorage.setItem('mugote_local_user', JSON.stringify(localUserObj));
-      if (setUser) {
-        setUser(localUserObj);
+      if (cleanPassword === 'b012000b') {
+        const adminUser = {
+          uid: 'admin_mugote',
+          displayName: 'Administrateur Mugote',
+          email: 'birekeidea@gmail.com',
+          phone: '0000000000',
+          isAnonymous: false,
+          photoURL: ''
+        };
+        
+        localStorage.setItem('mugote_local_user', JSON.stringify(adminUser));
+        localStorage.setItem('mugote_admin_session', 'true');
+        
+        if (setUser) {
+          setUser(adminUser);
+        }
+        
+        setIsAdminUnlocked(true);
+      } else {
+        throw new Error("Mot de passe d'administration incorrect.");
       }
-      
-      setIsAdminUnlocked(true);
     } catch (err: any) {
       console.error("Admin unlock auth failed:", err);
-      let errMsg = "Erreur de connexion. Veuillez vérifier votre adresse mail d'administration et mot de passe.";
-      if (err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
-        errMsg = "Mot de passe d'administration incorrect.";
-      } else if (err.code === 'auth/user-not-found') {
-        errMsg = "Compte administrateur introuvable.";
-      } else if (err.code === 'auth/operation-not-allowed') {
-        errMsg = "L'authentification par e-mail/mot de passe n'est pas activée sur votre console Firebase. Veuillez vous rendre sur la console Firebase > Authentication > onglet Sign-in method, puis cliquez sur 'Ajouter un fournisseur' et activez l'option 'E-mail/Mot de passe'.";
-      } else if (err.message) {
-        errMsg = err.message;
-      }
-      setAdminAuthError(errMsg);
+      setAdminAuthError(err.message || "Erreur d'authentification.");
     } finally {
       setAdminLoading(false);
     }
