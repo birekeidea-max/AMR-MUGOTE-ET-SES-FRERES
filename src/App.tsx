@@ -431,7 +431,7 @@ export default function App() {
               displayName: localUser.displayName || 'Passager',
               phone: localUser.phone || '',
               photoURL: localUser.photoURL || '',
-              isAnonymous: true,
+              isAnonymous: localUser.isAnonymous ?? false,
               lastLogin: serverTimestamp(),
             }, { merge: true }).catch((err) => console.warn("Background user sync skipped:", err));
 
@@ -440,7 +440,7 @@ export default function App() {
               email: localUser.email || 'Anonyme',
               displayName: localUser.displayName || 'Passager',
               phone: localUser.phone || '',
-              isAnonymous: true,
+              isAnonymous: localUser.isAnonymous ?? false,
               lastLogin: serverTimestamp()
             }, { merge: true }).catch((err) => console.warn("Background users_list sync skipped:", err));
           }
@@ -515,6 +515,51 @@ export default function App() {
     });
     return () => unsub();
   }, []);
+
+  // Synchroniser automatiquement tout utilisateur connecté avec Firestore
+  useEffect(() => {
+    if (!user) return;
+    
+    // Si c'est l'administrateur de l'interface locale
+    if (user.uid === 'admin_mugote') return;
+
+    const runSync = async () => {
+      try {
+        const uid = user.uid;
+        const emailVal = user.email || 'Anonyme';
+        const displayName = user.displayName || 'Passager';
+        const phone = user.phone || '';
+        const isAnonymous = user.isAnonymous ?? true;
+
+        // Mise à jour de la collection 'users'
+        await setDoc(doc(db, 'users', uid), {
+          uid,
+          email: emailVal,
+          displayName,
+          phone,
+          isAnonymous,
+          lastLogin: serverTimestamp(),
+          photoURL: user.photoURL || ''
+        }, { merge: true });
+
+        // Mise à jour de la collection 'users_list' pour le tableau de bord de l'Admin
+        await setDoc(doc(db, 'users_list', uid), {
+          uid,
+          email: emailVal,
+          displayName,
+          phone,
+          isAnonymous,
+          lastLogin: serverTimestamp()
+        }, { merge: true });
+
+        console.log("Automatic Firestore user registration completed:", uid);
+      } catch (err) {
+        console.warn("Automatic Firestore user sync skipped or failed:", err);
+      }
+    };
+
+    runSync();
+  }, [user]);
 
   const login = () => setAuthModal({ isOpen: true, mode: 'user' });
   const logout = () => {
@@ -924,16 +969,12 @@ export default function App() {
 function UserLoginForm({ onSuccess, setUser }: { onSuccess: () => void, setUser?: (u: any) => void }) {
   const [tab, setTab] = useState<'phone' | 'email'>('phone');
   
-  // Phone/Name State
+  // Nom Complet & numéros
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   
-  // Email State
+  // Email
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [isSignUp, setIsSignUp] = useState(false);
-  const [signUpName, setSignUpName] = useState('');
-  const [signUpPhone, setSignUpPhone] = useState('');
   
   const [loading, setLoading] = useState(false);
   const [errorCode, setErrorCode] = useState<string | null>(null);
@@ -956,20 +997,39 @@ function UserLoginForm({ onSuccess, setUser }: { onSuccess: () => void, setUser?
 
     setLoading(true);
     try {
-      // Key the user specifically by phone number under "usr_PHONE"
-      // to avoid different users overwriting each other's credentials on the same device,
-      // and guarantee unique, stable records for every passenger in Firestore.
-      const uid = "usr_" + cleanPhone;
-      const emailVal = 'Anonyme';
-      
+      // Pour s’assurer que l’utilisateur est visible dans la console d’authentification de Firebase,
+      // on lui crée un identifiant Firebase Auth sous forme d’un e-mail virtuel stable
+      const pseudoEmail = `${cleanPhone}@mugote.com`;
+      const pseudoPassword = `phone_pass_${cleanPhone}`;
+      let cred;
+      let uid = "usr_" + cleanPhone; // Fallback d'identification stable si l'iframe bloque Firebase Auth
+      let authSuccess = false;
+
       try {
-        // Establish anonymous session optionally to satisfy underlying sign-in checks
-        await signInAnonymously(auth);
+        cred = await signInWithEmailAndPassword(auth, pseudoEmail, pseudoPassword);
+        uid = cred.user.uid;
+        authSuccess = true;
       } catch (authErr: any) {
-        console.warn("Firebase Auth anonymous session skipped or offline, continuing local record:", authErr);
+        console.warn("Tentative de connexion téléphonique échouée ou bloquée par réseau, tentative de création de compte :", authErr.message || authErr);
+        try {
+          cred = await createUserWithEmailAndPassword(auth, pseudoEmail, pseudoPassword);
+          uid = cred.user.uid;
+          authSuccess = true;
+        } catch (createErr: any) {
+          console.warn("Création de compte téléphonique de secours échouée ou bloquée par réseau :", createErr.message || createErr);
+        }
       }
 
-      // Persist credentials locally
+      if (cred?.user) {
+        try {
+          await updateProfile(cred.user, { displayName: cleanName });
+        } catch (profileErr) {
+          console.warn("Could not sync profile to Firebase Auth:", profileErr);
+        }
+      }
+
+      const emailVal = pseudoEmail;
+      
       localStorage.setItem('mugote_user_name', cleanName);
       localStorage.setItem('mugote_user_phone', cleanPhone);
       
@@ -978,8 +1038,9 @@ function UserLoginForm({ onSuccess, setUser }: { onSuccess: () => void, setUser?
         displayName: cleanName,
         phone: cleanPhone,
         email: emailVal,
-        isAnonymous: true,
-        photoURL: ''
+        isAnonymous: false,
+        photoURL: '',
+        isLocalSyncOnly: !authSuccess
       };
       
       localStorage.setItem('mugote_local_user', JSON.stringify(localUserObj));
@@ -987,30 +1048,41 @@ function UserLoginForm({ onSuccess, setUser }: { onSuccess: () => void, setUser?
         setUser(localUserObj);
       }
       
-      // Save user details directly to database synchronously to confirm it works
-      await setDoc(doc(db, 'users', uid), {
-        uid,
-        email: emailVal,
-        displayName: cleanName,
-        phone: cleanPhone,
-        photoURL: '',
-        isAnonymous: true,
-        lastLogin: serverTimestamp()
-      }, { merge: true });
+      // Enregistrer directement dans Firestore de manière synchrone pour garantir l’affichage instantané.
+      // Fonctionne via la règle Firestore 'usr_' même si Firebase Auth est bloqué par le navigateur.
+      try {
+        await setDoc(doc(db, 'users', uid), {
+          uid,
+          email: emailVal,
+          displayName: cleanName,
+          phone: cleanPhone,
+          photoURL: '',
+          isAnonymous: false,
+          lastLogin: serverTimestamp(),
+          isLocalSyncOnly: !authSuccess
+        }, { merge: true });
+      } catch (dbErr) {
+        console.warn("Could not sync phone user to main users collection in DB (offline or blocked rules):", dbErr);
+      }
 
-      await setDoc(doc(db, 'users_list', uid), {
-        uid,
-        email: emailVal,
-        displayName: cleanName,
-        phone: cleanPhone,
-        isAnonymous: true,
-        lastLogin: serverTimestamp()
-      }, { merge: true });
+      try {
+        await setDoc(doc(db, 'users_list', uid), {
+          uid,
+          email: emailVal,
+          displayName: cleanName,
+          phone: cleanPhone,
+          isAnonymous: false,
+          lastLogin: serverTimestamp(),
+          isLocalSyncOnly: !authSuccess
+        }, { merge: true });
+      } catch (dbErr) {
+        console.warn("Could not sync phone user to users_list collection in DB (offline or blocked rules):", dbErr);
+      }
       
-      console.log("Registered usr_ user successfully in Firestore database:", uid);
+      console.log("Registered phone user successfully in Firebase and/or Firestore:", uid, "Auth status:", authSuccess);
       onSuccess();
     } catch (err: any) {
-      console.error("General authentication failure:", err);
+      console.error("Phone authentication failure:", err);
       setErrorCode(err.message || "Impossible de se connecter.");
     } finally {
       setLoading(false);
@@ -1020,109 +1092,103 @@ function UserLoginForm({ onSuccess, setUser }: { onSuccess: () => void, setUser?
   const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorCode(null);
-    const cleanEmail = email.trim();
-    const cleanPassword = password.trim();
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanName = name.trim();
 
     if (!cleanEmail) {
       setErrorCode("L'adresse e-mail est requise.");
       return;
     }
-    if (cleanPassword.length < 6) {
-      setErrorCode("Le mot de passe doit contenir au moins 6 caractères.");
+    if (!cleanName || cleanName.length < 2) {
+      setErrorCode("Veuillez entrer un nom complet (au moins 2 lettres).");
       return;
     }
 
     setLoading(true);
     try {
+      // Pour s’assurer que l’utilisateur est visible dans la console d’authentification de firebase
+      // avec son nom et son e-mail, on lui crée/connecte un compte Firebase Auth silencieux
+      const pseudoPassword = `pwd_mugote_${cleanEmail}`;
       let cred;
-      let displayNameValue = '';
-      let phoneValue = '';
+      const cleanEmailKey = cleanEmail.replace(/[^a-zA-Z0-9]/g, '_');
+      let uid = `usr_email_${cleanEmailKey}`; // Fallback stable UID
+      let authSuccess = false;
 
-      if (isSignUp) {
-        const cleanRegisterName = signUpName.trim();
-        const cleanRegisterPhone = signUpPhone.trim().replace(/[\s\-\(\)\.]/g, '');
-
-        if (!cleanRegisterName || cleanRegisterName.length < 2) {
-          setErrorCode("Veuillez entrer un nom valide pour l'inscription.");
-          setLoading(false);
-          return;
-        }
-
-        cred = await createUserWithEmailAndPassword(auth, cleanEmail, cleanPassword);
-        displayNameValue = cleanRegisterName;
-        phoneValue = cleanRegisterPhone;
-        await updateProfile(cred.user, { displayName: displayNameValue });
-      } else {
-        cred = await signInWithEmailAndPassword(auth, cleanEmail, cleanPassword);
-        
-        // Fetch existing database record to get their stored details
+      try {
+        cred = await signInWithEmailAndPassword(auth, cleanEmail, pseudoPassword);
+        uid = cred.user.uid;
+        authSuccess = true;
+      } catch (authErr: any) {
+        console.warn("Connexion email silencieuse échouée ou bloquée (réseau/iframe), tentative de création automatique :", authErr.message || authErr);
         try {
-          const uDoc = await getDoc(doc(db, 'users', cred.user.uid));
-          if (uDoc.exists()) {
-            displayNameValue = uDoc.data().displayName || cred.user.displayName || 'Voyageur';
-            phoneValue = uDoc.data().phone || '';
-          } else {
-            displayNameValue = cred.user.displayName || 'Voyageur';
-          }
-        } catch (dbErr) {
-          console.warn("Could not retrieve user doc from DB:", dbErr);
-          displayNameValue = cred.user.displayName || 'Voyageur';
+          cred = await createUserWithEmailAndPassword(auth, cleanEmail, pseudoPassword);
+          uid = cred.user.uid;
+          authSuccess = true;
+        } catch (createErr: any) {
+          console.warn("Création email de secours échouée ou bloquée par réseau :", createErr.message || createErr);
         }
       }
 
-      const uid = cred.user.uid;
+      if (cred?.user) {
+        try {
+          await updateProfile(cred.user, { displayName: cleanName });
+        } catch (profileErr) {
+          console.warn("Could not sync profile to Firebase Auth:", profileErr);
+        }
+      }
+
       const localUserObj = {
         uid,
-        displayName: displayNameValue,
-        phone: phoneValue,
+        displayName: cleanName,
+        phone: '',
         email: cleanEmail,
         isAnonymous: false,
-        photoURL: cred.user.photoURL || ''
+        photoURL: cred?.user?.photoURL || '',
+        isLocalSyncOnly: !authSuccess
       };
 
-      localStorage.setItem('mugote_user_name', displayNameValue);
-      if (phoneValue) {
-        localStorage.setItem('mugote_user_phone', phoneValue);
-      }
+      localStorage.setItem('mugote_user_name', cleanName);
       localStorage.setItem('mugote_local_user', JSON.stringify(localUserObj));
       if (setUser) {
         setUser(localUserObj);
       }
 
-      // Live Firestore syncing for both collections asynchronously in background
-      setDoc(doc(db, 'users', uid), {
-        uid,
-        email: cleanEmail,
-        displayName: displayNameValue,
-        phone: phoneValue,
-        photoURL: cred.user.photoURL || '',
-        isAnonymous: false,
-        lastLogin: serverTimestamp()
-      }, { merge: true }).catch(err => console.error("Database users sync failed:", err));
+      // Enregistrer directement dans Firestore de manière synchrone pour garantir l’affichage instantané.
+      // Fonctionne via la règle Firestore 'usr_' même si Firebase Auth est bloqué par le navigateur.
+      try {
+        await setDoc(doc(db, 'users', uid), {
+          uid,
+          email: cleanEmail,
+          displayName: cleanName,
+          phone: '',
+          photoURL: cred?.user?.photoURL || '',
+          isAnonymous: false,
+          lastLogin: serverTimestamp(),
+          isLocalSyncOnly: !authSuccess
+        }, { merge: true });
+      } catch (dbErr) {
+        console.warn("Could not sync email user to main users collection in DB (offline or blocked rules):", dbErr);
+      }
 
-      setDoc(doc(db, 'users_list', uid), {
-        uid: cleanEmail, // keep list key aligned
-        email: cleanEmail,
-        displayName: displayNameValue,
-        phone: phoneValue,
-        isAnonymous: false,
-        lastLogin: serverTimestamp()
-      }, { merge: true }).catch(err => console.error("Database users_list sync failed:", err));
+      try {
+        await setDoc(doc(db, 'users_list', uid), {
+          uid,
+          email: cleanEmail,
+          displayName: cleanName,
+          phone: '',
+          isAnonymous: false,
+          lastLogin: serverTimestamp(),
+          isLocalSyncOnly: !authSuccess
+        }, { merge: true });
+      } catch (dbErr) {
+        console.warn("Could not sync email user to users_list collection in DB (offline or blocked rules):", dbErr);
+      }
 
-      console.log("Registered or logged email user successfully in background:", uid);
+      console.log("Logged in passwordless email user successfully:", uid, "Auth successful:", authSuccess);
       onSuccess();
     } catch (err: any) {
-      console.error("Email authentication failed:", err);
+      console.error("Email passwordless authentication failure:", err);
       let errMsg = err.message || "Erreur lors de l'authentification.";
-      if (err.code === 'auth/email-already-in-use') {
-        errMsg = "Cette adresse e-mail est déjà utilisée par un autre compte.";
-      } else if (err.code === 'auth/invalid-credential' || err.code === 'auth/wrong-password' || err.code === 'auth/user-not-found') {
-        errMsg = "Adresse e-mail ou mot de passe incorrect.";
-      } else if (err.code === 'auth/weak-password') {
-        errMsg = "Le mot de passe choisi est trop faible (6 caractères minimum).";
-      } else if (err.code === 'auth/operation-not-allowed') {
-        errMsg = "L'authentification par e-mail/mot de passe n'est pas activée sur la console Firebase de ce projet (Authentication > Sign-in method). Veuillez contacter l'administrateur.";
-      }
       setErrorCode(errMsg);
     } finally {
       setLoading(false);
@@ -1158,8 +1224,8 @@ function UserLoginForm({ onSuccess, setUser }: { onSuccess: () => void, setUser?
         setUser(localUserObj);
       }
       
-      // Attempt background Firestore registration asynchronously
-      setDoc(doc(db, 'users', cred.user.uid), {
+      // Enregistrer directement dans Firestore de manière synchrone pour garantir l’affichage instantané
+      await setDoc(doc(db, 'users', cred.user.uid), {
         uid: cred.user.uid,
         email: emailVal,
         displayName: nameVal,
@@ -1167,17 +1233,18 @@ function UserLoginForm({ onSuccess, setUser }: { onSuccess: () => void, setUser?
         photoURL: cred.user.photoURL || '',
         isAnonymous: false,
         lastLogin: serverTimestamp()
-      }, { merge: true }).catch(err => console.warn("Database Google session syncing users error:", err));
+      }, { merge: true });
 
-      setDoc(doc(db, 'users_list', cred.user.uid), {
+      await setDoc(doc(db, 'users_list', cred.user.uid), {
         uid: cred.user.uid,
         email: emailVal,
         displayName: nameVal,
         phone: '',
         isAnonymous: false,
         lastLogin: serverTimestamp()
-      }, { merge: true }).catch(err => console.warn("Database Google session syncing users_list error:", err));
+      }, { merge: true });
       
+      console.log("Registered or logged Google user successfully:", cred.user.uid);
       onSuccess();
     } catch (err: any) {
       console.error("Google authentication failed:", err);
@@ -1194,7 +1261,7 @@ function UserLoginForm({ onSuccess, setUser }: { onSuccess: () => void, setUser?
   return (
     <div className="space-y-6">
       {/* Tab Selector */}
-      <div className="flex bg-slate-100 p-1 rounded-2xl border border-slate-200/50 mb-6">
+      <div className="flex bg-slate-100 p-1 rounded-2xl border border-slate-200/50 mb-6 font-sans">
         <button
           type="button"
           onClick={() => { setTab('phone'); setErrorCode(null); }}
@@ -1217,7 +1284,7 @@ function UserLoginForm({ onSuccess, setUser }: { onSuccess: () => void, setUser?
           }`}
         >
           <Mail size={12} />
-          Email & Passe
+          Email (Sans Passe)
         </button>
       </div>
 
@@ -1252,15 +1319,31 @@ function UserLoginForm({ onSuccess, setUser }: { onSuccess: () => void, setUser?
           </div>
 
           {errorCode && (
-            <div className="p-4 bg-rose-50 border border-rose-100 rounded-xl">
-              <p className="text-rose-500 text-[10px] font-bold uppercase tracking-wider leading-relaxed text-left">{errorCode}</p>
+            <div className="p-4 bg-rose-50 border border-rose-150 rounded-2xl space-y-2">
+              <div className="text-rose-600 text-[10px] font-bold uppercase tracking-wider leading-relaxed text-left">
+                {errorCode.includes('network-request-failed') || errorCode.toLowerCase().includes('network') ? (
+                  <>
+                    <span className="block font-black text-rose-800 mb-1">⚠️ Restriction Sécuritaire de l'Iframe</span>
+                    L'aperçu AI Studio interdit les requêtes sécurisées de connexion tiers. Ouvrez l'application dans un nouvel onglet pour contourner ce blocage.
+                    <button 
+                      type="button" 
+                      onClick={() => window.open(window.location.origin + window.location.pathname, '_blank')}
+                      className="block mt-2 font-black text-maritime hover:text-black hover:underline cursor-pointer uppercase text-[9px] tracking-wider"
+                    >
+                      👉 Ouvrir l'application dans un nouvel onglet
+                    </button>
+                  </>
+                ) : (
+                  errorCode
+                )}
+              </div>
             </div>
           )}
 
           <button 
             type="submit"
             disabled={loading}
-            className="w-full py-5 bg-maritime text-white font-black rounded-2xl uppercase tracking-[0.25em] text-[10px] sm:text-xs shadow-xl shadow-maritime/20 hover:bg-black transform active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer animate-fade-in"
+            className="w-full py-5 bg-maritime text-white font-black rounded-2xl uppercase tracking-[0.25em] text-[10px] sm:text-xs shadow-xl shadow-maritime/20 hover:bg-black transform active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer animate-fade-in animate-pulse"
           >
             {loading ? (
               <>
@@ -1276,43 +1359,24 @@ function UserLoginForm({ onSuccess, setUser }: { onSuccess: () => void, setUser?
           </button>
         </form>
       ) : (
-        /* Email & Password Form */
+        /* Email passwordless Form */
         <form onSubmit={handleEmailAuth} className="space-y-6 text-left">
-          {isSignUp && (
-            <>
-              <div>
-                <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 ml-1">
-                  Nom Complet
-                </label>
-                <div className="relative">
-                  <span className="absolute left-5 top-4.5 text-slate-300"><User size={16} /></span>
-                  <input 
-                    required
-                    type="text" 
-                    value={signUpName} 
-                    onChange={e => setSignUpName(e.target.value)}
-                    className="w-full pl-12 pr-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl focus:outline-none focus:ring-2 ring-maritime/5 text-sm font-bold uppercase tracking-wide placeholder-slate-300"
-                    placeholder="Ex: JEAN LOKO"
-                  />
-                </div>
-              </div>
-              <div>
-                <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 ml-1">
-                  Téléphone (Facultatif mais recommandé)
-                </label>
-                <div className="relative">
-                  <span className="absolute left-5 top-4.5 text-slate-300"><Phone size={16} /></span>
-                  <input 
-                    type="text" 
-                    value={signUpPhone} 
-                    onChange={e => setSignUpPhone(e.target.value)}
-                    className="w-full pl-12 pr-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl focus:outline-none focus:ring-2 ring-maritime/5 text-sm font-bold font-mono tracking-wider placeholder-slate-300"
-                    placeholder="Ex: 0991234567"
-                  />
-                </div>
-              </div>
-            </>
-          )}
+          <div>
+            <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 ml-1">
+              Votre Nom Complet (Nom & Post-nom)
+            </label>
+            <div className="relative">
+              <span className="absolute left-5 top-4.5 text-slate-300"><User size={16} /></span>
+              <input 
+                required
+                type="text" 
+                value={name} 
+                onChange={e => setName(e.target.value)}
+                className="w-full pl-12 pr-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl focus:outline-none focus:ring-2 ring-maritime/5 text-sm font-bold uppercase tracking-wide placeholder-slate-300"
+                placeholder="Ex: JEAN LOKO"
+              />
+            </div>
+          </div>
 
           <div>
             <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 ml-1">
@@ -1331,33 +1395,32 @@ function UserLoginForm({ onSuccess, setUser }: { onSuccess: () => void, setUser?
             </div>
           </div>
 
-          <div>
-            <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 ml-1">
-              Mot de passe (Min. 6 caractères)
-            </label>
-            <div className="relative">
-              <span className="absolute left-5 top-4.5 text-slate-300"><Lock size={16} /></span>
-              <input 
-                required
-                type="password" 
-                value={password} 
-                onChange={e => setPassword(e.target.value)}
-                className="w-full pl-12 pr-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl focus:outline-none focus:ring-2 ring-maritime/5 text-sm font-bold placeholder-slate-300"
-                placeholder="••••••"
-              />
-            </div>
-          </div>
-
           {errorCode && (
-            <div className="p-4 bg-rose-50 border border-rose-100 rounded-xl">
-              <p className="text-rose-500 text-[10px] font-bold uppercase tracking-wider leading-relaxed text-left">{errorCode}</p>
+            <div className="p-4 bg-rose-50 border border-rose-150 rounded-2xl space-y-2">
+              <div className="text-rose-600 text-[10px] font-bold uppercase tracking-wider leading-relaxed text-left">
+                {errorCode.includes('network-request-failed') || errorCode.toLowerCase().includes('network') ? (
+                  <>
+                    <span className="block font-black text-rose-800 mb-1">⚠️ Restriction Sécuritaire de l'Iframe</span>
+                    L'aperçu AI Studio interdit les requêtes sécurisées de connexion tiers. Ouvrez l'application dans un nouvel onglet pour contourner ce blocage.
+                    <button 
+                      type="button" 
+                      onClick={() => window.open(window.location.origin + window.location.pathname, '_blank')}
+                      className="block mt-2 font-black text-maritime hover:text-black hover:underline cursor-pointer uppercase text-[9px] tracking-wider"
+                    >
+                      👉 Ouvrir l'application dans un nouvel onglet
+                    </button>
+                  </>
+                ) : (
+                  errorCode
+                )}
+              </div>
             </div>
           )}
 
           <button 
             type="submit"
             disabled={loading}
-            className="w-full py-5 bg-maritime text-white font-black rounded-2xl uppercase tracking-[0.25em] text-[10px] sm:text-xs shadow-xl shadow-maritime/20 hover:bg-black transform active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer animate-fade-in"
+            className="w-full py-5 bg-maritime text-white font-black rounded-2xl uppercase tracking-[0.25em] text-[10px] sm:text-xs shadow-xl shadow-maritime/20 hover:bg-black transform active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer animate-fade-in animate-pulse"
           >
             {loading ? (
               <>
@@ -1366,21 +1429,11 @@ function UserLoginForm({ onSuccess, setUser }: { onSuccess: () => void, setUser?
               </>
             ) : (
               <>
-                {isSignUp ? "Créer mon Compte" : "Se Connecter par Email"}
+                Se Connecter par Email
                 <ChevronRight size={14} />
               </>
             )}
           </button>
-
-          <div className="text-center pt-2">
-            <button
-              type="button"
-              onClick={() => { setIsSignUp(!isSignUp); setErrorCode(null); }}
-              className="text-[10px] font-black uppercase tracking-widest text-maritime hover:underline"
-            >
-              {isSignUp ? "Déjà inscrit ? Connectez-vous" : "Nouveau passager ? Créez un compte"}
-            </button>
-          </div>
         </form>
       )}
 
@@ -1492,6 +1545,23 @@ function AdminAuthForm({ onSuccess, setIsAdmin, setIsAdminUnlocked, setUser }: {
     setError(null);
     try {
       if (password === 'b012000b') {
+        // Authentifier également en arrière-plan avec Firebase Auth pour accorder les privilèges Firestore
+        try {
+          await signInWithEmailAndPassword(auth, 'birekeidea@gmail.com', 'b012000b');
+          console.log("Firebase Auth admin session initiated successfully.");
+        } catch (authErr: any) {
+          if (authErr.code === 'auth/user-not-found') {
+            try {
+              await createUserWithEmailAndPassword(auth, 'birekeidea@gmail.com', 'b012000b');
+              console.log("Firebase Auth admin account created successfully.");
+            } catch (signUpErr) {
+              console.warn("Could not automatically sign up admin in Firestore:", signUpErr);
+            }
+          } else {
+            console.warn("Underlying Firebase Auth admin sign-in skipped:", authErr);
+          }
+        }
+
         const adminUser = {
           uid: 'admin_mugote',
           displayName: 'Administrateur Mugote',
@@ -3289,6 +3359,23 @@ function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlock
       }
 
       if (cleanPassword === 'b012000b') {
+        // Authentifier également en arrière-plan avec Firebase Auth pour accorder les privilèges Firestore
+        try {
+          await signInWithEmailAndPassword(auth, 'birekeidea@gmail.com', 'b012000b');
+          console.log("Firebase Auth admin session initiated successfully.");
+        } catch (authErr: any) {
+          if (authErr.code === 'auth/user-not-found') {
+            try {
+              await createUserWithEmailAndPassword(auth, 'birekeidea@gmail.com', 'b012000b');
+              console.log("Firebase Auth admin account created successfully.");
+            } catch (signUpErr) {
+              console.warn("Could not automatically sign up admin in Firestore:", signUpErr);
+            }
+          } else {
+            console.warn("Underlying Firebase Auth admin sign-in skipped:", authErr);
+          }
+        }
+
         const adminUser = {
           uid: 'admin_mugote',
           displayName: 'Administrateur Mugote',
