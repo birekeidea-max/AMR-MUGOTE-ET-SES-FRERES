@@ -967,127 +967,12 @@ export default function App() {
 }
 
 function UserLoginForm({ onSuccess, setUser }: { onSuccess: () => void, setUser?: (u: any) => void }) {
-  const [tab, setTab] = useState<'phone' | 'email'>('phone');
-  
-  // Nom Complet & numéros
+  // Nom Complet & Email
   const [name, setName] = useState('');
-  const [phone, setPhone] = useState('');
-  
-  // Email
   const [email, setEmail] = useState('');
   
   const [loading, setLoading] = useState(false);
   const [errorCode, setErrorCode] = useState<string | null>(null);
-
-  const handlePhoneLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setErrorCode(null);
-    const cleanName = name.trim();
-    const cleanPhone = phone.trim().replace(/[\s\-\(\)\.]/g, '');
-
-    if (!cleanName || cleanName.length < 2) {
-      setErrorCode("Veuillez entrer un nom valide (au moins 2 lettres).");
-      return;
-    }
-
-    if (!cleanPhone || cleanPhone.length < 7) {
-      setErrorCode("Un numéro de téléphone valide est requis (au moins 7 chiffres, ex: 0991234567).");
-      return;
-    }
-
-    setLoading(true);
-    try {
-      // Pour s’assurer que l’utilisateur est visible dans la console d’authentification de Firebase,
-      // on lui crée un identifiant Firebase Auth sous forme d’un e-mail virtuel stable
-      const pseudoEmail = `${cleanPhone}@mugote.com`;
-      const pseudoPassword = `phone_pass_${cleanPhone}`;
-      let cred;
-      let uid = "usr_" + cleanPhone; // Fallback d'identification stable si l'iframe bloque Firebase Auth
-      let authSuccess = false;
-
-      try {
-        cred = await signInWithEmailAndPassword(auth, pseudoEmail, pseudoPassword);
-        uid = cred.user.uid;
-        authSuccess = true;
-      } catch (authErr: any) {
-        console.warn("Tentative de connexion téléphonique échouée ou bloquée par réseau, tentative de création de compte :", authErr.message || authErr);
-        try {
-          cred = await createUserWithEmailAndPassword(auth, pseudoEmail, pseudoPassword);
-          uid = cred.user.uid;
-          authSuccess = true;
-        } catch (createErr: any) {
-          console.warn("Création de compte téléphonique de secours échouée ou bloquée par réseau :", createErr.message || createErr);
-        }
-      }
-
-      if (cred?.user) {
-        try {
-          await updateProfile(cred.user, { displayName: cleanName });
-        } catch (profileErr) {
-          console.warn("Could not sync profile to Firebase Auth:", profileErr);
-        }
-      }
-
-      const emailVal = pseudoEmail;
-      
-      localStorage.setItem('mugote_user_name', cleanName);
-      localStorage.setItem('mugote_user_phone', cleanPhone);
-      
-      const localUserObj = {
-        uid,
-        displayName: cleanName,
-        phone: cleanPhone,
-        email: emailVal,
-        isAnonymous: false,
-        photoURL: '',
-        isLocalSyncOnly: !authSuccess
-      };
-      
-      localStorage.setItem('mugote_local_user', JSON.stringify(localUserObj));
-      if (setUser) {
-        setUser(localUserObj);
-      }
-      
-      // Enregistrer directement dans Firestore de manière synchrone pour garantir l’affichage instantané.
-      // Fonctionne via la règle Firestore 'usr_' même si Firebase Auth est bloqué par le navigateur.
-      try {
-        await setDoc(doc(db, 'users', uid), {
-          uid,
-          email: emailVal,
-          displayName: cleanName,
-          phone: cleanPhone,
-          photoURL: '',
-          isAnonymous: false,
-          lastLogin: serverTimestamp(),
-          isLocalSyncOnly: !authSuccess
-        }, { merge: true });
-      } catch (dbErr) {
-        console.warn("Could not sync phone user to main users collection in DB (offline or blocked rules):", dbErr);
-      }
-
-      try {
-        await setDoc(doc(db, 'users_list', uid), {
-          uid,
-          email: emailVal,
-          displayName: cleanName,
-          phone: cleanPhone,
-          isAnonymous: false,
-          lastLogin: serverTimestamp(),
-          isLocalSyncOnly: !authSuccess
-        }, { merge: true });
-      } catch (dbErr) {
-        console.warn("Could not sync phone user to users_list collection in DB (offline or blocked rules):", dbErr);
-      }
-      
-      console.log("Registered phone user successfully in Firebase and/or Firestore:", uid, "Auth status:", authSuccess);
-      onSuccess();
-    } catch (err: any) {
-      console.error("Phone authentication failure:", err);
-      setErrorCode(err.message || "Impossible de se connecter.");
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1105,27 +990,27 @@ function UserLoginForm({ onSuccess, setUser }: { onSuccess: () => void, setUser?
     }
 
     setLoading(true);
+    let authSuccess = false;
     try {
-      // Pour s’assurer que l’utilisateur est visible dans la console d’authentification de firebase
-      // avec son nom et son e-mail, on lui crée/connecte un compte Firebase Auth silencieux
+      // Compte Firebase Auth silencieux (email-passwordless)
       const pseudoPassword = `pwd_mugote_${cleanEmail}`;
       let cred;
       const cleanEmailKey = cleanEmail.replace(/[^a-zA-Z0-9]/g, '_');
-      let uid = `usr_email_${cleanEmailKey}`; // Fallback stable UID
-      let authSuccess = false;
+      let uid = `usr_email_${cleanEmailKey}`;
 
       try {
         cred = await signInWithEmailAndPassword(auth, cleanEmail, pseudoPassword);
         uid = cred.user.uid;
         authSuccess = true;
       } catch (authErr: any) {
-        console.warn("Connexion email silencieuse échouée ou bloquée (réseau/iframe), tentative de création automatique :", authErr.message || authErr);
+        console.warn("Connexion email silencieuse échouée, tentative de création automatique :", authErr.message || authErr);
         try {
           cred = await createUserWithEmailAndPassword(auth, cleanEmail, pseudoPassword);
           uid = cred.user.uid;
           authSuccess = true;
         } catch (createErr: any) {
-          console.warn("Création email de secours échouée ou bloquée par réseau :", createErr.message || createErr);
+          console.error("La création/connexion avec Firebase Auth a échoué :", createErr);
+          throw createErr;
         }
       }
 
@@ -1144,7 +1029,7 @@ function UserLoginForm({ onSuccess, setUser }: { onSuccess: () => void, setUser?
         email: cleanEmail,
         isAnonymous: false,
         photoURL: cred?.user?.photoURL || '',
-        isLocalSyncOnly: !authSuccess
+        isLocalSyncOnly: false
       };
 
       localStorage.setItem('mugote_user_name', cleanName);
@@ -1153,8 +1038,7 @@ function UserLoginForm({ onSuccess, setUser }: { onSuccess: () => void, setUser?
         setUser(localUserObj);
       }
 
-      // Enregistrer directement dans Firestore de manière synchrone pour garantir l’affichage instantané.
-      // Fonctionne via la règle Firestore 'usr_' même si Firebase Auth est bloqué par le navigateur.
+      // Enregistrer directement dans Firestore
       try {
         await setDoc(doc(db, 'users', uid), {
           uid,
@@ -1164,10 +1048,10 @@ function UserLoginForm({ onSuccess, setUser }: { onSuccess: () => void, setUser?
           photoURL: cred?.user?.photoURL || '',
           isAnonymous: false,
           lastLogin: serverTimestamp(),
-          isLocalSyncOnly: !authSuccess
+          isLocalSyncOnly: false
         }, { merge: true });
       } catch (dbErr) {
-        console.warn("Could not sync email user to main users collection in DB (offline or blocked rules):", dbErr);
+        console.warn("Could not sync email user to main users collection in DB:", dbErr);
       }
 
       try {
@@ -1178,17 +1062,20 @@ function UserLoginForm({ onSuccess, setUser }: { onSuccess: () => void, setUser?
           phone: '',
           isAnonymous: false,
           lastLogin: serverTimestamp(),
-          isLocalSyncOnly: !authSuccess
+          isLocalSyncOnly: false
         }, { merge: true });
       } catch (dbErr) {
-        console.warn("Could not sync email user to users_list collection in DB (offline or blocked rules):", dbErr);
+        console.warn("Could not sync email user to users_list collection in DB:", dbErr);
       }
 
-      console.log("Logged in passwordless email user successfully:", uid, "Auth successful:", authSuccess);
+      console.log("Logged in passwordless email user successfully:", uid);
       onSuccess();
     } catch (err: any) {
       console.error("Email passwordless authentication failure:", err);
-      let errMsg = err.message || "Erreur lors de l'authentification.";
+      let errMsg = err.message || "Erreur d'authentification.";
+      if (err.code === 'auth/network-request-failed' || err.message?.includes('network-request-failed')) {
+        errMsg = "network-request-failed";
+      }
       setErrorCode(errMsg);
     } finally {
       setLoading(false);
@@ -1224,32 +1111,46 @@ function UserLoginForm({ onSuccess, setUser }: { onSuccess: () => void, setUser?
         setUser(localUserObj);
       }
       
-      // Enregistrer directement dans Firestore de manière synchrone pour garantir l’affichage instantané
-      await setDoc(doc(db, 'users', cred.user.uid), {
-        uid: cred.user.uid,
-        email: emailVal,
-        displayName: nameVal,
-        phone: '',
-        photoURL: cred.user.photoURL || '',
-        isAnonymous: false,
-        lastLogin: serverTimestamp()
-      }, { merge: true });
+      try {
+        await setDoc(doc(db, 'users', cred.user.uid), {
+          uid: cred.user.uid,
+          email: emailVal,
+          displayName: nameVal,
+          phone: '',
+          photoURL: cred.user.photoURL || '',
+          isAnonymous: false,
+          lastLogin: serverTimestamp()
+        }, { merge: true });
 
-      await setDoc(doc(db, 'users_list', cred.user.uid), {
-        uid: cred.user.uid,
-        email: emailVal,
-        displayName: nameVal,
-        phone: '',
-        isAnonymous: false,
-        lastLogin: serverTimestamp()
-      }, { merge: true });
+        await setDoc(doc(db, 'users_list', cred.user.uid), {
+          uid: cred.user.uid,
+          email: emailVal,
+          displayName: nameVal,
+          phone: '',
+          isAnonymous: false,
+          lastLogin: serverTimestamp()
+        }, { merge: true });
+      } catch (dbErr) {
+        console.warn("Did not sync authenticated Google user to Firestore (non-blocking):", dbErr);
+      }
       
       console.log("Registered or logged Google user successfully:", cred.user.uid);
       onSuccess();
     } catch (err: any) {
       console.error("Google authentication failed:", err);
-      if (err.code === 'auth/popup-blocked') {
-        setErrorCode("Le popup de connexion Google a été bloqué par votre navigateur. Veuillez autoriser les popups pour ce site ou ouvrir l'application dans un nouvel onglet.");
+      const isIframeOrPopupError = 
+        err.code === 'auth/popup-blocked' || 
+        err.code === 'auth/popup-closed-by-user' || 
+        err.message?.includes('popup-closed-by-user') ||
+        err.message?.includes('Pending promise was never set') ||
+        err.message?.includes('network-request-failed') ||
+        err.code?.includes('network-request-failed') ||
+        err.message?.includes('INTERNAL ASSERTION');
+        
+      if (isIframeOrPopupError) {
+        setErrorCode("REGRETS_IFRAME_GOOGLE_AUTH");
+      } else if (err.code === 'auth/popup-blocked') {
+        setErrorCode("Le popup de connexion Google a été bloqué par votre navigateur. Veuillez autoriser les popups ou ouvrir l'application dans un nouvel onglet.");
       } else {
         setErrorCode(err.message || "Impossible de se connecter via Google.");
       }
@@ -1260,182 +1161,82 @@ function UserLoginForm({ onSuccess, setUser }: { onSuccess: () => void, setUser?
 
   return (
     <div className="space-y-6">
-      {/* Tab Selector */}
-      <div className="flex bg-slate-100 p-1 rounded-2xl border border-slate-200/50 mb-6 font-sans">
-        <button
-          type="button"
-          onClick={() => { setTab('phone'); setErrorCode(null); }}
-          className={`flex-1 py-3 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all flex items-center justify-center gap-2 ${
-            tab === 'phone'
-              ? 'bg-white text-maritime shadow-sm font-black'
-              : 'text-slate-500 hover:text-slate-800'
-          }`}
-        >
-          <Phone size={12} />
-          Nom & Téléphone
-        </button>
-        <button
-          type="button"
-          onClick={() => { setTab('email'); setErrorCode(null); }}
-          className={`flex-1 py-3 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all flex items-center justify-center gap-2 ${
-            tab === 'email'
-              ? 'bg-white text-maritime shadow-sm font-black'
-              : 'text-slate-500 hover:text-slate-800'
-          }`}
-        >
-          <Mail size={12} />
-          Email (Sans Passe)
-        </button>
-      </div>
-
-      {tab === 'phone' ? (
-        /* Traditional Name & Phone Form */
-        <form onSubmit={handlePhoneLogin} className="space-y-6 text-left">
-          <div>
-            <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 ml-1">
-              Votre Nom Complet (Nom & Post-nom)
-            </label>
+      {/* Email passwordless Form */}
+      <form onSubmit={handleEmailAuth} className="space-y-6 text-left">
+        <div>
+          <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 ml-1">
+            Votre Nom Complet (Nom & Post-nom)
+          </label>
+          <div className="relative">
+            <span className="absolute left-5 top-4.5 text-slate-300"><User size={16} /></span>
             <input 
               required
               type="text" 
               value={name} 
               onChange={e => setName(e.target.value)}
-              className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl focus:outline-none focus:ring-2 ring-maritime/5 text-sm font-bold uppercase tracking-wide placeholder-slate-300"
-              placeholder="Ex: LANDRY MUGOTE"
+              className="w-full pl-12 pr-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl focus:outline-none focus:ring-2 ring-maritime/5 text-sm font-bold uppercase tracking-wide placeholder-slate-300"
+              placeholder="Ex: JEAN LOKO"
             />
           </div>
-          <div>
-            <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 ml-1">
-              Votre Numéro de Téléphone
-            </label>
+        </div>
+
+        <div>
+          <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 ml-1">
+            Adresse E-mail
+          </label>
+          <div className="relative">
+            <span className="absolute left-5 top-4.5 text-slate-300"><Mail size={16} /></span>
             <input 
               required
-              type="text" 
-              value={phone} 
-              onChange={e => setPhone(e.target.value)}
-              className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl focus:outline-none focus:ring-2 ring-maritime/5 text-sm font-bold font-mono tracking-wider placeholder-slate-300"
-              placeholder="Ex: 0991234567"
+              type="email" 
+              value={email} 
+              onChange={e => setEmail(e.target.value)}
+              className="w-full pl-12 pr-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl focus:outline-none focus:ring-2 ring-maritime/5 text-sm font-bold placeholder-slate-300"
+              placeholder="voyageur@compagnie.com"
             />
           </div>
+        </div>
 
-          {errorCode && (
-            <div className="p-4 bg-rose-50 border border-rose-150 rounded-2xl space-y-2">
-              <div className="text-rose-600 text-[10px] font-bold uppercase tracking-wider leading-relaxed text-left">
-                {errorCode.includes('network-request-failed') || errorCode.toLowerCase().includes('network') ? (
-                  <>
-                    <span className="block font-black text-rose-800 mb-1">⚠️ Restriction Sécuritaire de l'Iframe</span>
-                    L'aperçu AI Studio interdit les requêtes sécurisées de connexion tiers. Ouvrez l'application dans un nouvel onglet pour contourner ce blocage.
-                    <button 
-                      type="button" 
-                      onClick={() => window.open(window.location.origin + window.location.pathname, '_blank')}
-                      className="block mt-2 font-black text-maritime hover:text-black hover:underline cursor-pointer uppercase text-[9px] tracking-wider"
-                    >
-                      👉 Ouvrir l'application dans un nouvel onglet
-                    </button>
-                  </>
-                ) : (
-                  errorCode
-                )}
-              </div>
-            </div>
-          )}
-
-          <button 
-            type="submit"
-            disabled={loading}
-            className="w-full py-5 bg-maritime text-white font-black rounded-2xl uppercase tracking-[0.25em] text-[10px] sm:text-xs shadow-xl shadow-maritime/20 hover:bg-black transform active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer animate-fade-in animate-pulse"
-          >
-            {loading ? (
-              <>
-                <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1, ease: 'linear' }} className="border-2 border-white/35 border-t-white w-4 h-4 rounded-full" />
-                Accès en cours...
-              </>
-            ) : (
-              <>
-                Se Connecter par Nom/Tél
-                <ChevronRight size={14} />
-              </>
-            )}
-          </button>
-        </form>
-      ) : (
-        /* Email passwordless Form */
-        <form onSubmit={handleEmailAuth} className="space-y-6 text-left">
-          <div>
-            <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 ml-1">
-              Votre Nom Complet (Nom & Post-nom)
-            </label>
-            <div className="relative">
-              <span className="absolute left-5 top-4.5 text-slate-300"><User size={16} /></span>
-              <input 
-                required
-                type="text" 
-                value={name} 
-                onChange={e => setName(e.target.value)}
-                className="w-full pl-12 pr-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl focus:outline-none focus:ring-2 ring-maritime/5 text-sm font-bold uppercase tracking-wide placeholder-slate-300"
-                placeholder="Ex: JEAN LOKO"
-              />
+        {errorCode && (
+          <div className="p-4 bg-rose-50 border border-rose-150 rounded-2xl space-y-2">
+            <div className="text-rose-600 text-[10px] font-bold uppercase tracking-wider leading-relaxed text-left">
+              {errorCode.includes('network-request-failed') || errorCode.toLowerCase().includes('network') ? (
+                <>
+                  <span className="block font-black text-rose-800 mb-1">⚠️ Restriction Sécuritaire de l'Iframe</span>
+                  L'aperçu AI Studio interdit les requêtes sécurisées de connexion tiers. Ouvrez l'application dans un nouvel onglet pour contourner ce blocage.
+                  <button 
+                    type="button" 
+                    onClick={() => window.open(window.location.origin + window.location.pathname, '_blank')}
+                    className="block mt-2 font-black text-maritime hover:text-black hover:underline cursor-pointer uppercase text-[9px] tracking-wider"
+                  >
+                    👉 Ouvrir l'application dans un nouvel onglet
+                  </button>
+                </>
+              ) : (
+                errorCode
+              )}
             </div>
           </div>
+        )}
 
-          <div>
-            <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 ml-1">
-              Adresse E-mail
-            </label>
-            <div className="relative">
-              <span className="absolute left-5 top-4.5 text-slate-300"><Mail size={16} /></span>
-              <input 
-                required
-                type="email" 
-                value={email} 
-                onChange={e => setEmail(e.target.value)}
-                className="w-full pl-12 pr-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl focus:outline-none focus:ring-2 ring-maritime/5 text-sm font-bold placeholder-slate-300"
-                placeholder="voyageur@compagnie.com"
-              />
-            </div>
-          </div>
-
-          {errorCode && (
-            <div className="p-4 bg-rose-50 border border-rose-150 rounded-2xl space-y-2">
-              <div className="text-rose-600 text-[10px] font-bold uppercase tracking-wider leading-relaxed text-left">
-                {errorCode.includes('network-request-failed') || errorCode.toLowerCase().includes('network') ? (
-                  <>
-                    <span className="block font-black text-rose-800 mb-1">⚠️ Restriction Sécuritaire de l'Iframe</span>
-                    L'aperçu AI Studio interdit les requêtes sécurisées de connexion tiers. Ouvrez l'application dans un nouvel onglet pour contourner ce blocage.
-                    <button 
-                      type="button" 
-                      onClick={() => window.open(window.location.origin + window.location.pathname, '_blank')}
-                      className="block mt-2 font-black text-maritime hover:text-black hover:underline cursor-pointer uppercase text-[9px] tracking-wider"
-                    >
-                      👉 Ouvrir l'application dans un nouvel onglet
-                    </button>
-                  </>
-                ) : (
-                  errorCode
-                )}
-              </div>
-            </div>
+        <button 
+          type="submit"
+          disabled={loading}
+          className="w-full py-5 bg-maritime text-white font-black rounded-2xl uppercase tracking-[0.25em] text-[10px] sm:text-xs shadow-xl shadow-maritime/20 hover:bg-black transform active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer animate-fade-in animate-pulse"
+        >
+          {loading ? (
+            <>
+              <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1, ease: 'linear' }} className="border-2 border-white/35 border-t-white w-4 h-4 rounded-full" />
+              Traitement...
+            </>
+          ) : (
+            <>
+              Se Connecter par Email
+              <ChevronRight size={14} />
+            </>
           )}
-
-          <button 
-            type="submit"
-            disabled={loading}
-            className="w-full py-5 bg-maritime text-white font-black rounded-2xl uppercase tracking-[0.25em] text-[10px] sm:text-xs shadow-xl shadow-maritime/20 hover:bg-black transform active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer animate-fade-in animate-pulse"
-          >
-            {loading ? (
-              <>
-                <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1, ease: 'linear' }} className="border-2 border-white/35 border-t-white w-4 h-4 rounded-full" />
-                Traitement...
-              </>
-            ) : (
-              <>
-                Se Connecter par Email
-                <ChevronRight size={14} />
-              </>
-            )}
-          </button>
-        </form>
-      )}
+        </button>
+      </form>
 
       {/* Modern Google Separator & Button */}
       <div className="flex items-center my-6">
@@ -1443,6 +1244,26 @@ function UserLoginForm({ onSuccess, setUser }: { onSuccess: () => void, setUser?
         <span className="px-4 text-[9px] font-black tracking-widest text-slate-300 uppercase">OU</span>
         <div className="flex-1 border-t border-slate-100"></div>
       </div>
+
+      {errorCode === "REGRETS_IFRAME_GOOGLE_AUTH" && (
+        <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl space-y-3 mb-4 text-left">
+          <div className="text-amber-800 text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5">
+            <span className="text-sm">⚠️</span> Restriction de Sécurité Iframe Détectée
+          </div>
+          <p className="text-slate-600 text-[10px] uppercase font-bold tracking-wide leading-relaxed">
+            L'aperçu de l'éditeur AI Studio interdit l'authentification Google via Popup dans une Iframe sécurisée. Veuillez ouvrir l'application dans un nouvel onglet pour vous connecter de manière sécurisée et officielle.
+          </p>
+          <div className="grid grid-cols-1 gap-2 pt-1 font-sans">
+            <button 
+              type="button" 
+              onClick={() => window.open(window.location.origin + window.location.pathname, '_blank')}
+              className="py-3 px-4 bg-maritime text-white font-black rounded-xl uppercase text-[9px] tracking-wider text-center hover:bg-black transition-all cursor-pointer shadow-sm text-ellipsis overflow-hidden"
+            >
+              👉 Nouvel Onglet
+            </button>
+          </div>
+        </div>
+      )}
 
       <button 
         type="button"
@@ -1476,7 +1297,7 @@ function LandingLogin({ siteSettings, onLoginSuccess, setUser, onAdminClick }: {
         <div className="space-y-2">
           <h1 className="text-3xl font-black uppercase tracking-tighter italic text-maritime">Connexion Portage</h1>
           <p className="text-slate-500 text-xs font-bold uppercase tracking-widest leading-relaxed max-w-xs mx-auto">
-            Accédez instantanément à la plateforme Mugote avec votre nom complet & numéro.
+            Accédez instantanément à la plateforme Mugote avec votre nom complet & e-mail.
           </p>
         </div>
       </div>
