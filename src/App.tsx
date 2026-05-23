@@ -2103,7 +2103,7 @@ function Home({ onBook, onNavigate, siteSettings, schedules }: { onBook: () => v
         const data = doc.data();
         const type = (data.type || '').toLowerCase();
         const url = data.url || data.videoUrl || data.imageUrl || data.image || data.video || data.contentUrl || '';
-        const isVideo = type === 'video' || (url && url.match(/\.(mp4|webm|ogg|mov)(\?.*)?$/i)) || !!(data.videoUrl || data.video);
+        const isVideo = type === 'video' || !!(data.videoUrl || data.video) || (url && (url.toLowerCase().match(/\.(mp4|webm|ogg|mov|mkv|3gp|m4v|avi)(\?.*)?$/i) || url.toLowerCase().includes('youtube.com') || url.toLowerCase().includes('youtu.be') || url.toLowerCase().includes('vimeo.com') || (url.toLowerCase().includes('firebasestorage.googleapis.com') && (url.toLowerCase().includes('.mov') || url.toLowerCase().includes('.mp4') || url.toLowerCase().includes('video') || url.toLowerCase().includes('.webm') || url.toLowerCase().includes('.avi')))));
         
         return {
           ...data,
@@ -3289,6 +3289,13 @@ function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlock
   const detailInputRef = useRef<HTMLInputElement>(null);
   const mediaInputRef = useRef<HTMLInputElement>(null);
 
+  const isVid = (u: string) => {
+    const l = (u || '').toLowerCase();
+    return l.includes('.mp4') || l.includes('.mov') || l.includes('.avi') || l.includes('.webm') || 
+           l.includes('.mkv') || l.includes('.3gp') || l.includes('.m4v') || l.includes('.quicktime') ||
+           l.includes('video') || l.includes('youtube.com') || l.includes('youtu.be') || l.includes('vimeo.com');
+  };
+
   const compressImage = (file: File, maxWidth: number = 1200, quality: number = 0.6): Promise<Blob> => {
     return new Promise((resolve) => {
       const reader = new FileReader();
@@ -3430,7 +3437,7 @@ function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlock
         const data = doc.data();
         const type = (data.type || '').toLowerCase();
         const url = data.url || data.videoUrl || data.imageUrl || data.image || data.video || data.contentUrl || '';
-        const isVideo = type === 'video' || (url && url.match(/\.(mp4|webm|ogg|mov)(\?.*)?$/i)) || !!(data.videoUrl || data.video);
+        const isVideo = type === 'video' || !!(data.videoUrl || data.video) || (url && (url.toLowerCase().match(/\.(mp4|webm|ogg|mov|mkv|3gp|m4v|avi)(\?.*)?$/i) || url.toLowerCase().includes('youtube.com') || url.toLowerCase().includes('youtu.be') || url.toLowerCase().includes('vimeo.com') || (url.toLowerCase().includes('firebasestorage.googleapis.com') && (url.toLowerCase().includes('.mov') || url.toLowerCase().includes('.mp4') || url.toLowerCase().includes('video') || url.toLowerCase().includes('.webm') || url.toLowerCase().includes('.avi')))));
         
         // Use a very robust date fallback
         const sortDate = data.publishedAt || data.createdAt || data.updatedAt || { seconds: 0 };
@@ -3608,13 +3615,6 @@ function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlock
       const uploadedUrls = [...newMedia.media];
       let finalType = newMedia.type;
       const finalUrl = uploadedUrls[0] || newMedia.url || '';
-      
-      const isVid = (u: string) => {
-        const l = (u || '').toLowerCase();
-        return l.includes('.mp4') || l.includes('.mov') || l.includes('.avi') || l.includes('.webm') || 
-               l.includes('youtube.com') || l.includes('youtu.be') || l.includes('vimeo.com') ||
-               l.includes('storage.googleapis.com') && (l.includes('video') || l.includes('.mp4'));
-      };
 
       if (uploadedUrls.length > 0) {
         finalType = isVid(uploadedUrls[0]) ? 'video' : 'image';
@@ -4520,46 +4520,63 @@ function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlock
                         {(newMedia.media.length > 0 || previewUrls.length > 0) && (
                           <div className="flex gap-3 p-4 bg-white/50 rounded-2xl border border-slate-100 overflow-x-auto no-scrollbar scroll-smooth">
                             {/* Previously uploaded media items */}
-                            {newMedia.media.map((url, i) => (
-                              <div key={`existing-${i}`} className="relative group flex-shrink-0">
-                                <div className="w-20 h-20 rounded-xl overflow-hidden border-2 border-emerald-500 shadow-sm">
-                                  <img src={url || undefined} className="w-full h-full object-cover" />
+                            {newMedia.media.map((url, i) => {
+                              const isVideoUrl = isVid(url);
+                              return (
+                                <div key={`existing-${i}`} className="relative group flex-shrink-0">
+                                  <div className="w-20 h-20 rounded-xl overflow-hidden border-2 border-emerald-500 shadow-sm bg-black flex items-center justify-center">
+                                    {isVideoUrl ? (
+                                      <video src={url || undefined} className="w-full h-full object-cover" muted playsInline />
+                                    ) : (
+                                      <img src={url || undefined} className="w-full h-full object-cover" />
+                                    )}
+                                  </div>
+                                  <button 
+                                    type="button" 
+                                    onClick={() => {
+                                      const next = [...newMedia.media];
+                                      next.splice(i, 1);
+                                      setNewMedia(prev => ({ ...prev, media: next }));
+                                    }}
+                                    className="absolute -top-1 -right-1 bg-rose-500 text-white p-1.5 rounded-full shadow-lg hover:scale-110 transition-all border border-white z-10"
+                                  >
+                                    <X size={10} />
+                                  </button>
                                 </div>
-                                <button 
-                                  type="button" 
-                                  onClick={() => {
-                                    const next = [...newMedia.media];
-                                    next.splice(i, 1);
-                                    setNewMedia(prev => ({ ...prev, media: next }));
-                                  }}
-                                  className="absolute -top-1 -right-1 bg-rose-500 text-white p-1.5 rounded-full shadow-lg hover:scale-110 transition-all border border-white z-10"
-                                >
-                                  <X size={10} />
-                                </button>
-                              </div>
-                            ))}
+                              );
+                            })}
                             {/* New files to be uploaded */}
-                            {previewUrls.map((url, i) => (
-                              <div key={`pending-${i}`} className="relative group flex-shrink-0">
-                                <div className="w-20 h-20 rounded-xl overflow-hidden border-2 border-slate-200 shadow-sm">
-                                  <img src={url || undefined} className="w-full h-full object-cover" />
+                            {previewUrls.map((url, i) => {
+                              const file = newMedia.pendingFiles[i];
+                              const isVideoFile = file?.type?.startsWith('video/') || 
+                                                  ['.mp4', '.mov', '.avi', '.webm', '.mkv'].some(ext => file?.name?.toLowerCase().endsWith(ext)) ||
+                                                  isVid(url);
+                              return (
+                                <div key={`pending-${i}`} className="relative group flex-shrink-0">
+                                  <div className="w-20 h-20 rounded-xl overflow-hidden border-2 border-slate-200 shadow-sm bg-black flex items-center justify-center">
+                                    {isVideoFile ? (
+                                      <video src={url || undefined} className="w-full h-full object-cover" muted playsInline />
+                                    ) : (
+                                      <img src={url || undefined} className="w-full h-full object-cover" />
+                                    )}
+                                  </div>
+                                  <button 
+                                    type="button" 
+                                    onClick={() => {
+                                      const nextPreviews = [...previewUrls];
+                                      nextPreviews.splice(i, 1);
+                                      setPreviewUrls(nextPreviews);
+                                      const nextFiles = [...newMedia.pendingFiles];
+                                      nextFiles.splice(i, 1);
+                                      setNewMedia(prev => ({ ...prev, pendingFiles: nextFiles }));
+                                    }}
+                                    className="absolute -top-1 -right-1 bg-rose-500 text-white p-1.5 rounded-full shadow-lg hover:scale-110 transition-all border border-white z-10"
+                                  >
+                                    <X size={10} />
+                                  </button>
                                 </div>
-                                <button 
-                                  type="button" 
-                                  onClick={() => {
-                                    const nextPreviews = [...previewUrls];
-                                    nextPreviews.splice(i, 1);
-                                    setPreviewUrls(nextPreviews);
-                                    const nextFiles = [...newMedia.pendingFiles];
-                                    nextFiles.splice(i, 1);
-                                    setNewMedia(prev => ({ ...prev, pendingFiles: nextFiles }));
-                                  }}
-                                  className="absolute -top-1 -right-1 bg-rose-500 text-white p-1.5 rounded-full shadow-lg hover:scale-110 transition-all border border-white z-10"
-                                >
-                                  <X size={10} />
-                                </button>
-                              </div>
-                            ))}
+                              );
+                            })}
                           </div>
                         )}
                       </div>
@@ -4830,7 +4847,7 @@ function GalleryView({ siteSettings }: { siteSettings: any }) {
         const data = doc.data();
         const type = (data.type || '').toLowerCase();
         const url = data.url || data.videoUrl || data.imageUrl || data.image || data.video || data.contentUrl || '';
-        const isVideo = type === 'video' || (url && url.match(/\.(mp4|webm|ogg|mov)(\?.*)?$/i)) || !!(data.videoUrl || data.video);
+        const isVideo = type === 'video' || !!(data.videoUrl || data.video) || (url && (url.toLowerCase().match(/\.(mp4|webm|ogg|mov|mkv|3gp|m4v|avi)(\?.*)?$/i) || url.toLowerCase().includes('youtube.com') || url.toLowerCase().includes('youtu.be') || url.toLowerCase().includes('vimeo.com') || (url.toLowerCase().includes('firebasestorage.googleapis.com') && (url.toLowerCase().includes('.mov') || url.toLowerCase().includes('.mp4') || url.toLowerCase().includes('video') || url.toLowerCase().includes('.webm') || url.toLowerCase().includes('.avi')))));
 
         return {
           ...data,
@@ -5101,7 +5118,7 @@ function NewsView() {
         const data = doc.data();
         const type = (data.type || '').toLowerCase();
         const url = data.url || data.videoUrl || data.imageUrl || data.image || data.video || data.contentUrl || '';
-        const isVideo = type === 'video' || (url && url.match(/\.(mp4|webm|ogg|mov)(\?.*)?$/i)) || !!(data.videoUrl || data.video);
+        const isVideo = type === 'video' || !!(data.videoUrl || data.video) || (url && (url.toLowerCase().match(/\.(mp4|webm|ogg|mov|mkv|3gp|m4v|avi)(\?.*)?$/i) || url.toLowerCase().includes('youtube.com') || url.toLowerCase().includes('youtu.be') || url.toLowerCase().includes('vimeo.com') || (url.toLowerCase().includes('firebasestorage.googleapis.com') && (url.toLowerCase().includes('.mov') || url.toLowerCase().includes('.mp4') || url.toLowerCase().includes('video') || url.toLowerCase().includes('.webm') || url.toLowerCase().includes('.avi')))));
 
         return {
           ...data,
