@@ -25,6 +25,7 @@ interface RegisteredUser {
   photoURL?: string;
   isAnonymous?: boolean;
   lastLogin?: any;
+  usageCount?: number;
 }
 
 export default function UsersListView({ className }: { className?: string }) {
@@ -119,6 +120,9 @@ export default function UsersListView({ className }: { className?: string }) {
     const emailMatches = (u.email || '').toLowerCase().includes(search.toLowerCase());
     return nameMatches || phoneMatches || emailMatches;
   });
+  
+  // Compter le nombre cumulé d'utilisations du service
+  const totalUsages = filteredUsers.reduce((sum, u) => sum + (u.usageCount || 1), 0);
 
   return (
     <motion.div 
@@ -133,22 +137,37 @@ export default function UsersListView({ className }: { className?: string }) {
         {/* Background Overlay Decor */}
         <div className="absolute right-0 top-0 bottom-0 w-1/3 bg-radialEdge from-gold/10 to-transparent pointer-events-none opacity-40" />
         
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 relative z-10">
+        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 relative z-10">
           <div>
             <div className="flex items-center gap-2 mb-1">
               <Users className="text-gold" size={24} />
-              <span className="text-[9px] font-black uppercase tracking-[0.3em] text-gold">Annuaire de Voyage</span>
+              <span className="text-[9px] font-black uppercase tracking-[0.3em] text-gold">Statistiques De Connexion</span>
             </div>
             <h2 className="text-2xl sm:text-3xl font-black uppercase tracking-tighter italic">
-              Voyageurs Connectés
+              Voyageurs & Utilisations
             </h2>
             <p className="text-[10px] font-bold text-white/50 uppercase tracking-widest mt-1">
-              Liste des passagers et utilisateurs en temps réel sur la flotte
+              Nombre de voyageurs enregistrés et mesure du taux d'utilisation de la plateforme.
             </p>
           </div>
-          <div className="px-5 py-2.5 bg-white/5 border border-white/10 rounded-2xl flex items-center gap-3">
-            <span className="text-xs font-bold text-slate-300">Total :</span>
-            <span className="text-lg font-black text-gold font-mono">{filteredUsers.length}</span>
+          
+          {/* Counters Widgets */}
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="px-5 py-3 bg-white/5 border border-white/10 rounded-2xl flex items-center gap-3">
+              <div className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
+              <div className="text-left">
+                <p className="text-[9px] font-bold text-slate-300 uppercase tracking-wider">Membres Actifs</p>
+                <p className="text-lg font-black text-white font-mono leading-none mt-0.5">{filteredUsers.length} <span className="text-xs text-slate-400 font-sans">Passagers</span></p>
+              </div>
+            </div>
+            
+            <div className="px-5 py-3 bg-white/5 border border-white/10 rounded-2xl flex items-center gap-3">
+              <div className="w-2.5 h-2.5 rounded-full bg-gold" />
+              <div className="text-left">
+                <p className="text-[9px] font-bold text-slate-300 uppercase tracking-wider">Utilisations</p>
+                <p className="text-lg font-black text-gold font-mono leading-none mt-0.5">{totalUsages} <span className="text-xs text-slate-400 font-sans">Sessions</span></p>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -257,6 +276,10 @@ export default function UsersListView({ className }: { className?: string }) {
                           <span>
                             {u.lastLogin ? (u.lastLogin.seconds ? new Date(u.lastLogin.seconds * 1000).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' }) : new Date(u.lastLogin).toLocaleString('fr-FR')) : 'Dernièrement'}
                           </span>
+                        </div>
+                        <div className="flex items-center gap-1.5 text-slate-500 font-extrabold text-[9px] uppercase tracking-wider mt-1 bg-slate-50 border border-slate-100/50 px-2.5 py-1 rounded-lg self-start">
+                          <Users size={10} className="text-maritime" />
+                          <span>Connexions : <strong className="font-extrabold text-maritime">{u.usageCount || 1}</strong></span>
                         </div>
                       </div>
                     </div>

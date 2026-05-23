@@ -441,7 +441,8 @@ export default function App() {
               displayName: localUser.displayName || 'Passager',
               phone: localUser.phone || '',
               isAnonymous: localUser.isAnonymous ?? false,
-              lastLogin: serverTimestamp()
+              lastLogin: serverTimestamp(),
+              usageCount: increment(1)
             }, { merge: true }).catch((err) => console.warn("Background users_list sync skipped:", err));
           }
           return;
@@ -486,7 +487,8 @@ export default function App() {
           displayName: nameVal,
           phone: '',
           isAnonymous: u.isAnonymous,
-          lastLogin: serverTimestamp()
+          lastLogin: serverTimestamp(),
+          usageCount: increment(1)
         }, { merge: true }).catch((err) => console.warn("Background auth-sync users_list failed safely:", err));
       } else {
         setUser(null);
@@ -549,7 +551,8 @@ export default function App() {
           displayName,
           phone,
           isAnonymous,
-          lastLogin: serverTimestamp()
+          lastLogin: serverTimestamp(),
+          usageCount: increment(1)
         }, { merge: true });
 
         console.log("Automatic Firestore user registration completed:", uid);
@@ -1073,7 +1076,8 @@ function UserLoginForm({ onSuccess, setUser }: { onSuccess: () => void, setUser?
           phone: cleanPhone,
           isAnonymous: false,
           lastLogin: serverTimestamp(),
-          isLocalSyncOnly: !authSuccess
+          isLocalSyncOnly: !authSuccess,
+          usageCount: increment(1)
         }, { merge: true });
       } catch (dbErr) {
         console.warn("Could not sync phone user to users_list collection in DB (offline or blocked rules):", dbErr);
@@ -1199,7 +1203,8 @@ function UserLoginForm({ onSuccess, setUser }: { onSuccess: () => void, setUser?
           phone: '',
           isAnonymous: false,
           lastLogin: serverTimestamp(),
-          isLocalSyncOnly: false
+          isLocalSyncOnly: false,
+          usageCount: increment(1)
         }, { merge: true });
       } catch (dbErr) {
         console.warn("Could not sync email user to users_list collection in DB:", dbErr);
@@ -1265,7 +1270,8 @@ function UserLoginForm({ onSuccess, setUser }: { onSuccess: () => void, setUser?
           displayName: nameVal,
           phone: '',
           isAnonymous: false,
-          lastLogin: serverTimestamp()
+          lastLogin: serverTimestamp(),
+          usageCount: increment(1)
         }, { merge: true });
       } catch (dbErr) {
         console.warn("Did not sync authenticated Google user to Firestore (non-blocking):", dbErr);
@@ -2278,59 +2284,112 @@ function Home({ onBook, onNavigate, siteSettings, schedules }: { onBook: () => v
 
       {/* News Highlight */}
       {media.length > 0 && (
-        <section id="news-feed" className="bg-black py-12 -mx-8 relative overflow-hidden">
+        <section id="news-feed" className="bg-slate-50 py-16 -mx-8 border-y border-slate-150 relative overflow-hidden">
           <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-gold/50 to-transparent" />
           <div className="max-w-7xl mx-auto px-8 relative z-10">
-            <div className="flex flex-col md:flex-row justify-between items-end mb-12 gap-6">
-              <div className="space-y-3">
-                <h3 className="text-gold text-[9px] font-extrabold tracking-[0.4em] uppercase">Journal de Bord</h3>
-                <h4 className="text-xl font-extrabold tracking-tighter text-white leading-none uppercase text-center md:text-left">ACTUALITÉS NAVALES</h4>
+            <div className="flex flex-col md:flex-row justify-between items-center mb-12 gap-6 border-b border-slate-200 pb-6 text-center md:text-left">
+              <div className="space-y-2">
+                <h3 className="text-gold text-[9px] font-extrabold tracking-[0.4em] uppercase">Journal d'Actualités</h3>
+                <h4 className="text-2xl font-black tracking-tighter text-[#001233] leading-none uppercase">PUBLICATIONS RECENTES</h4>
+                <p className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Mises à jour de la flotte et avertissements aux voyageurs</p>
               </div>
-              <button onClick={() => onNavigate('news')} className="text-white text-[9px] font-bold uppercase tracking-widest flex items-center gap-2 hover:gap-3 transition-all">Détails <ChevronRight size={14} /></button>
+              <button onClick={() => onNavigate('news')} className="px-5 py-2.5 bg-[#001233] text-white hover:bg-[#002255] cursor-pointer text-[9px] font-black uppercase tracking-widest flex items-center gap-2 rounded-xl shadow-md transition-all">Tous les détails <ChevronRight size={14} /></button>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-              {media.map((item: any, i) => (
-                <div key={i} className="group cursor-pointer">
-                  <div className="aspect-[4/5] rounded-2xl overflow-hidden mb-4 relative">
-                    {item.processedType === 'video' ? (
-                      <div className="w-full h-full relative bg-black">
-                        <video 
-                          key={item.processedUrl}
-                          src={item.processedUrl || undefined} 
-                          className="w-full h-full object-cover" 
-                          muted 
-                          loop 
-                          autoPlay 
-                          playsInline
-                        >
-                          {item.processedUrl && (
-                            <>
-                              <source src={item.processedUrl} type="video/mp4" />
-                              <source src={item.processedUrl} type="video/quicktime" />
-                            </>
-                          )}
-                          Votre navigateur ne supporte pas la lecture de vidéos.
-                        </video>
-                        <div className="absolute inset-0 bg-black/20 group-hover:bg-transparent transition-all pointer-events-none" />
-                        <div className="absolute top-4 right-4 bg-gold px-2 py-0.5 rounded text-[7px] font-black uppercase text-black z-20">Vidéo</div>
+            
+            <div className="max-w-3xl mx-auto space-y-12">
+              {media.map((item: any, i) => {
+                const isVideo = item.processedType === 'video';
+                const isImage = item.processedType === 'image';
+                const hasMedia = isVideo || isImage;
+                
+                return (
+                  <div key={i} className="bg-white border border-slate-200/85 rounded-[32px] overflow-hidden shadow-lg flex flex-col text-left group transition-all hover:border-gold/30">
+                    {/* Header info */}
+                    <div className="p-6 sm:p-8 pb-4 flex items-center justify-between border-b border-slate-100">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-[#001233]/5 border border-[#001233]/15 flex items-center justify-center text-[#001233]">
+                          <Ship size={18} className="text-[#001233]" />
+                        </div>
+                        <div>
+                          <span className="text-[10px] font-black uppercase text-gold tracking-widest block">ETS AMR MUGOTE</span>
+                          <span className="text-[10px] text-slate-400 font-bold block">
+                            {item.publishedAt ? (item.publishedAt.seconds ? new Date(item.publishedAt.seconds * 1000).toLocaleDateString() : new Date(item.publishedAt).toLocaleDateString()) : 'Nouveauté'}
+                          </span>
+                        </div>
                       </div>
-                    ) : item.processedType === 'image' ? (
-                      <img src={item.processedUrl || undefined} alt={item.title} className="w-full h-full object-cover transition-transform duration-[2s] group-hover:scale-110" />
-                    ) : (
-                      <div className="w-full h-full bg-slate-900 flex flex-col items-center justify-center p-6 text-center border border-white/5 relative">
-                        <div className="absolute top-0 left-0 w-full h-1 bg-gold opacity-30" />
-                        <FileText size={20} className="text-gold opacity-30 mb-4" />
-                        <p className="text-white text-[10px] font-bold uppercase tracking-[0.2em] line-clamp-6 leading-relaxed">
-                          {item.processedDesc}
-                        </p>
+                      <span className="text-[9px] font-extrabold uppercase tracking-[0.2em] px-3 py-1 bg-[#001233]/5 text-[#001233] rounded-md border border-[#001233]/10">
+                        {item.processedType === 'video' ? 'Vidéo' : item.processedType === 'image' ? 'Image' : 'Information'}
+                      </span>
+                    </div>
+
+                    {/* Content Section */}
+                    <div className="p-6 sm:p-8 space-y-4">
+                      <h5 className="text-[#001233] text-xl sm:text-2xl font-black uppercase tracking-tight italic">
+                        {item.title}
+                      </h5>
+                      <p className="text-slate-700 text-sm sm:text-base leading-relaxed whitespace-pre-line font-medium">
+                        {item.processedDesc}
+                      </p>
+                    </div>
+
+                    {/* Media Attachments Section (Fully visible! Natural uncropped aspect ratios) */}
+                    {hasMedia && (
+                      <div className="px-6 sm:px-8 pb-6">
+                        <div className="aspect-video sm:aspect-[16/10] rounded-2xl overflow-hidden bg-slate-900 shadow-inner relative flex items-center justify-center border border-slate-150">
+                          {isVideo ? (
+                            <video 
+                              key={item.processedUrl}
+                              src={item.processedUrl || undefined} 
+                              className="w-full h-full object-contain bg-black" 
+                              controls
+                              autoPlay={false}
+                              muted={false}
+                              playsInline
+                            >
+                              {item.processedUrl && (
+                                <>
+                                  <source src={item.processedUrl} type="video/mp4" />
+                                  <source src={item.processedUrl} type="video/quicktime" />
+                                </>
+                              )}
+                              Votre navigateur ne supporte pas la lecture de vidéos.
+                            </video>
+                          ) : (
+                            <div className="w-full h-full flex overflow-x-auto snap-x snap-mandatory no-scrollbar bg-slate-900">
+                              {(item.media && item.media.length > 0 ? item.media : [item.processedUrl]).map((img: string, idx: number) => (
+                                <img 
+                                  key={idx} 
+                                  src={img || undefined} 
+                                  className="w-full h-full object-contain snap-center flex-shrink-0" 
+                                  alt={`${item.title}-${idx}`} 
+                                />
+                              ))}
+                              {item.media && item.media.length > 1 && (
+                                <div className="absolute top-4 right-4 bg-gold px-2.5 py-1 rounded text-[8px] font-black text-black uppercase tracking-widest shadow-xl">
+                                  {item.media.length} PHOTOS
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
                       </div>
                     )}
-                    <div className="absolute inset-0 bg-gradient-to-t from-maritime-dark/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+
+                    {/* Comments & Metrics Panel */}
+                    <div className="px-6 sm:px-8 py-4 bg-slate-50 border-t border-slate-100 flex justify-between items-center text-[10px] sm:text-xs font-bold text-slate-500">
+                      <div className="flex items-center gap-4">
+                        <span className="flex items-center gap-1.5"><Eye size={12} className="text-slate-400" /> {item.views || 0} vues</span>
+                        <NewsComments newsId={item.id} />
+                      </div>
+                      {item.processedUrl && (
+                        <a href={item.processedUrl} target="_blank" rel="noreferrer" className="text-gold flex items-center gap-1 pb-0.5 border-b border-transparent hover:border-gold transition-all">
+                          En savoir plus <ChevronRight size={12} />
+                        </a>
+                      )}
+                    </div>
                   </div>
-                  <h5 className="text-white text-lg font-bold mb-1.5 group-hover:text-gold transition-colors uppercase tracking-tight">{item.title}</h5>
-                  <p className="text-white/40 text-xs line-clamp-2 leading-relaxed">{item.processedDesc}</p>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         </section>
