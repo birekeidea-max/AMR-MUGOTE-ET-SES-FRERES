@@ -2303,14 +2303,14 @@ function Home({ onBook, onNavigate, siteSettings, schedules }: { onBook: () => v
                 const hasMedia = isVideo || isImage;
                 
                 return (
-                  <div key={i} className="bg-white border border-slate-200/85 rounded-[32px] overflow-hidden shadow-lg flex flex-col text-left group transition-all hover:border-gold/30">
+                  <div key={i} className="bg-white border border-slate-200/85 rounded-[32px] overflow-hidden shadow-lg flex flex-col text-center items-center group transition-all hover:border-gold/30">
                     {/* Header info */}
-                    <div className="p-6 sm:p-8 pb-4 flex items-center justify-between border-b border-slate-100">
-                      <div className="flex items-center gap-3">
+                    <div className="p-6 sm:p-8 pb-4 flex flex-col sm:flex-row items-center justify-between border-b border-slate-100 gap-4 w-full text-center sm:text-left">
+                      <div className="flex flex-col sm:flex-row items-center gap-3">
                         <div className="w-10 h-10 rounded-full bg-[#001233]/5 border border-[#001233]/15 flex items-center justify-center text-[#001233]">
                           <Ship size={18} className="text-[#001233]" />
                         </div>
-                        <div>
+                        <div className="text-center sm:text-left">
                           <span className="text-[10px] font-black uppercase text-gold tracking-widest block">ETS AMR MUGOTE</span>
                           <span className="text-[10px] text-slate-400 font-bold block">
                             {item.publishedAt ? (item.publishedAt.seconds ? new Date(item.publishedAt.seconds * 1000).toLocaleDateString() : new Date(item.publishedAt).toLocaleDateString()) : 'Nouveauté'}
@@ -2323,19 +2323,19 @@ function Home({ onBook, onNavigate, siteSettings, schedules }: { onBook: () => v
                     </div>
 
                     {/* Content Section */}
-                    <div className="p-6 sm:p-8 space-y-4">
-                      <h5 className="text-[#001233] text-xl sm:text-2xl font-black uppercase tracking-tight italic">
+                    <div className="p-6 sm:p-8 space-y-4 text-center w-full">
+                      <h5 className="text-[#001233] text-xl sm:text-2xl font-black uppercase tracking-tight italic text-center">
                         {item.title}
                       </h5>
-                      <p className="text-slate-700 text-sm sm:text-base leading-relaxed whitespace-pre-line font-medium">
+                      <p className="text-slate-700 text-sm sm:text-base leading-relaxed whitespace-pre-line font-medium text-center max-w-2xl mx-auto">
                         {item.processedDesc}
                       </p>
                     </div>
 
                     {/* Media Attachments Section (Fully visible! Natural uncropped aspect ratios) */}
                     {hasMedia && (
-                      <div className="px-6 sm:px-8 pb-6">
-                        <div className="aspect-video sm:aspect-[16/10] rounded-2xl overflow-hidden bg-slate-900 shadow-inner relative flex items-center justify-center border border-slate-150">
+                      <div className="px-6 sm:px-8 pb-6 w-full">
+                        <div className="aspect-video sm:aspect-[16/10] rounded-2xl overflow-hidden bg-slate-900 shadow-inner relative flex items-center justify-center border border-slate-150 w-full">
                           {isVideo ? (
                             <video 
                               key={item.processedUrl}
@@ -2376,7 +2376,7 @@ function Home({ onBook, onNavigate, siteSettings, schedules }: { onBook: () => v
                     )}
 
                     {/* Comments & Metrics Panel */}
-                    <div className="px-6 sm:px-8 py-4 bg-slate-50 border-t border-slate-100 flex justify-between items-center text-[10px] sm:text-xs font-bold text-slate-500">
+                    <div className="px-6 sm:px-8 py-4 bg-slate-50 border-t border-slate-100 flex flex-col sm:flex-row justify-between items-center text-[10px] sm:text-xs font-bold text-slate-500 w-full gap-2 sm:gap-0">
                       <div className="flex items-center gap-4">
                         <span className="flex items-center gap-1.5"><Eye size={12} className="text-slate-400" /> {item.views || 0} vues</span>
                         <NewsComments newsId={item.id} />
@@ -5140,13 +5140,13 @@ function NewsView() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {news.map((n, i) => (
-            <div key={i} className="bg-black border border-white/5 shadow-2xl shadow-black/50 rounded-xl overflow-hidden group hover:border-gold transition-all flex flex-col">
-              <div className="p-8 flex-1 flex flex-col justify-between">
-                <div className="space-y-4">
-                  <span className="text-[9px] font-extrabold uppercase tracking-[0.3em] text-gold">{n.processedType === 'text' ? 'Actualité' : n.processedType === 'image' ? 'Photo' : 'Vidéo'}</span>
-                  <h3 className="text-xl font-extrabold tracking-tighter leading-none text-white group-hover:text-gold transition-colors italic">{n.title}</h3>
-                  <p className="text-white/60 text-xs font-medium leading-relaxed">{n.processedDesc}</p>
-                  <div className="flex items-center gap-4 text-[9px] font-black uppercase tracking-widest text-white/30 pt-4 border-t border-white/5">
+            <div key={i} className="bg-black border border-white/5 shadow-2xl shadow-black/50 rounded-xl overflow-hidden group hover:border-gold transition-all flex flex-col text-center items-center">
+              <div className="p-8 flex-1 flex flex-col justify-between w-full items-center">
+                <div className="space-y-4 w-full flex flex-col items-center">
+                  <span className="text-[9px] font-extrabold uppercase tracking-[0.3em] text-gold block text-center">{n.processedType === 'text' ? 'Actualité' : n.processedType === 'image' ? 'Photo' : 'Vidéo'}</span>
+                  <h3 className="text-xl font-extrabold tracking-tighter leading-none text-white group-hover:text-gold transition-colors italic text-center mx-auto">{n.title}</h3>
+                  <p className="text-white/60 text-xs font-medium leading-relaxed text-center mx-auto max-w-md">{n.processedDesc}</p>
+                  <div className="flex items-center justify-center gap-4 text-[9px] font-black uppercase tracking-widest text-white/30 pt-4 border-t border-white/5 w-full">
                     <span className="flex items-center gap-1.5"><Eye size={12} className="text-gold" /> {n.views || 0} vues</span>
                     <NewsComments newsId={n.id} />
                   </div>
