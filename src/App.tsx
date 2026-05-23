@@ -1758,7 +1758,11 @@ function AdminChatView({ conversation }: { conversation: any }) {
     const q = query(collection(db, 'conversations', conversation.id, 'messages'));
     const unsub = onSnapshot(q, (snap) => {
       const msgs = snap.docs.map(d => ({ ...d.data() as any, id: d.id }));
-      msgs.sort((a, b) => (a.createdAt?.seconds || 0) - (b.createdAt?.seconds || 0));
+      msgs.sort((a, b) => {
+        const timeA = a.createdAt?.seconds !== undefined ? a.createdAt.seconds : (Date.now() / 1000);
+        const timeB = b.createdAt?.seconds !== undefined ? b.createdAt.seconds : (Date.now() / 1000);
+        return timeA - timeB;
+      });
       setMessages(msgs);
       setTimeout(() => scrollRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
     });
@@ -1884,7 +1888,11 @@ function ChatWidget({ user }: { user: FirebaseUser | null }) {
     const q = query(collection(db, 'conversations', convId, 'messages'));
     const unsub = onSnapshot(q, (snap) => {
       const msgs = snap.docs.map(d => ({ ...d.data() as any, id: d.id }));
-      msgs.sort((a, b) => (a.createdAt?.seconds || 0) - (b.createdAt?.seconds || 0));
+      msgs.sort((a, b) => {
+        const timeA = a.createdAt?.seconds !== undefined ? a.createdAt.seconds : (Date.now() / 1000);
+        const timeB = b.createdAt?.seconds !== undefined ? b.createdAt.seconds : (Date.now() / 1000);
+        return timeA - timeB;
+      });
       setMessages(msgs);
     });
     return unsub;

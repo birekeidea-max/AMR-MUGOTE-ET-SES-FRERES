@@ -39,21 +39,33 @@ async function startServer() {
 
       console.log("Chat Request Message:", message);
       
-      const contents = [];
+      const rawContents = [];
       const historyItems = history || [];
       
       for (const h of historyItems) {
-        const role = h.role === 'AI' ? 'model' : 'user';
-        contents.push({ role, parts: [{ text: h.text || "" }] });
+        // AI and ADMIN roles represent the responder/model; USER represents the human client
+        const role = (h.role === 'AI' || h.role === 'ADMIN') ? 'model' : 'user';
+        rawContents.push({ role, parts: [{ text: h.text || "" }] });
       }
 
-      // Add the latest message if not already present in history
-      const lastHistoryMessage = contents.length > 0 ? contents[contents.length - 1].parts[0].text : "";
+      // Add the current message if it's not already the last turn
+      const lastHistoryMessage = rawContents.length > 0 ? rawContents[rawContents.length - 1].parts[0].text : "";
       if (lastHistoryMessage !== message) {
-        contents.push({ role: 'user', parts: [{ text: message }] });
+        rawContents.push({ role: 'user', parts: [{ text: message }] });
       }
 
-      // Ensure the first message is from 'user'
+      // Merge consecutive entries of the same role (e.g., user -> user or model -> model)
+      // to comply with Gemini's strict alternation constraint.
+      const contents = [];
+      for (const item of rawContents) {
+        if (contents.length > 0 && contents[contents.length - 1].role === item.role) {
+          contents[contents.length - 1].parts[0].text += "\n" + item.parts[0].text;
+        } else {
+          contents.push(item);
+        }
+      }
+
+      // Ensure the dialogue starts with a user turn
       while (contents.length > 0 && contents[0].role !== 'user') {
         contents.shift();
       }
@@ -140,6 +152,17 @@ TON ET STYLE :
     res.json({
       merchantPhone: "+243994286469",
       merchantName: "AMR MUGOTE & FRÈRES"
+    });
+  });
+
+  // Diagnostic route for environment verification (securely obfuscated)
+  app.get("/api/debug-env", (req, res) => {
+    const key = process.env.GEMINI_API_KEY;
+    res.json({
+      hasKey: !!key,
+      keyLength: key ? key.length : 0,
+      keyStart: key ? key.substring(0, 4) : "none",
+      nodeEnv: process.env.NODE_ENV || "development"
     });
   });
 

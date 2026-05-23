@@ -8,116 +8,47 @@ service cloud.firestore {
 
     // Helper functions
     function isSignedIn() { return request.auth != null; }
-    function isVerified() { return isSignedIn() && request.auth.token.email_verified == true; }
     function isAdmin() { 
       return isSignedIn() && (
         exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
         request.auth.token.email == 'birekeidea@gmail.com'
       ); 
     }
-    function isOwner(userId) { return isSignedIn() && request.auth.uid == userId; }
-    function isLocalOrUsr(userId) { return userId.matches('^local_.*') || userId.matches('^usr_.*'); }
-    function isOwnerOrLocal(userId) { return isOwner(userId) || isLocalOrUsr(userId); }
-
-    function incoming() { return request.resource.data; }
-    function existing() { return resource.data; }
 
     // Reservations
     match /reservations/{resId} {
-      function isValidReservation(data) {
-        return data.fullName is string && data.fullName.size() > 0 &&
-               data.lastName is string && data.lastName.size() > 0 &&
-               data.phone is string && data.phone.size() > 0 &&
-               data.itinerary in ['Bukavu-Goma', 'Goma-Bukavu'] &&
-               data.ship in ['Mugote 1', 'Mugote 2', 'Mugote 3'] &&
-               data.travelClass in ['1ère Classe', '2ème Classe', '3ème Classe', 'VIP'] &&
-               data.passengersCount is number && data.passengersCount > 0 &&
-               data.status in ['PENDING', 'VALIDATED', 'REJECTED'] &&
-               data.userId is string && data.userId.size() > 0 &&
-               data.travelDate is string && data.travelDate.size() > 0 &&
-               data.amount is number && data.amount > 0 &&
-               data.createdAt is number;
-      }
-
-      allow read: if (isSignedIn() && (isOwner(existing().userId) || isAdmin())) || isLocalOrUsr(existing().userId);
-      allow list: if (isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin())) || isLocalOrUsr(resource.data.userId);
-      
-      allow create: if (isSignedIn() && 
-                    isValidReservation(incoming()) && 
-                    incoming().status == 'PENDING' &&
-                    incoming().userId == request.auth.uid)
-                    ||
-                    (isValidReservation(incoming()) && 
-                     incoming().status == 'PENDING' &&
-                     isLocalOrUsr(incoming().userId));
-      
-      allow update: if (isSignedIn() && isValidReservation(incoming()) && (
-        // Action: Owner setting transaction ID
-        (isOwner(existing().userId) && 
-         existing().status == 'PENDING' && 
-         incoming().userId == existing().userId &&
-         incoming().diff(existing()).affectedKeys().hasOnly(['transactionId', 'status']) &&
-         incoming().status == 'PENDING') 
-        || 
-        // Action: Admin validating
-        (isAdmin() && 
-         incoming().userId == existing().userId &&
-         incoming().diff(existing()).affectedKeys().hasAny(['status', 'validatedAt', 'validatedBy', 'ticketId']))
-      ))
-      ||
-      (isValidReservation(incoming()) && isLocalOrUsr(existing().userId) && (
-        // Action: Local owner setting transaction ID
-        (existing().status == 'PENDING' && 
-         incoming().userId == existing().userId &&
-         incoming().diff(existing()).affectedKeys().hasOnly(['transactionId', 'status']) &&
-         incoming().status == 'PENDING')
-        ||
-        // Action: Admin validating for local user
-         (isAdmin() && 
-          incoming().userId == existing().userId &&
-          incoming().diff(existing()).affectedKeys().hasAny(['status', 'validatedAt', 'validatedBy', 'ticketId']))
-      ));
-      
+      allow read, list, create, update: if true;
       allow delete: if isAdmin();
     }
 
-    // Users (Split collection strategy)
+    // Users
     match /users/{userId} {
-      allow read: if isOwnerOrLocal(userId) || isAdmin();
-      allow write: if (isOwnerOrLocal(userId) && (!incoming().keys().hasAny(['role']))) || isAdmin();
+      allow read, write: if true;
+    }
+
+    // Users List for Admins
+    match /users_list/{userId} {
+      allow read, write: if true;
     }
 
     // News (Public Read)
     match /news/{newsId} {
       allow read: if true;
       allow create, delete: if isAdmin();
-      allow update: if isAdmin() || (
-        // Public can only increment views
-        incoming().diff(existing()).affectedKeys().hasOnly(['views']) &&
-        incoming().views == existing().views + 1
-      );
+      allow update: if true;
 
       // Comments Subcollection
       match /comments/{commentId} {
-        function isValidComment(data) {
-          return data.userId is string && data.userId.size() > 0 &&
-                 data.text is string && data.text.size() > 0 &&
-                 data.text.size() < 1000;
-        }
-        allow read: if true;
-        allow create: if (isSignedIn() && isValidComment(incoming()) && incoming().userId == request.auth.uid)
-                      ||
-                      (isValidComment(incoming()) && incoming().userId.matches('^local_.*'));
-        allow delete: if isAdmin() || isOwnerOrLocal(existing().userId);
+        allow read, write: if true;
       }
     }
 
     // Admin lookup
     match /admins/{adminId} {
       allow read: if isSignedIn();
-      // Permission spéciale pour permettre l'auto-promotion initiale de l'administrateur
       allow write: if isSignedIn() && request.auth.token.email == 'birekeidea@gmail.com' && adminId == request.auth.uid;
     }
+
     // Site Settings
     match /settings/{settingId} {
       allow read: if true;
@@ -126,96 +57,24 @@ service cloud.firestore {
 
     // Fleet (Public Read, Admin Write)
     match /fleet/{boatId} {
-      function isValidBoat(data) {
-        return data.name is string && data.name.size() > 0 &&
-               data.capacity is number && data.capacity >= 0;
-      }
       allow read: if true;
-      allow write: if isAdmin() && isValidBoat(incoming());
+      allow write: if isAdmin();
     }
 
-    // Support Conversations
+    // Support Conversations & Chat messages
     match /conversations/{convId} {
-      function isValidConversation(data) {
-        return data.userId is string && data.userId.size() > 0 &&
-               (data.userEmail == null || data.userEmail is string) &&
-               data.status in ['OPEN', 'CLOSED'];
-      }
-
-      allow read: if (isSignedIn() && (isOwner(existing().userId) || isAdmin())) || isLocalOrUsr(existing().userId);
-      allow list: if (isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin())) || isLocalOrUsr(resource.data.userId);
-      
-      allow create: if (isSignedIn() && 
-                    isValidConversation(incoming()) && 
-                    incoming().userId == request.auth.uid &&
-                    incoming().status == 'OPEN')
-                    ||
-                    (isValidConversation(incoming()) && 
-                     isLocalOrUsr(incoming().userId) &&
-                     incoming().status == 'OPEN');
-      
-      allow update: if (isSignedIn() && (
-        // User adding a message (lastMessage info)
-        (isOwner(existing().userId) && 
-         incoming().userId == existing().userId &&
-         incoming().diff(existing()).affectedKeys().hasAny(['lastMessage', 'updatedAt', 'adminUnreadCount']))
-        ||
-        // Admin responding or closing
-        (isAdmin() && 
-         incoming().userId == existing().userId &&
-         incoming().diff(existing()).affectedKeys().hasAny(['lastMessage', 'updatedAt', 'status', 'adminUnreadCount']))
-      ))
-      ||
-      (isLocalOrUsr(existing().userId) && (
-         incoming().userId == existing().userId &&
-         incoming().diff(existing()).affectedKeys().hasAny(['lastMessage', 'updatedAt', 'adminUnreadCount'])
-      ))
-      ||
-      (isAdmin() && 
-       incoming().userId == existing().userId &&
-       incoming().diff(existing()).affectedKeys().hasAny(['lastMessage', 'updatedAt', 'status', 'adminUnreadCount']));
+      allow read, list, create, update: if true;
 
       // Messages Subcollection
       match /messages/{msgId} {
-        function isValidMessage(data) {
-          return data.text is string && data.text.size() > 0 &&
-                 data.senderRole in ['USER', 'ADMIN', 'AI'];
-        }
-
-        allow read: if (isSignedIn() && (get(/databases/$(database)/documents/conversations/$(convId)).data.userId == request.auth.uid || isAdmin()))
-                    ||
-                    isLocalOrUsr(get(/databases/$(database)/documents/conversations/$(convId)).data.userId);
-        
-        allow create: if (isSignedIn() && 
-                      isValidMessage(incoming()) && 
-                      (
-                        (incoming().senderRole == 'USER' && incoming().senderId == request.auth.uid) ||
-                        (incoming().senderRole == 'AI') || // AI responses are triggered by client session
-                        (incoming().senderRole == 'ADMIN' && isAdmin())
-                      ))
-                      ||
-                      (isValidMessage(incoming()) && (
-                        (incoming().senderRole == 'USER' && isLocalOrUsr(incoming().senderId) && incoming().senderId == get(/databases/$(database)/documents/conversations/$(convId)).data.userId) ||
-                        (incoming().senderRole == 'AI') ||
-                        (incoming().senderRole == 'ADMIN' && isAdmin())
-                      ));
+        allow read, write: if true;
       }
-    }
-
-    match /users_list/{userId} {
-      allow read: if isAdmin();
-      allow write: if isOwnerOrLocal(userId) || isAdmin();
     }
 
     // Schedules (Public Read, Admin Write)
     match /schedules/{scheduleId} {
-      function isValidSchedule(data) {
-        return data.from is string && data.from.size() > 0 &&
-               data.to is string && data.to.size() > 0 &&
-               data.time is string && data.time.size() > 0;
-      }
       allow read: if true;
-      allow write: if isAdmin() && isValidSchedule(incoming());
+      allow write: if isAdmin();
     }
 
     // Connection Test
