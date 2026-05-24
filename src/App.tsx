@@ -3019,12 +3019,12 @@ function Booking({ onReserved, user, onLoginRequest }: { onReserved: (res: Reser
 function Payment({ reservation, onComplete }: { reservation: Reservation | null, onComplete: () => void }) {
   const [step, setStep] = useState<'init' | 'processing' | 'success'>('init');
   const [submitting, setSubmitting] = useState(false);
-  const [transactionId, setTransactionId] = useState('');
+  const [transactionId, setTransactionId] = useState(reservation ? (reservation.transactionId || '') : '');
   const [errorLocal, setErrorLocal] = useState<string | null>(null);
 
   if (!reservation) return null;
 
-  const handleManualConfirm = async (id: string) => {
+  const handleManualConfirm = async (id: string, redirectImmediately = false) => {
     const cleanId = id.trim();
     setErrorLocal(null);
     if (!cleanId) {
@@ -3051,7 +3051,12 @@ function Payment({ reservation, onComplete }: { reservation: Reservation | null,
         transactionId: cleanId,
         status: 'PENDING'
       });
-      onComplete();
+      
+      if (redirectImmediately) {
+        onComplete();
+      } else {
+        setStep('success');
+      }
     } catch (error: any) {
       console.error("Firestore update error:", error);
       setErrorLocal(error.message || "Une erreur réseau est survenue. Veuillez vérifier votre connexion et réessayer.");
@@ -3218,34 +3223,45 @@ function Payment({ reservation, onComplete }: { reservation: Reservation | null,
             key="success"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="bg-white rounded-[40px] p-12 text-center space-y-8 shadow-2xl border-4 border-emerald-500"
+            className="bg-white rounded-[40px] p-10 text-center space-y-8 shadow-2xl border-4 border-gold"
           >
-            <div className="w-24 h-24 bg-emerald-50 text-emerald-500 rounded-[32px] flex items-center justify-center mx-auto shadow-xl shadow-emerald-500/10">
-              <CheckCircle size={56} />
+            <div className="w-20 h-20 bg-emerald-50 text-emerald-500 rounded-[32px] flex items-center justify-center mx-auto shadow-xl shadow-emerald-500/10 mb-2">
+              <CheckCircle size={48} />
             </div>
 
-            <div className="space-y-4">
-              <h3 className="text-3xl font-black uppercase tracking-tighter italic">Paiement Reçu !</h3>
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em]">Transaction {transactionId}</p>
+            <div className="space-y-2">
+              <p className="text-gold text-[10px] font-black tracking-[0.4em] uppercase">M/V MUGOTE</p>
+              <h3 className="text-2xl font-black uppercase tracking-tighter italic text-[#001233]">DEMANDE ENREGISTRÉE</h3>
             </div>
 
-            <div className="bg-slate-50 p-8 rounded-3xl space-y-6">
-              <div className="flex justify-between items-center text-sm font-black uppercase">
-                <span className="text-slate-400 text-[10px]">ID Transaction</span>
-                <span className="font-mono text-maritime">{transactionId}</span>
+            <div className="bg-slate-50 p-6 sm:p-8 rounded-3xl space-y-6 text-left border border-slate-150">
+              <div className="flex justify-between items-center text-xs font-black uppercase text-slate-400 pb-4 border-b border-slate-200">
+                <span>RÉFÉRENCE TRANSACTION</span>
+                <span className="font-mono text-[#001233] text-sm bg-gold/10 px-3 py-1 rounded-lg border border-gold/20">{transactionId}</span>
               </div>
-              <div className="border-t border-slate-200 pt-6">
-                <p className="text-[11px] font-bold text-slate-600 leading-relaxed uppercase">
-                  Votre paiement a été détecté automatiquement. Votre billet sera généré et validé par un administrateur dans quelques instants.
+              
+              <div className="space-y-4 text-slate-700 text-[12px] sm:text-[13px] font-medium leading-relaxed">
+                <p className="font-black text-slate-900 text-sm">
+                  Votre demande de réservation a bien été reçue avec succès et est actuellement en cours de traitement.
+                </p>
+                <p>
+                  Nous vous prions de patienter pendant la vérification de votre paiement à partir du TID (numéro de transaction) fourni. Une fois la transaction confirmée et la réservation validée, votre billet électronique sera automatiquement généré.
+                </p>
+                <p>
+                  Nous vous invitons à consulter régulièrement l’onglet <span className="font-black text-[#001233]">« BILLETS »</span> dans la barre de navigation afin de vérifier l’état de votre réservation. Dès que le billet sera validé, vous pourrez le télécharger directement depuis votre espace.
+                </p>
+                <div className="h-px bg-slate-200 my-4" />
+                <p className="font-black text-[#001233] text-center italic text-xs tracking-wide">
+                  Merci de votre confiance et bon voyage avec AMR MUGOTE ET SES FRÈRES.
                 </p>
               </div>
             </div>
 
             <button 
-              onClick={() => handleManualConfirm(transactionId)}
-              className="w-full py-6 bg-black text-white font-black uppercase tracking-[0.3em] rounded-2xl shadow-xl shadow-black/20 hover:scale-[1.02] active:scale-95 transition-all text-xs"
+              onClick={() => handleManualConfirm(transactionId, true)}
+              className="w-full py-5 bg-[#001233] text-white hover:bg-[#002255] font-black uppercase tracking-[0.3em] rounded-2xl shadow-xl shadow-black/20 hover:scale-[1.01] active:scale-95 transition-all text-[11px]"
             >
-              Voir mon billet
+              Consulter mon Espace Billets
             </button>
           </motion.div>
         )}
