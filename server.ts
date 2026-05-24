@@ -91,6 +91,13 @@ CONTEXTE DE L'ENTREPRISE :
 - Slogan : "Voyager en toute sécurité".
 - Flotte : Nos navires emblématiques MUGOTE 1, MUGOTE 2 et MUGOTE 3. Ils sont inspectés quotidiennement et offrent des espaces VIP climatisés.
 
+LOCALISATION PHARE (PORT AMR MUGOTE BUKAVU) :
+- Pays/Province/Ville : RDC, Province du Sud-Kivu, Ville de Bukavu.
+- Commune, Avenue, Quartier : Commune de Kadutu, Avenue Michombero, Quartier Nkafu.
+- Points de repère : Situé en diagonale avec le célèbre marché Beach Muhanzi de Bukavu.
+- Limites physiques du Port Mugote : Borné à l'EST par le marché Beach Muhanzi, et à l'OUEST par le port de l'ETS SILIMU.
+- Onglet de Géolocalisation : Les voyageurs peuvent se rendre sur l'onglet "LOCALISATION" de la barre de navigation. Cela leur permet de voir leur position GPS en temps réel sur la carte interactive, d'évaluer le nombre de kilomètres restants jusqu'au port d'embarquement, et d'obtenir l'itinéraire.
+
 FONCTIONNEMENT DE LA PLATEFORME (À EXPLIQUER AUX UTILISATEURS) :
 1. RÉSERVATION : Les utilisateurs doivent aller dans l'onglet "RÉSERVER", choisir le sens (Bukavu->Goma ou Goma->Bukavu), la date, le bateau et leur classe.
 2. PAIEMENT : Une fois les informations saisies, ils doivent effectuer le paiement via Mobile Money (Airtel, Orange, M-Pesa) au numéro officiel : +243 994 286 469 (Titulaire : AMR MUGOTE).

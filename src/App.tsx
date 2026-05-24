@@ -86,9 +86,10 @@ import { QRCodeSVG } from 'qrcode.react';
 import QRCode from 'qrcode';
 import { jsPDF } from 'jspdf';
 import UsersListView from './components/UsersListView';
+import LocalisationView from './components/LocalisationView';
 
 // --- Types ---
-type Page = 'home' | 'booking' | 'payment' | 'dashboard' | 'tickets' | 'news' | 'gallery' | 'users';
+type Page = 'home' | 'booking' | 'payment' | 'dashboard' | 'tickets' | 'news' | 'gallery' | 'users' | 'map';
 
 // --- Constants ---
 const MERCHANT_PHONE = "+243 994 286 469";
@@ -706,6 +707,7 @@ export default function App() {
                 { id: 'tickets', label: 'BILLETS' },
                 { id: 'news', label: 'JOURNAL' },
                 { id: 'gallery', label: 'FLOTTE' },
+                { id: 'map', label: 'LOCALISATION' },
                 { id: 'dashboard', label: '⚙️ ADMINISTRATION COMITÉ', adminOnly: true }
               ].map(item => {
                 if (item.adminOnly && !isAdmin) return null;
@@ -774,6 +776,7 @@ export default function App() {
                 { id: 'home', label: 'ACCUEIL' },
                 { id: 'booking', label: 'RÉSERVER' },
                 { id: 'tickets', label: 'MES BILLETS' },
+                { id: 'map', label: 'LOCALISATION' },
                 { id: 'news', label: 'JOURNAL', anchor: 'news-feed' },
                 { id: 'gallery', label: 'FLOTTE', anchor: 'fleet-gallery' },
                 { id: 'tarifs', label: 'TARIFS', anchor: 'prices' },
@@ -878,6 +881,7 @@ export default function App() {
               {currentPage === 'news' && <NewsView />}
               {currentPage === 'gallery' && <GalleryView siteSettings={siteSettings} />}
               {currentPage === 'users' && <UsersListView />}
+              {currentPage === 'map' && <LocalisationView />}
               <ChatWidget user={user} />
             </>
           )}
