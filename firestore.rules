@@ -9,44 +9,51 @@ service cloud.firestore {
     // Helper functions
     function isSignedIn() { return request.auth != null; }
     function isAdmin() { 
-      return isSignedIn() && (
-        exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
-        request.auth.token.email == 'birekeidea@gmail.com'
-      ); 
+      return isSignedIn() && request.auth.token.email == 'birekeidea@gmail.com';
     }
 
     // Reservations
     match /reservations/{resId} {
-      allow read, list, create, update: if true;
+      // Allow read/list only if the reservation belongs to the user OR user is admin
+      allow read, list: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      // Allow creation if the data contains the correct user ID
+      allow create: if isSignedIn() && (request.resource.data.userId == request.auth.uid || isAdmin());
+      // Allow updates if the reservation belongs to user (to add transaction ID / cancellation) or if they are admin
+      allow update: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      // Only admin can delete reservations
       allow delete: if isAdmin();
     }
 
     // Users
     match /users/{userId} {
-      allow read, write: if true;
+      // A user can read/write their own document, or administrator can access everything
+      allow read, write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
     }
 
     // Users List for Admins
     match /users_list/{userId} {
-      allow read, write: if true;
+      // A user can create/update their own document, but only admin can view or list everyone
+      allow get, create, update: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      allow list: if isAdmin();
     }
 
     // News (Public Read)
     match /news/{newsId} {
       allow read: if true;
       allow create, delete: if isAdmin();
-      allow update: if true;
+      allow update: if true; // to like or comment on news publicly
 
       // Comments Subcollection
       match /comments/{commentId} {
-        allow read, write: if true;
+        allow read: if true;
+        allow write: if isSignedIn();
       }
     }
 
     // Admin lookup
     match /admins/{adminId} {
       allow read: if isSignedIn();
-      allow write: if isSignedIn() && request.auth.token.email == 'birekeidea@gmail.com' && adminId == request.auth.uid;
+      allow write: if isAdmin() && adminId == request.auth.uid;
     }
 
     // Site Settings
@@ -63,11 +70,20 @@ service cloud.firestore {
 
     // Support Conversations & Chat messages
     match /conversations/{convId} {
-      allow read, list, create, update: if true;
+      // Standard users can view/update/create their own conversations
+      allow read, list, create, update: if isSignedIn() && (
+        (request.resource != null && request.resource.data.userId == request.auth.uid) ||
+        (resource != null && resource.data.userId == request.auth.uid) || 
+        isAdmin()
+      );
 
       // Messages Subcollection
       match /messages/{msgId} {
-        allow read, write: if true;
+        // Only parent conversation owner or admin can read/write message subcollection
+        allow read, write: if isSignedIn() && (
+          get(/databases/$(database)/documents/conversations/$(convId)).data.userId == request.auth.uid ||
+          isAdmin()
+        );
       }
     }
 

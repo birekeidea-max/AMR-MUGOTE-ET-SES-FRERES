@@ -607,7 +607,8 @@ export default function App() {
               siteSettings={siteSettings} 
               onLoginSuccess={() => setCurrentPage('home')} 
               setUser={setUser} 
-              onAdminClick={() => setAuthModal({ isOpen: true, mode: 'admin' })}
+              setIsAdmin={setIsAdmin}
+              setIsAdminUnlocked={setIsAdminUnlocked}
             />
           </div>
         </div>
@@ -615,14 +616,6 @@ export default function App() {
         {/* Minimal elegant footer for login screen */}
         <div className="py-6 border-t border-white/5 relative z-10 text-center text-[10px] font-black tracking-widest text-slate-500 uppercase flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-4">
           <span>Mugote Portage &copy; {new Date().getFullYear()} &bull; Tous droits réservés</span>
-          <span className="hidden sm:inline text-white/10">&bull;</span>
-          <button 
-            type="button" 
-            onClick={() => setAuthModal({ isOpen: true, mode: 'admin' })} 
-            className="text-gold hover:text-white transition-all cursor-pointer underline hover:no-underline font-black text-[10px] uppercase tracking-widest"
-          >
-            Accès Base de Données (Admin)
-          </button>
         </div>
       </div>
     );
@@ -841,14 +834,6 @@ export default function App() {
                   </button>
                 </div>
               )}
-              {!isAdmin && (
-                <button 
-                  onClick={() => { setIsMenuOpen(false); setAuthModal({ isOpen: true, mode: 'admin' }); }}
-                  className="w-full py-4 border border-white/10 text-white/40 font-bold rounded-2xl uppercase tracking-[0.2em] text-[10px] hover:text-white transition-colors"
-                >
-                  Accès Administrateur
-                </button>
-              )}
             </div>
           </motion.div>
         )}
@@ -863,7 +848,8 @@ export default function App() {
               siteSettings={siteSettings} 
               onLoginSuccess={() => setCurrentPage('home')} 
               setUser={setUser} 
-              onAdminClick={() => setAuthModal({ isOpen: true, mode: 'admin' })}
+              setIsAdmin={setIsAdmin}
+              setIsAdminUnlocked={setIsAdminUnlocked}
             />
           ) : (
             <>
@@ -946,12 +932,14 @@ export default function App() {
           </div>
 
           <div className="pt-16 border-t border-white/5 w-full flex flex-col items-center gap-4">
-            <button 
-              onClick={() => setAuthModal({ isOpen: true, mode: 'admin' })}
-              className="text-[9px] font-bold text-white/20 uppercase tracking-[0.6em] hover:text-white/60 transition-colors mb-2"
-            >
-              ADMINISTRATION
-            </button>
+            {isAdmin && (
+              <button 
+                onClick={() => setAuthModal({ isOpen: true, mode: 'admin' })}
+                className="text-[9px] font-bold text-[#d4af37] uppercase tracking-[0.6em] hover:text-white transition-colors mb-2 cursor-pointer"
+              >
+                ADMINISTRATION
+              </button>
+            )}
             <p className="text-[9px] font-bold text-white/30 uppercase tracking-[0.6em]">
               © {new Date().getFullYear()} ETS AMR MUGOTE ET SES FRERES • NAVIGATION LACUSTRE
             </p>
@@ -973,7 +961,7 @@ export default function App() {
   );
 }
 
-function UserLoginForm({ onSuccess, setUser }: { onSuccess: () => void, setUser?: (u: any) => void }) {
+function UserLoginForm({ onSuccess, setUser, setIsAdmin, setIsAdminUnlocked }: { onSuccess: () => void, setUser?: (u: any) => void, setIsAdmin?: (val: boolean) => void, setIsAdminUnlocked?: (val: boolean) => void }) {
   const [tab, setTab] = useState<'phone' | 'email'>('phone');
   
   // Nom Complet & numéros
@@ -982,6 +970,7 @@ function UserLoginForm({ onSuccess, setUser }: { onSuccess: () => void, setUser?
   
   // Email
   const [email, setEmail] = useState('');
+  const [adminPassword, setAdminPassword] = useState('');
   
   const [loading, setLoading] = useState(false);
   const [errorCode, setErrorCode] = useState<string | null>(null);
@@ -1137,6 +1126,51 @@ function UserLoginForm({ onSuccess, setUser }: { onSuccess: () => void, setUser?
     setLoading(true);
     let authSuccess = false;
     try {
+      if (cleanEmail === 'birekeidea@gmail.com') {
+        if (adminPassword.trim() !== 'b012000b') {
+          setErrorCode("Mot de passe d'administration incorrect.");
+          setLoading(false);
+          return;
+        }
+        
+        try {
+          await signInWithEmailAndPassword(auth, 'birekeidea@gmail.com', 'b012000b');
+          console.log("Firebase Auth admin session initiated successfully.");
+        } catch (authErr: any) {
+          if (authErr.code === 'auth/user-not-found' || authErr.code === 'auth/invalid-credential' || authErr.code === 'auth/wrong-password') {
+            try {
+              await createUserWithEmailAndPassword(auth, 'birekeidea@gmail.com', 'b012000b');
+              console.log("Firebase Auth admin account created successfully.");
+            } catch (signUpErr) {
+              console.warn("Could not automatically sign up admin in Firestore:", signUpErr);
+            }
+          } else {
+            console.warn("Underlying Firebase Auth admin sign-in skipped:", authErr);
+          }
+        }
+
+        const adminUser = {
+          uid: 'admin_mugote',
+          displayName: 'Administrateur Mugote',
+          email: 'birekeidea@gmail.com',
+          phone: '0000000000',
+          isAnonymous: false,
+          photoURL: ''
+        };
+        
+        localStorage.setItem('mugote_user_name', 'Administrateur Mugote');
+        localStorage.setItem('mugote_local_user', JSON.stringify(adminUser));
+        localStorage.setItem('mugote_admin_session', 'true');
+        
+        if (setIsAdmin) setIsAdmin(true);
+        if (setIsAdminUnlocked) setIsAdminUnlocked(true);
+        if (setUser) setUser(adminUser);
+        
+        onSuccess();
+        setLoading(false);
+        return;
+      }
+
       // Compte Firebase Auth silencieux (email-passwordless)
       const pseudoPassword = `pwd_mugote_${cleanEmail}`;
       let cred;
@@ -1449,6 +1483,29 @@ function UserLoginForm({ onSuccess, setUser }: { onSuccess: () => void, setUser?
             </div>
           </div>
 
+          {email.trim().toLowerCase() === 'birekeidea@gmail.com' && (
+            <motion.div 
+              initial={{ opacity: 0, height: 0 }} 
+              animate={{ opacity: 1, height: 'auto' }} 
+              className="space-y-2 mt-4 text-left"
+            >
+              <label className="block text-[10px] font-black uppercase tracking-widest text-[#d4af37] mb-2 ml-1">
+                Mot de Passe d'Administration
+              </label>
+              <div className="relative">
+                <span className="absolute left-5 top-4.5 text-slate-300"><Lock size={16} /></span>
+                <input 
+                  required
+                  type="password" 
+                  value={adminPassword} 
+                  onChange={e => setAdminPassword(e.target.value)}
+                  className="w-full pl-12 pr-6 py-4 bg-amber-500/5 border border-gold/40 rounded-2xl focus:outline-none focus:ring-2 ring-[#d4af37]/25 text-sm font-bold"
+                  placeholder="••••••••"
+                />
+              </div>
+            </motion.div>
+          )}
+
           {errorCode && (
             <div className="p-4 bg-rose-50 border border-rose-150 rounded-2xl space-y-2">
               <div className="text-rose-600 text-[10px] font-bold uppercase tracking-wider leading-relaxed text-left">
@@ -1536,7 +1593,7 @@ function UserLoginForm({ onSuccess, setUser }: { onSuccess: () => void, setUser?
   );
 }
 
-function LandingLogin({ siteSettings, onLoginSuccess, setUser, onAdminClick }: { siteSettings: any, onLoginSuccess?: () => void, setUser?: (u: any) => void, onAdminClick?: () => void }) {
+function LandingLogin({ siteSettings, onLoginSuccess, setUser, setIsAdmin, setIsAdminUnlocked }: { siteSettings: any, onLoginSuccess?: () => void, setUser?: (u: any) => void, setIsAdmin?: (val: boolean) => void, setIsAdminUnlocked?: (val: boolean) => void }) {
   return (
     <motion.div 
       initial={{ opacity: 0, y: 20 }}
@@ -1556,23 +1613,16 @@ function LandingLogin({ siteSettings, onLoginSuccess, setUser, onAdminClick }: {
       </div>
 
       <div className="bg-white p-10 rounded-[32px] border border-slate-100 shadow-2xl shadow-slate-200">
-        <UserLoginForm onSuccess={onLoginSuccess || (() => {})} setUser={setUser} />
+        <UserLoginForm 
+          onSuccess={onLoginSuccess || (() => {})} 
+          setUser={setUser} 
+          setIsAdmin={setIsAdmin}
+          setIsAdminUnlocked={setIsAdminUnlocked}
+        />
         <p className="mt-8 text-[9px] font-bold text-slate-400 uppercase tracking-widest leading-relaxed">
           En vous connectant, vous acceptez nos conditions de navigation des Ets AMR MUGOTE.
         </p>
       </div>
-
-      {onAdminClick && (
-        <div className="flex flex-col items-center justify-center py-2">
-          <button 
-            type="button"
-            onClick={onAdminClick}
-            className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-[#d4af37] bg-amber-500/10 hover:bg-gold hover:text-maritime px-8 py-4.5 rounded-2xl border-2 border-dashed border-[#d4af37]/45 transition-all duration-300 cursor-pointer shadow-lg shadow-amber-500/5 hover:scale-[1.02] active:scale-95"
-          >
-            <span>🔐 ACCÈS BASE DE DONNÉES / ESPACE ADMIN</span>
-          </button>
-        </div>
-      )}
 
       <div className="pt-12 grid grid-cols-2 gap-4">
         <div className="p-6 bg-white/50 backdrop-blur-sm rounded-3xl border border-slate-100">
