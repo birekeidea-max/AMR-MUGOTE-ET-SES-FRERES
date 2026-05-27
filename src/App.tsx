@@ -329,14 +329,20 @@ export default function App() {
   });
    const [isAdmin, setIsAdmin] = useState(() => {
      try {
-       return localStorage.getItem('mugote_admin_session') === 'true';
+       const localUserStr = localStorage.getItem('mugote_local_user');
+       const localUser = localUserStr ? JSON.parse(localUserStr) : null;
+       const hasAdminEmail = localUser && localUser.email?.toLowerCase() === 'birekeidea@gmail.com';
+       return !!(hasAdminEmail && localStorage.getItem('mugote_admin_session') === 'true');
      } catch {
        return false;
      }
    });
    const [isAdminUnlocked, setIsAdminUnlocked] = useState(() => {
      try {
-       return localStorage.getItem('mugote_admin_session') === 'true';
+       const localUserStr = localStorage.getItem('mugote_local_user');
+       const localUser = localUserStr ? JSON.parse(localUserStr) : null;
+       const hasAdminEmail = localUser && localUser.email?.toLowerCase() === 'birekeidea@gmail.com';
+       return !!(hasAdminEmail && localStorage.getItem('mugote_admin_session') === 'true');
      } catch {
        return false;
      }
@@ -395,14 +401,30 @@ export default function App() {
     });
 
     const unsubscribe = onAuthStateChanged(auth, async (u) => {
-      if (localStorage.getItem('mugote_admin_session') === 'true') {
+      const adminEmail = 'birekeidea@gmail.com';
+      const localUserStr = localStorage.getItem('mugote_local_user');
+      let localUser: any = null;
+      if (localUserStr) {
+        try {
+          localUser = JSON.parse(localUserStr);
+        } catch {}
+      }
+
+      const isSessionAdmin = localStorage.getItem('mugote_admin_session') === 'true';
+      const hasFirebaseAdminMail = u && u.email?.toLowerCase() === adminEmail.toLowerCase();
+      const hasLocalAdminMail = localUser && localUser.email?.toLowerCase() === adminEmail.toLowerCase();
+
+      // STRICT CHECK: Admin role is only granted if the authenticated user or local session has the admin email address
+      const isAllowedAdmin = !!(isSessionAdmin && (hasFirebaseAdminMail || hasLocalAdminMail));
+
+      if (isAllowedAdmin) {
         const adminUser = {
-          uid: 'admin_mugote',
-          displayName: 'Administrateur Mugote',
-          email: 'birekeidea@gmail.com',
-          phone: '0000000000',
+          uid: u ? u.uid : 'admin_mugote',
+          displayName: u?.displayName || localUser?.displayName || 'Administrateur Mugote',
+          email: adminEmail,
+          phone: localUser?.phone || '0000000000',
           isAnonymous: false,
-          photoURL: ''
+          photoURL: u?.photoURL || localUser?.photoURL || ''
         };
         setUser(adminUser);
         setIsAdmin(true);
@@ -412,18 +434,18 @@ export default function App() {
       }
 
       // Prioritize our persistent local-first phone-based user session if defined
-      const localUserStr = localStorage.getItem('mugote_local_user');
       if (localUserStr) {
         try {
           const localUser = JSON.parse(localUserStr);
           setUser(localUser);
           
           // Determine if this user has admin rights
-          const adminEmail = 'birekeidea@gmail.com';
-          const isOwner = localUser.email?.toLowerCase() === adminEmail.toLowerCase();
+          const isOwner = localUser.email?.toLowerCase() === adminEmail.toLowerCase() && (u && u.email?.toLowerCase() === adminEmail.toLowerCase());
           setIsAdmin(isOwner);
-          // Auto-unlock disabled to force manual credential verification
-          // if (isOwner) setIsAdminUnlocked(true);
+          if (!isOwner) {
+            localStorage.removeItem('mugote_admin_session');
+            setIsAdminUnlocked(false);
+          }
           setLoading(false);
           
           // Sync profile details to DB to ensure they instantly appear in user list
@@ -468,11 +490,12 @@ export default function App() {
         setUser(localUserObj);
         
         // Admin check logic
-        const adminEmail = 'birekeidea@gmail.com';
         const isOwner = u.email?.toLowerCase() === adminEmail.toLowerCase();
         setIsAdmin(isOwner);
-        // Auto-unlock disabled to force manual credential verification
-        // if (isOwner) setIsAdminUnlocked(true);
+        if (!isOwner) {
+          localStorage.removeItem('mugote_admin_session');
+          setIsAdminUnlocked(false);
+        }
 
         setDoc(doc(db, 'users', u.uid), {
           uid: u.uid,
@@ -497,6 +520,7 @@ export default function App() {
         setUser(null);
         setIsAdmin(false);
         setIsAdminUnlocked(false);
+        localStorage.removeItem('mugote_admin_session');
       }
       setLoading(false);
     });
