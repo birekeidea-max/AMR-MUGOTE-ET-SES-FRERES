@@ -18,6 +18,8 @@ export interface Reservation {
   passengersCount: number;
   status: ReservationStatus;
   paymentMethod: string;
+  momoOperator?: string;
+  identityNum?: string;
   transactionId: string;
   amount: number;
   createdAt: number;

@@ -42,11 +42,13 @@ import {
   Users,
   Cat,
   PhoneCall,
+  Smartphone,
   RotateCw,
   Rocket,
   Camera,
   Check,
-  ExternalLink
+  ExternalLink,
+  Download
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { auth, db, handleFirestoreError, OperationType, uploadToStorage } from './lib/firebase';
@@ -861,7 +863,7 @@ export default function App() {
                   onLoginRequest={() => setAuthModal({ isOpen: true, mode: 'user' })}
                 />
               )}
-              {currentPage === 'payment' && <Payment reservation={currentReservation} onComplete={() => setCurrentPage('tickets')} />}
+              {currentPage === 'payment' && <Payment reservation={currentReservation} onComplete={() => setCurrentPage('tickets')} siteSettings={siteSettings} />}
               {currentPage === 'dashboard' && <Dashboard siteSettings={siteSettings} onNavigate={setCurrentPage} schedules={schedules} isAdmin={isAdmin} isAdminUnlocked={isAdminUnlocked} setIsAdminUnlocked={setIsAdminUnlocked} setUser={setUser} />}
               {currentPage === 'tickets' && <MyTickets user={user} siteSettings={siteSettings} />}
               {currentPage === 'news' && <NewsView />}
@@ -2554,13 +2556,15 @@ function Booking({ onReserved, user, onLoginRequest }: { onReserved: (res: Reser
     lastName: '',
     phone: '',
     email: '',
+    identityNum: '',
+    momoOperator: 'Airtel Money',
     itinerary: 'Bukavu-Goma' as Itinerary,
     ship: 'Mugote 1' as ShipName,
     travelDate: '',
     departureTime: '07:30',
     travelClass: '2ème Classe' as TravelClass,
     passengersCount: 1,
-    paymentMethod: 'Airtel Money',
+    paymentMethod: 'Mobile Money',
     transactionId: ''
   });
   const [submitting, setSubmitting] = useState(false);
@@ -2568,7 +2572,12 @@ function Booking({ onReserved, user, onLoginRequest }: { onReserved: (res: Reser
 
   useEffect(() => {
     if (user) {
-      setFormData(prev => ({ ...prev, fullName: user.displayName || '', email: user.email || '' }));
+      setFormData(prev => ({ 
+        ...prev, 
+        fullName: user.displayName || '', 
+        email: user.email || '',
+        phone: user.phoneNumber || prev.phone
+      }));
     }
   }, [user]);
 
@@ -2583,6 +2592,10 @@ function Booking({ onReserved, user, onLoginRequest }: { onReserved: (res: Reser
     }
     if (!formData.lastName.trim() || formData.lastName.trim().length < 2) {
       setErrorLocal("Veuillez entrer un post-nom valide (au moins 2 lettres).");
+      return;
+    }
+    if (!formData.identityNum.trim() || formData.identityNum.trim().length < 4) {
+      setErrorLocal("Veuillez indiquer un numéro / une pièce d'identité (Ex: Carte d'électeur, Passeport, Permis).");
       return;
     }
 
@@ -2614,17 +2627,12 @@ function Booking({ onReserved, user, onLoginRequest }: { onReserved: (res: Reser
     const generalPhoneRegex = /^\+?[0-9]{9,15}$/;
     
     if (!cleanPhone) {
-      setErrorLocal("Un numéro de téléphone est obligatoire.");
+      setErrorLocal("Un numéro de téléphone Mobile Money est obligatoire.");
       return;
     }
 
     if (!phoneRegex.test(cleanPhone) && !generalPhoneRegex.test(cleanPhone)) {
       setErrorLocal("Le numéro de téléphone n'est pas valide. Exemple de format valide: 0991234567 ou +243991234567");
-      return;
-    }
-
-    if (!formData.transactionId.trim()) {
-      setErrorLocal("ID de transaction requis. Veuillez d'abord payer votre place par Mobile Money puis renseigner l'identifiant de la transaction.");
       return;
     }
 
@@ -2636,12 +2644,15 @@ function Booking({ onReserved, user, onLoginRequest }: { onReserved: (res: Reser
     
     const amount = PRICES[formData.travelClass] * formData.passengersCount;
     
+    // We auto-generate a temporary pending transactionId structure to satisfy the collection structure
+    const tempTxnId = `TEMP-MUG-PAY-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+
     const resData: Reservation = {
       ...formData,
       userId: user.uid,
       status: 'PENDING',
       amount,
-      transactionId: formData.transactionId,
+      transactionId: tempTxnId,
       createdAt: Date.now(),
       ticketId: ''
     };
@@ -2708,14 +2719,14 @@ function Booking({ onReserved, user, onLoginRequest }: { onReserved: (res: Reser
                       </label>
                     </div>
                   </div>
-                  <div className="p-2.5 lg:p-6 flex-1">
+                  <div className="p-2.5 lg:p-6 flex-1 space-y-4">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 lg:gap-4">
                       <input 
                         required
                         type="text" 
                         value={formData.fullName}
                         onChange={e => setFormData({ ...formData, fullName: e.target.value })}
-                        className="w-full px-3 py-1.5 lg:px-5 lg:py-3 bg-slate-50 border-2 border-maritime/30 rounded-lg lg:rounded-2xl focus:outline-none focus:ring-4 focus:ring-gold/10 focus:border-gold transition-all font-bold text-[11px] lg:text-sm"
+                        className="w-full px-3 py-1.5 lg:px-5 lg:py-3 bg-slate-50 border-2 border-maritime/30 rounded-lg lg:rounded-2xl focus:outline-none focus:ring-4 focus:ring-gold/10 focus:border-gold transition-all font-bold text-[11px] lg:text-sm text-black"
                         placeholder="NOM"
                       />
                       <input 
@@ -2723,31 +2734,77 @@ function Booking({ onReserved, user, onLoginRequest }: { onReserved: (res: Reser
                         type="text" 
                         value={formData.lastName}
                         onChange={e => setFormData({ ...formData, lastName: e.target.value })}
-                        className="w-full px-3 py-1.5 lg:px-5 lg:py-3 bg-slate-50 border-2 border-maritime/30 rounded-lg lg:rounded-2xl focus:outline-none focus:ring-4 focus:ring-gold/10 focus:border-gold transition-all font-bold text-[11px] lg:text-sm"
+                        className="w-full px-3 py-1.5 lg:px-5 lg:py-3 bg-slate-50 border-2 border-maritime/30 rounded-lg lg:rounded-2xl focus:outline-none focus:ring-4 focus:ring-gold/10 focus:border-gold transition-all font-bold text-[11px] lg:text-sm text-black"
                         placeholder="POST-NOM"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[8px] lg:text-[10px] font-black uppercase tracking-[0.1em] text-slate-400 mb-1">
+                        Pièce d'Identité obligatoires (Carte d'Électeur / Passeport / Permis de conduire)
+                      </label>
+                      <input 
+                        required
+                        type="text" 
+                        value={formData.identityNum}
+                        onChange={e => setFormData({ ...formData, identityNum: e.target.value })}
+                        className="w-full px-3 py-1.5 lg:px-5 lg:py-3 bg-slate-50 border-2 border-maritime/30 rounded-lg lg:rounded-2xl focus:outline-none focus:ring-4 focus:ring-gold/10 focus:border-gold transition-all font-bold text-[11px] lg:text-sm uppercase text-black"
+                        placeholder="EX: N° CARTE D'ÉLECTEUR OU PASSEPORT"
                       />
                     </div>
                   </div>
                 </div>
 
-                {/* Contact */}
+                {/* Contact & Mobile Money */}
                 <div className="flex flex-col sm:flex-row group transition-colors hover:bg-slate-50/50">
                   <div className="p-2 lg:p-6 sm:border-r border-slate-100 bg-slate-50/30 sm:w-[150px] lg:w-[200px] shrink-0">
                     <div className="flex flex-col gap-0.5 lg:gap-1">
                       <label className="text-[8px] lg:text-[10px] font-black uppercase text-maritime tracking-widest flex items-center gap-1.5 lg:gap-2">
-                        <Phone size={10} className="text-gold" /> Contact
+                        <Smartphone size={10} className="text-gold" /> Mobile Money
                       </label>
                     </div>
                   </div>
-                  <div className="p-2.5 lg:p-6 flex-1">
-                    <input 
-                      required
-                      type="tel" 
-                      value={formData.phone}
-                      onChange={e => setFormData({ ...formData, phone: e.target.value })}
-                      className="w-full px-3 py-1.5 lg:px-5 lg:py-3 bg-slate-50 border-2 border-maritime/30 rounded-lg lg:rounded-2xl focus:outline-none focus:ring-4 focus:ring-gold/10 focus:border-gold transition-all font-mono font-black text-[11px] lg:text-sm text-maritime"
-                      placeholder="+243 999 999 999"
-                    />
+                  <div className="p-2.5 lg:p-6 flex-1 space-y-4">
+                    <div>
+                      <label className="block text-[8px] lg:text-[10px] font-black uppercase tracking-[0.1em] text-slate-400 mb-2">
+                        Choisir l'Opérateur du Paiement Push
+                      </label>
+                      <div className="grid grid-cols-3 gap-2">
+                        {[
+                          { name: 'Airtel Money', style: 'border-rose-100 hover:border-rose-500 bg-rose-50 text-rose-700 font-extrabold', activeStyle: 'bg-rose-600 text-white border-rose-600 shadow-md' },
+                          { name: 'Orange Money', style: 'border-orange-100 hover:border-orange-500 bg-orange-50 text-orange-700 font-extrabold', activeStyle: 'bg-orange-650 text-white border-orange-650 shadow-md' },
+                          { name: 'M-Pesa', style: 'border-emerald-100 hover:border-emerald-500 bg-emerald-50 text-emerald-700 font-extrabold', activeStyle: 'bg-emerald-600 text-white border-emerald-600 shadow-md' }
+                        ].map(op => {
+                          const isSel = formData.momoOperator === op.name;
+                          return (
+                            <button
+                              key={op.name}
+                              type="button"
+                              onClick={() => setFormData(prev => ({ ...prev, momoOperator: op.name, paymentMethod: op.name }))}
+                              className={cn(
+                                "py-2 px-1 rounded-xl border text-[9px] sm:text-xs font-black uppercase tracking-wider transition-all text-center flex items-center justify-center cursor-pointer",
+                                isSel ? op.activeStyle : op.style
+                              )}
+                            >
+                              {op.name}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-[8px] lg:text-[10px] font-black uppercase tracking-[0.1em] text-slate-400 mb-1">
+                        Numéro Mobile Money (pour confirmer le STK Push sur votre mobile)
+                      </label>
+                      <input 
+                        required
+                        type="tel" 
+                        value={formData.phone}
+                        onChange={e => setFormData({ ...formData, phone: e.target.value })}
+                        className="w-full px-3 py-1.5 lg:px-5 lg:py-3 bg-slate-50 border-2 border-maritime/30 rounded-lg lg:rounded-2xl focus:outline-none focus:ring-4 focus:ring-gold/10 focus:border-gold transition-all font-mono font-black text-[11px] lg:text-sm text-maritime"
+                        placeholder="Ex: 0991234567 ou +243991234567"
+                      />
+                    </div>
                   </div>
                 </div>
 
@@ -2889,38 +2946,9 @@ function Booking({ onReserved, user, onLoginRequest }: { onReserved: (res: Reser
                     </div>
                   </div>
                 </div>
-
-                {/* Transaction ID */}
-                <div className="flex flex-col sm:flex-row group transition-colors hover:bg-slate-50/50">
-                  <div className="p-2 lg:p-6 sm:border-r border-slate-100 bg-slate-50/30 sm:w-[150px] lg:w-[200px] shrink-0">
-                    <div className="flex flex-col gap-0.5 lg:gap-1">
-                      <label className="text-[8px] lg:text-[10px] font-black uppercase text-maritime tracking-widest flex items-center gap-1.5 lg:gap-2">
-                        <CheckCircle size={10} className="text-gold" /> Paiement
-                      </label>
-                    </div>
-                  </div>
-                  <div className="p-2.5 lg:p-6 flex-1">
-                    <div className="space-y-2 lg:space-y-4">
-                      <div className="p-2 lg:p-4 bg-maritime/5 border border-maritime/10 rounded-lg lg:rounded-xl space-y-1 lg:space-y-2">
-                        <p className="text-[7px] lg:text-[9px] font-black text-maritime uppercase tracking-widest leading-none">Paiement Mobile :</p>
-                        <p className="text-[9px] lg:text-[11px] font-bold text-slate-700 leading-relaxed uppercase">
-                          <span className="font-black text-maritime tracking-wider">+243 994 286 469</span>
-                        </p>
-                      </div>
-                      <input 
-                        required
-                        type="text" 
-                        value={formData.transactionId}
-                        onChange={e => setFormData({ ...formData, transactionId: e.target.value })}
-                        className="w-full px-3 py-1.5 lg:px-5 lg:py-3 bg-slate-50 border-2 border-maritime/30 rounded-lg lg:rounded-2xl focus:outline-none focus:ring-4 focus:ring-gold/10 focus:border-gold transition-all font-mono font-black text-[11px] lg:text-sm uppercase"
-                        placeholder="ID TRANSACTION"
-                      />
-                    </div>
-                  </div>
-                </div>
               </div>
 
-              {/* Submission Row */}
+               {/* Submission Row */}
               <div className="bg-slate-50/80 p-4 lg:p-10 text-center">
                 <div className="max-w-md mx-auto space-y-4 lg:space-y-6">
                    <div className="space-y-3 lg:space-y-4">
@@ -2936,10 +2964,10 @@ function Booking({ onReserved, user, onLoginRequest }: { onReserved: (res: Reser
                               </div>
                             </div>
 
-                            <div className="flex items-start gap-3 p-3 bg-amber-50 rounded-xl text-left border border-amber-100">
-                              <AlertCircle size={16} className="text-amber-500 flex-shrink-0 mt-0.5" />
-                              <p className="text-[8px] lg:text-[10px] font-bold leading-relaxed text-amber-900 uppercase tracking-[0.05em]">
-                                Validation après confirmation au <span className="font-black text-black">+243 994 286 469</span>.
+                            <div className="flex items-start gap-3 p-3 bg-indigo-50 border border-indigo-100 rounded-xl text-left">
+                              <Smartphone size={16} className="text-indigo-600 flex-shrink-0 mt-0.5 animate-pulse" />
+                              <p className="text-[8px] lg:text-[10px] font-bold leading-relaxed text-indigo-900 uppercase tracking-[0.05em]">
+                                Système de paiement automatisé. En cliquant ci-dessous, la requête de paiement Mobile Money USSD / STK Push sera instantanément lancée sur votre téléphone.
                               </p>
                             </div>
                          </div>
@@ -2947,9 +2975,9 @@ function Booking({ onReserved, user, onLoginRequest }: { onReserved: (res: Reser
                          <button 
                             disabled={submitting}
                             type="submit"
-                            className="w-full py-4 lg:py-5 bg-maritime text-white text-[10px] lg:text-xs font-black uppercase tracking-[0.2em] shadow-xl hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-50 rounded-xl lg:rounded-2xl relative overflow-hidden group"
+                            className="w-full py-4 lg:py-5 bg-maritime hover:bg-[#002255] text-white text-[10px] lg:text-xs font-black uppercase tracking-[0.2em] shadow-xl hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-50 rounded-xl lg:rounded-2xl relative overflow-hidden group border-2 border-gold/10 hover:border-gold/30"
                           >
-                            <span className="relative z-10">{submitting ? "Traitement..." : `Confirmer & Payer ${PRICES[formData.travelClass] * formData.passengersCount}$`}</span>
+                            <span className="relative z-10">{submitting ? "Initiation du paiement..." : "Réserver et payer le billet"}</span>
                             <div className="absolute inset-0 bg-gradient-to-r from-gold via-transparent to-gold opacity-0 group-hover:opacity-20 transition-opacity" />
                           </button>
                       </div>
@@ -3070,255 +3098,517 @@ function Booking({ onReserved, user, onLoginRequest }: { onReserved: (res: Reser
   );
 }
 
-function Payment({ reservation, onComplete }: { reservation: Reservation | null, onComplete: () => void }) {
-  const [step, setStep] = useState<'init' | 'processing' | 'success'>('init');
-  const [submitting, setSubmitting] = useState(false);
-  const [transactionId, setTransactionId] = useState(reservation ? (reservation.transactionId || '') : '');
+function Payment({ reservation, onComplete, siteSettings }: { reservation: Reservation | null, onComplete: () => void, siteSettings: any }) {
+  const [step, setStep] = useState<'processing' | 'stk-input' | 'stk-validating' | 'success'>('processing');
+  const [pin, setPin] = useState('');
+  const [momoTransactionId, setMomoTransactionId] = useState('');
+  const [generatedTicketId, setGeneratedTicketId] = useState('');
   const [errorLocal, setErrorLocal] = useState<string | null>(null);
+  const [secRemaining, setSecRemaining] = useState(3);
 
   if (!reservation) return null;
 
-  const handleManualConfirm = async (id: string, redirectImmediately = false) => {
-    const cleanId = id.trim();
-    setErrorLocal(null);
-    if (!cleanId) {
-      setErrorLocal("Veuillez saisir l'ID de transaction pour confirmer votre billet.");
-      return;
+  // Sync / default operator styling
+  const operatorName = reservation.momoOperator || 'M-Pesa';
+  const operatorColors: Record<string, { bg: string, text: string, accent: string }> = {
+    'M-Pesa': { bg: 'bg-[#E11B22]', text: 'text-white', accent: 'bg-[#C11016]' },
+    'Airtel Money': { bg: 'bg-[#FF0000]', text: 'text-white', accent: 'bg-[#CC0000]' },
+    'Orange Money': { bg: 'bg-[#F28500]', text: 'text-black', accent: 'bg-[#E07400]' }
+  };
+  const currentOpStyle = operatorColors[operatorName] || { bg: 'bg-slate-800', text: 'text-white', accent: 'bg-slate-900' };
+
+  // Timer loop for processing state at the beginning
+  useEffect(() => {
+    if (step === 'processing') {
+      const interval = setInterval(() => {
+        setSecRemaining((prev) => {
+          if (prev <= 1) {
+            clearInterval(interval);
+            setStep('stk-input');
+            return 3;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+      return () => clearInterval(interval);
     }
+  }, [step]);
 
-    setSubmitting(true);
-    try {
-      // Vérifier si l'ID de transaction est unique
-      const q = query(collection(db, 'reservations'), where('transactionId', '==', cleanId));
-      const querySnapshot = await getDocs(q);
-      
-      // On vérifie si un AUTRE document possède déjà cet ID
-      const alreadyExists = querySnapshot.docs.some(d => d.id !== reservation.id);
-      
-      if (alreadyExists) {
-        setErrorLocal("Cet ID de transaction a déjà été utilisé sur un autre billet. Veuillez entrer un ID valide et unique.");
-        setSubmitting(false);
-        return;
-      }
-
-      await updateDoc(doc(db, 'reservations', reservation.id!), {
-        transactionId: cleanId,
-        status: 'PENDING'
-      });
-      
-      if (redirectImmediately) {
-        onComplete();
-      } else {
-        setStep('success');
-      }
-    } catch (error: any) {
-      console.error("Firestore update error:", error);
-      setErrorLocal(error.message || "Une erreur réseau est survenue. Veuillez vérifier votre connexion et réessayer.");
-    } finally {
-      setSubmitting(false);
+  const handleKeyClick = (num: string) => {
+    setErrorLocal(null);
+    if (pin.length < 6) {
+      setPin(prev => prev + num);
     }
   };
 
-  const startStkPush = () => {
+  const handleBackspace = () => {
+    setPin(prev => prev.slice(0, -1));
+  };
+
+  const handleStkSubmit = async () => {
+    if (pin.length < 4) {
+      setErrorLocal("Veuillez saisir votre code secret Momo (4 chiffres minimum).");
+      return;
+    }
+
+    setStep('stk-validating');
     setErrorLocal(null);
-    setStep('processing');
-    // Simulate real STK Push timing
-    setTimeout(() => {
-      const mockId = `MUG-${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
-      setTransactionId(mockId);
+
+    try {
+      // 1. Generate unique local operator reference ID
+      const localRef = `MOM-${operatorName.substring(0,3).toUpperCase()}-${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
+      setMomoTransactionId(localRef);
+
+      // 2. Generate unique Ticket ID with strict loop checking in Firestore
+      let uniqueTicketId = '';
+      let isUnique = false;
+      let attempts = 0;
+
+      while (!isUnique && attempts < 15) {
+        const randomHex = Math.random().toString(36).substring(2, 8).toUpperCase();
+        uniqueTicketId = `AMR-${randomHex}`;
+        const q = query(collection(db, 'reservations'), where('ticketId', '==', uniqueTicketId));
+        const qSnap = await getDocs(q);
+        if (qSnap.empty) {
+          isUnique = true;
+        }
+        attempts++;
+      }
+
+      if (!uniqueTicketId) {
+        uniqueTicketId = `AMR-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+      }
+
+      setGeneratedTicketId(uniqueTicketId);
+
+      // 3. Update reservation document status directly to VALIDATED
+      const docRef = doc(db, 'reservations', reservation.id!);
+      await updateDoc(docRef, {
+        status: 'VALIDATED',
+        ticketId: uniqueTicketId,
+        transactionId: localRef,
+        validatedAt: Date.now(),
+        momoOperator: operatorName
+      });
+
+      // 4. Trigger automatic background ticket download for optimal UX!
+      const updatedRes: Reservation = {
+        ...reservation,
+        status: 'VALIDATED',
+        ticketId: uniqueTicketId,
+        transactionId: localRef,
+        momoOperator: operatorName
+      };
+      
+      try {
+        await generateTicket(updatedRes, siteSettings || { homeBg: '' });
+      } catch (err) {
+        console.warn("Could not auto-trigger ticket PDF generation:", err);
+      }
+
       setStep('success');
-    }, 4000);
+    } catch (err: any) {
+      console.error("Simulation database update error:", err);
+      setErrorLocal(err.message || "Erreur lors de la validation du paiement.");
+      setStep('stk-input');
+    }
   };
 
   return (
     <motion.div 
-      initial={{ opacity: 0, scale: 0.95 }}
+      initial={{ opacity: 0, scale: 0.98 }}
       animate={{ opacity: 1, scale: 1 }}
-      className="max-w-xl mx-auto"
+      className="max-w-4xl mx-auto px-4 py-6"
     >
       <AnimatePresence mode="wait">
-        {step === 'init' && (
+        
+        {/* Step 1: Processing */}
+        {step === 'processing' && (
           <motion.div 
-            key="init"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
+            key="processing"
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, y: -20 }}
-            className="bg-white rounded-[40px] border border-slate-200 shadow-2xl overflow-hidden"
+            className="bg-slate-900 border border-slate-800 rounded-[35px] sm:rounded-[50px] p-8 sm:p-16 text-center text-white space-y-8 shadow-2xl relative overflow-hidden"
           >
-            <div className="bg-maritime p-10 text-white text-center space-y-4">
-              <div className="w-16 h-16 bg-white/10 rounded-2xl flex items-center justify-center mx-auto border border-white/20">
-                <PhoneCall size={32} className="text-gold" />
+            <div className="absolute top-0 right-0 w-80 h-80 bg-gold/10 rounded-full blur-3xl pointer-events-none" />
+            <div className="absolute -bottom-10 -left-10 w-80 h-80 bg-maritime/20 rounded-full blur-3xl pointer-events-none" />
+
+            <div className="relative z-10 space-y-8 max-w-lg mx-auto">
+              <div className="w-24 h-24 bg-white/5 rounded-3xl border border-white/10 flex items-center justify-center mx-auto shadow-xl">
+                <div className="relative">
+                  <div className="absolute inset-0 rounded-full border-4 border-gold/30" />
+                  <div className="w-12 h-12 rounded-full border-4 border-gold border-t-transparent animate-spin" />
+                </div>
               </div>
-              <div>
-                <h2 className="text-2xl font-black uppercase tracking-tighter italic">Paiement Mobile</h2>
-                <p className="text-[10px] font-bold text-white/60 tracking-[0.2em] uppercase">M-Pesa • Airtel Money • Orange Money</p>
+
+              <div className="space-y-3">
+                <span className="text-gold text-[10px] font-black tracking-[0.4em] uppercase">PASSERELLE DE PAIEMENT</span>
+                <h3 className="text-2xl sm:text-4xl font-black uppercase tracking-tighter italic leading-none">INITIATION DU PAIEMENT</h3>
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest leading-relaxed">
+                  Appel de l'API de l'opérateur <span className="text-gold font-black">{operatorName}</span> pour le numéro <span className="text-white font-black">{reservation.phone}</span>...
+                </p>
+              </div>
+
+              <div className="space-y-2 bg-white/[0.03] border border-white/10 rounded-2xl p-4 sm:p-6 text-left">
+                <div className="flex justify-between text-[10px] font-black uppercase text-slate-400">
+                  <span>Opérateur</span>
+                  <span className="text-white">{operatorName}</span>
+                </div>
+                <div className="h-px bg-white/5 my-2" />
+                <div className="flex justify-between text-[10px] font-black uppercase text-slate-400">
+                  <span>Numéro</span>
+                  <span className="text-white font-mono">{reservation.phone}</span>
+                </div>
+                <div className="h-px bg-white/5 my-2" />
+                <div className="flex justify-between text-[10px] font-black uppercase text-slate-400">
+                  <span>Montant</span>
+                  <span className="text-gold font-mono">{reservation.amount}.00$</span>
+                </div>
+              </div>
+
+              <div className="pt-4 flex items-center justify-center gap-3">
+                <div className="w-2 h-2 bg-gold rounded-full animate-ping" />
+                <p className="text-[9px] font-black tracking-[0.3em] uppercase text-white/50">
+                  Affichage du push sur votre écran dans {secRemaining}s...
+                </p>
               </div>
             </div>
+          </motion.div>
+        )}
 
-            <div className="p-10 space-y-8">
-              <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100 flex justify-between items-center">
-                <div className="text-left">
-                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Montant à payer</p>
-                  <p className="text-3xl font-black text-maritime font-mono">{reservation.amount}.00$</p>
-                </div>
-                <div className="text-right">
-                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Passager</p>
-                  <p className="text-xs font-black uppercase italic">{reservation.fullName}</p>
-                </div>
+        {/* Step 2: Smartphone STK Push Input Screen */}
+        {step === 'stk-input' && (
+          <motion.div 
+            key="stk-input"
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center"
+          >
+            {/* Left Column: Explanatory Context Card */}
+            <div className="lg:col-span-5 space-y-6 text-left">
+              <div className="space-y-2">
+                <span className="text-slate-400 text-[10px] font-black tracking-[0.3em] uppercase block">SIMULATEUR SÉCURISÉ</span>
+                <h2 className="text-2xl sm:text-4xl font-black text-maritime uppercase tracking-tighter leading-none italic">
+                  CONTRÔLE DE SÉCURITÉ OPÉRATEUR
+                </h2>
+                <div className="h-1.5 w-16 bg-gold rounded-full" />
               </div>
 
-              <div className="space-y-4">
-                <div className="flex items-center gap-3 p-4 bg-amber-50 rounded-2xl text-left border border-amber-100">
-                  <AlertCircle size={20} className="text-amber-500 flex-shrink-0" />
-                  <p className="text-[10px] font-black text-amber-900 uppercase">
-                    Une notification apparaîtra sur votre téléphone <span className="text-black font-black">{reservation.phone}</span> pour confirmer le paiement.
-                  </p>
-                </div>
+              <p className="text-xs font-medium text-slate-600 leading-relaxed uppercase">
+                Pour des questions de sécurité et de simplification, vous devez valider la requête de paiement STK / PUSH reçue sur la carte SIM de votre téléphone. 
+              </p>
 
-                <button 
-                  disabled={step === 'processing' || submitting}
-                  onClick={startStkPush}
-                  className="w-full py-6 bg-maritime text-white font-black uppercase tracking-[0.3em] rounded-2xl shadow-xl shadow-maritime/30 hover:scale-[1.02] active:scale-95 transition-all text-xs disabled:opacity-50"
-                >
-                  {step === 'processing' ? (
-                    <div className="flex items-center justify-center gap-2">
-                       <Ship size={16} className="animate-bounce" />
-                       Patientez...
-                    </div>
-                  ) : "Lancer le paiement direct"}
-                </button>
+              <div className="p-4 bg-indigo-50 border border-indigo-100 rounded-2xl space-y-3">
+                <h4 className="text-[10px] font-black text-[#001233] uppercase tracking-wider flex items-center gap-2">
+                  <Smartphone size={14} className="text-[#001233]" /> COMMENT PROCÉDER ?
+                </h4>
+                <ul className="space-y-1.5 text-[9px] font-bold text-indigo-900 list-disc list-inside leading-relaxed uppercase">
+                  <li>Regardez le simulateur de smartphone à droite.</li>
+                  <li>Une boîte de dialogue de paiement PIN s'est ouverte.</li>
+                  <li>Saisissez votre code PIN secret sur le clavier virtuel.</li>
+                  <li>Cliquez sur "CONFIRMER LES FONDS".</li>
+                </ul>
+              </div>
+
+              {errorLocal && (
+                <div className="p-4 bg-rose-50 border border-rose-100 rounded-2xl text-rose-600 text-[10px] font-black uppercase tracking-wide">
+                  {errorLocal}
+                </div>
+              )}
+            </div>
+
+            {/* Right Column: Visual Interactive Physical Smartphone Mockup */}
+            <div className="lg:col-span-7 flex justify-center">
+              <div className="w-[330px] h-[670px] bg-slate-900 rounded-[50px] p-3 shadow-2xl border-4 border-slate-700 relative flex flex-col overflow-hidden">
                 
-                <div className="relative py-4">
-                  <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-slate-100"></div></div>
-                  <div className="relative flex justify-center text-[8px] font-black uppercase tracking-widest text-slate-400 px-2 bg-white">Ou entrez l'ID manuellement</div>
+                {/* Camera punch-hole notch */}
+                <div className="absolute top-4 left-1/2 -translate-x-1/2 w-20 h-5 bg-black rounded-full z-30 flex items-center justify-center">
+                  <div className="w-3.5 h-3.5 rounded-full bg-slate-900 border border-slate-800" />
                 </div>
 
-                  <div className="space-y-4">
-                  {errorLocal && (
-                    <div className="p-4 bg-rose-50 border border-rose-100 rounded-2xl text-left space-y-1">
-                      <p className="text-rose-600 text-[10px] font-black uppercase tracking-[0.15em] flex items-center gap-1.5">
-                        <AlertCircle size={14} /> Confirmation Rejetée
-                      </p>
-                      <p className="text-rose-500 text-[10px] font-bold uppercase leading-relaxed tracking-wide">{errorLocal}</p>
+                {/* Speaker mesh & buttons decoratives */}
+                <div className="absolute top-1 left-1/2 -translate-x-1/2 w-12 h-1 bg-slate-700 rounded-full" />
+                <div className="absolute -left-1 top-24 w-1 h-12 bg-slate-800 rounded-r-md" />
+                <div className="absolute -left-1 top-40 w-1 h-12 bg-slate-800 rounded-r-md" />
+                <div className="absolute -right-1 top-32 w-1 h-16 bg-slate-800 rounded-l-md" />
+
+                {/* Phone screen canvas */}
+                <div className="flex-1 bg-slate-950 rounded-[42px] overflow-hidden border border-slate-800 relative p-4 flex flex-col justify-between pt-10">
+                  
+                  {/* Smartphone top status bar bar */}
+                  <div className="flex justify-between items-center text-[9px] font-black text-slate-300 font-mono px-3 absolute top-3 left-0 w-full z-25">
+                    <span>12:24</span>
+                    <div className="flex items-center gap-1.5">
+                      <span>4G LTE</span>
+                      <div className="w-5 h-2.5 bg-slate-400 rounded-sm relative p-0.5">
+                        <div className="w-full h-full bg-slate-300 rounded-xs" />
+                      </div>
                     </div>
-                  )}
-                  <div className="space-y-2">
-                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1">Code reçu par SMS après paiement (ID Unique)</p>
-                    <input 
-                      type="text" 
-                      placeholder="Ex: MP240512.1345.B12345"
-                      value={transactionId}
-                      onChange={(e) => setTransactionId(e.target.value)}
-                      className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:border-gold transition-all font-mono font-bold text-center text-maritime"
-                    />
                   </div>
-                  <button 
-                    disabled={!transactionId || submitting}
-                    onClick={() => handleManualConfirm(transactionId)}
-                    className="w-full py-4 border-2 border-slate-100 text-slate-400 font-black uppercase tracking-widest rounded-2xl hover:bg-slate-50 transition-all text-[10px]"
+
+                  {/* Operator branding background header */}
+                  <div className={cn("p-4 rounded-3xl mt-4 text-center space-y-1 py-6", currentOpStyle.bg, currentOpStyle.text)}>
+                    <p className="text-[8px] font-black uppercase tracking-[0.2em] opacity-80">SÉCURISÉ PAR</p>
+                    <h4 className="text-lg font-black tracking-tighter italic uppercase">{operatorName} Payment Gateway</h4>
+                  </div>
+
+                  {/* STK Push simulated USSD dialog */}
+                  <div className="my-auto bg-slate-800/95 border border-slate-700 rounded-3xl p-5 shadow-2xl text-left space-y-4">
+                    <div className="flex justify-between items-center text-[8px] font-black text-gold uppercase tracking-wider">
+                      <span>Message Réseau SIM</span>
+                      <span className="font-mono text-white/50">{reservation.momoOperator} STK v2.1</span>
+                    </div>
+
+                    <div className="h-px bg-slate-700" />
+
+                    <p className="text-[10px] font-bold text-white uppercase leading-normal tracking-wide">
+                      Souhaitez-vous payer le montant de <span className="text-gold font-black font-mono">{reservation.amount}.00 USD</span> pour votre billet electronique chez AMR MUGOTE ?
+                    </p>
+
+                    <div className="space-y-2 text-center pt-2">
+                      <p className="text-[8px] text-slate-400 font-black uppercase">Entrez votre code secret</p>
+                      
+                      {/* Password dots panel */}
+                      <div className="flex justify-center gap-3">
+                        {[0, 1, 2, 3, 4, 5].map((idx) => (
+                          <div key={idx} className="w-8 h-8 rounded-xl bg-slate-900 border border-slate-700 flex items-center justify-center font-bold text-lg text-gold font-mono">
+                            {pin.length > idx ? "•" : ""}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Realistic Touch Button Keypad panel */}
+                  <div className="space-y-2 pb-2">
+                    <div className="grid grid-cols-3 gap-2 justify-center max-w-[240px] mx-auto">
+                      {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((key) => (
+                        <button
+                          key={key}
+                          type="button"
+                          onClick={() => handleKeyClick(key)}
+                          className="w-12 h-12 rounded-full bg-slate-800 hover:bg-slate-700 active:scale-95 transition-all flex items-center justify-center font-black text-white text-base font-mono border border-slate-700 shadow-md"
+                        >
+                          {key}
+                        </button>
+                      ))}
+                      
+                      {/* Left: Back / Clear button */}
+                      <button
+                        type="button"
+                        onClick={handleBackspace}
+                        className="w-12 h-12 rounded-full bg-slate-900 hover:bg-rose-950/20 active:scale-95 transition-all text-xs font-black text-rose-500 uppercase font-sans border border-rose-950/40"
+                      >
+                        EFFACER
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleKeyClick('0')}
+                        className="w-12 h-12 rounded-full bg-slate-800 hover:bg-slate-700 active:scale-95 transition-all flex items-center justify-center font-black text-white text-base font-mono border border-slate-700"
+                      >
+                        0
+                      </button>
+
+                      {/* Right: Validation confirmation button */}
+                      <button
+                        type="button"
+                        onClick={handleStkSubmit}
+                        className="w-12 h-12 rounded-full bg-emerald-700 hover:bg-emerald-600 active:scale-95 transition-all text-[8px] font-black text-white uppercase leading-none font-sans shadow-lg shadow-emerald-950/40"
+                      >
+                        VALIDER
+                      </button>
+                    </div>
+
+                    <div className="text-center pt-2">
+                      <p className="text-[6px] font-black text-slate-500 uppercase tracking-[0.3em]">Simulation Physique AMR-TECH</p>
+                    </div>
+                  </div>
+
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
+
+        {/* Step 3: STK validating spinner progress */}
+        {step === 'stk-validating' && (
+          <motion.div 
+            key="stk-validating"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="bg-slate-900 border border-slate-800 rounded-[50px] p-16 text-center text-white space-y-8 shadow-2xl"
+          >
+            <div className="max-w-md mx-auto space-y-6">
+              <div className="w-20 h-20 bg-slate-800 border border-slate-700 rounded-3xl flex items-center justify-center mx-auto shadow-xl">
+                <div className="w-10 h-10 border-4 border-gold border-t-transparent rounded-full animate-spin" />
+              </div>
+              <div className="space-y-3">
+                <span className="text-gold text-[10px] font-black tracking-[0.4em] uppercase">VÉRIFICATION</span>
+                <h3 className="text-2xl font-black uppercase tracking-tighter italic">TRAITEMENT EN COURS</h3>
+                <p className="text-xs text-slate-400 font-bold leading-relaxed uppercase">
+                  Contact de l'opérateur mobile pour le débit instantané des fonds. Votre billet est en cours d'écriture dans la base de données...
+                </p>
+              </div>
+            </div>
+          </motion.div>
+        )}
+
+        {/* Step 4: SUCCESS Boarding Pass & Automatic Ticket PDF */}
+        {step === 'success' && (
+          <motion.div 
+            key="success"
+            className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start text-left"
+          >
+            {/* Left column: Ticket validation board */}
+            <div className="lg:col-span-7 space-y-6">
+              <div className="bg-white rounded-[35px] border border-slate-200 shadow-xl p-8 sm:p-10 text-center space-y-6 relative overflow-hidden">
+                <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-emerald-500 via-gold to-maritime" />
+                
+                <div className="w-20 h-20 bg-emerald-50 text-emerald-500 rounded-3xl flex items-center justify-center mx-auto shadow-inner">
+                  <CheckCircle size={44} className="animate-bounce" />
+                </div>
+
+                <div className="space-y-2">
+                  <span className="text-emerald-600 text-[10px] font-black tracking-[0.4em] uppercase block">PAIEMENT REÇU & CONFIRMÉ</span>
+                  <h2 className="text-2xl sm:text-3xl font-black text-maritime uppercase tracking-tighter italic leading-none">
+                    TRANSACTION VALIDÉE AVEC SUCCÈS
+                  </h2>
+                </div>
+
+                <div className="p-4 bg-emerald-50/60 border border-emerald-100 rounded-2xl text-[10px] sm:text-xs font-medium text-emerald-900 leading-relaxed uppercase max-w-md mx-auto">
+                  Votre codesecret a été accepté et les fonds ont été confirmés. Votre billet valide avec QR code a été enregistré directement sur cet appareil !
+                </div>
+
+                <div className="space-y-4 pt-4">
+                  {/* Action 1: Real PDF download button */}
+                  <button
+                    onClick={async () => {
+                      const finalRes: Reservation = {
+                        ...reservation,
+                        status: 'VALIDATED',
+                        ticketId: generatedTicketId,
+                        transactionId: momoTransactionId,
+                        momoOperator: operatorName
+                      };
+                      await generateTicket(finalRes, siteSettings);
+                    }}
+                    className="w-full py-5 bg-gold hover:bg-[#e0b400] text-maritime hover:scale-[1.01] active:scale-95 font-black uppercase tracking-[0.25em] rounded-2xl shadow-lg transition-all text-xs flex items-center justify-center gap-3"
                   >
-                    Confirmer avec cet ID Unique
+                    <Download size={16} />
+                    Télécharger le Billet (PDF)
+                  </button>
+
+                  {/* Action 2: Navigate dashboard */}
+                  <button
+                    onClick={onComplete}
+                    className="w-full py-4 bg-[#001233] hover:bg-slate-900 text-white font-black uppercase tracking-[0.2em] rounded-2xl transition-all text-[11px] flex items-center justify-center gap-2"
+                  >
+                    <Ticket size={14} />
+                    Accéder à mon espace Billets
                   </button>
                 </div>
               </div>
             </div>
-          </motion.div>
-        )}
 
-        {step === 'processing' && (
-          <motion.div 
-            key="processing"
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 1.1 }}
-            className="bg-black rounded-[40px] p-12 text-center text-white space-y-8 shadow-2xl relative overflow-hidden"
-          >
-            <div className="absolute inset-0 opacity-10">
-              <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-gold via-transparent to-transparent"></div>
-            </div>
+            {/* Right column: High-fidelity interactive Boarding Pass Printable component view */}
+            <div className="lg:col-span-5 flex justify-center">
+              <div className="w-[340px] bg-[#001233] rounded-[30px] shadow-2xl relative overflow-hidden text-white border border-white/10 flex flex-col justify-between">
+                
+                {/* Visual Glass highlights */}
+                <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full blur-2xl pointer-events-none" />
+                <div className="absolute inset-0 bg-gradient-to-b from-white/[0.04] to-transparent pointer-events-none" />
 
-            <div className="relative z-10 space-y-8">
-              <div className="w-24 h-24 bg-white/5 rounded-[32px] border border-white/10 flex items-center justify-center mx-auto shadow-2xl">
-                <motion.div
-                  animate={{ rotate: 360 }}
-                  transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-                >
-                  <Ship size={48} className="text-gold" />
-                </motion.div>
-              </div>
+                {/* Top sector */}
+                <div className="p-6 space-y-6 relative z-10">
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <p className="text-[7px] font-black text-gold uppercase tracking-widest leading-none">Billet Électronique</p>
+                      <h4 className="text-sm font-black uppercase tracking-tighter italic">AMR MUGOTE</h4>
+                    </div>
+                    <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center border border-white/20">
+                      <Anchor size={14} className="text-gold" />
+                    </div>
+                  </div>
 
-              <div className="space-y-4">
-                <h3 className="text-3xl font-black uppercase tracking-tighter italic">Demande Envoyée</h3>
-                <p className="text-[11px] font-black text-white/40 uppercase tracking-[0.3em]">Consultez votre téléphone {reservation.phone}</p>
-              </div>
+                  <div className="space-y-4">
+                    {/* Itinerary lines direction */}
+                    <div className="flex justify-between items-center bg-white/5 p-4 rounded-2xl border border-white/5">
+                      <div>
+                        <p className="text-[7px] font-black text-white/50 uppercase">DE / FROM</p>
+                        <p className="text-xl font-black uppercase tracking-tighter">{reservation.itinerary.split('-')[0]}</p>
+                      </div>
+                      <div className="text-center font-bold text-gold text-xs px-2 animate-pulse">⚓</div>
+                      <div className="text-right">
+                        <p className="text-[7px] font-black text-white/50 uppercase">À / TO</p>
+                        <p className="text-xl font-black uppercase tracking-tighter">{reservation.itinerary.split('-')[1] || 'Goma'}</p>
+                      </div>
+                    </div>
 
-              <div className="max-w-xs mx-auto p-6 bg-white/5 rounded-3xl border border-white/10 space-y-4">
-                <p className="text-[10px] font-black uppercase tracking-widest text-gold italic">Notification Flash</p>
-                <p className="text-sm font-medium leading-relaxed">
-                  "Voulez-vous payer {reservation.amount}.00$ à ETS AMR MUGOTE ? Entrez votre code Secret"
-                </p>
-                <div className="flex justify-center gap-2">
-                  {[1, 2, 3, 4].map(i => (
-                    <div key={i} className="w-3 h-3 rounded-full border-2 border-white/20" />
-                  ))}
+                    <div className="grid grid-cols-2 gap-4 text-left">
+                      <div>
+                        <p className="text-[7px] font-black text-white/40 uppercase">PASSAGER / CLIENT</p>
+                        <p className="text-xs font-black uppercase truncate">{reservation.fullName}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-[7px] font-black text-white/40 uppercase">CLASSE / CLASS</p>
+                        <p className="text-xs font-black text-gold uppercase leading-normal">{reservation.travelClass}</p>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4 text-left border-t border-white/5 pt-3">
+                      <div>
+                        <p className="text-[7px] font-black text-white/40 uppercase">SIÈGES / ADULT(S)</p>
+                        <p className="text-xs font-black font-mono">{reservation.passengersCount}x Billet(s)</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-[7px] font-black text-white/40 uppercase">STATUT BILLET</p>
+                        <span className="inline-block px-2 py-0.5 bg-emerald-500/20 border border-emerald-500/40 text-[9px] font-black text-emerald-400 uppercase rounded">VALIDÉ</span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-              </div>
-              
-              <div className="flex items-center justify-center gap-3">
-                <div className="w-2 h-2 bg-emerald-500 rounded-full animate-ping" />
-                <p className="text-[9px] font-black uppercase tracking-[0.4em] opacity-40">Attente du signal SIM...</p>
+
+                {/* Separation cutouts mimicking real tickets */}
+                <div className="flex items-center justify-between px-0 relative my-2">
+                  <div className="w-5 h-10 bg-[#f8fafc] rounded-r-full -ml-[1px] border border-l-0 border-slate-200" />
+                  <div className="flex-1 border-t border-dashed border-white/10 mx-2" />
+                  <div className="w-5 h-10 bg-[#f8fafc] rounded-l-full -mr-[1px] border border-r-0 border-slate-200" />
+                </div>
+
+                {/* Bottom barcode sector */}
+                <div className="p-6 bg-slate-950/40 flex flex-col items-center gap-4 text-center rounded-b-[30px]">
+                  
+                  {/* Dynamic generated QR code */}
+                  <div className="p-3 bg-white rounded-2xl shadow-xl inline-block border-2 border-gold/40">
+                    <QRCodeSVG 
+                      value={JSON.stringify({
+                        id: reservation.id,
+                        ticketId: generatedTicketId,
+                        client: reservation.fullName,
+                        voyage: reservation.itinerary,
+                        class: reservation.travelClass,
+                        amount: reservation.amount,
+                        date: formatDate(Date.now())
+                      })} 
+                      size={120} 
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <p className="text-[9px] font-black text-slate-500 uppercase font-mono">CODE ID UNIQUE BILLET</p>
+                    <p className="text-sm font-black font-mono tracking-wider text-gold">{generatedTicketId}</p>
+                    <p className="text-[7px] font-black text-white/30 uppercase font-mono">REF: {momoTransactionId}</p>
+                  </div>
+                </div>
+
               </div>
             </div>
           </motion.div>
         )}
 
-        {step === 'success' && (
-          <motion.div 
-            key="success"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="bg-white rounded-[40px] p-10 text-center space-y-8 shadow-2xl border-4 border-gold"
-          >
-            <div className="w-20 h-20 bg-emerald-50 text-emerald-500 rounded-[32px] flex items-center justify-center mx-auto shadow-xl shadow-emerald-500/10 mb-2">
-              <CheckCircle size={48} />
-            </div>
-
-            <div className="space-y-2">
-              <p className="text-gold text-[10px] font-black tracking-[0.4em] uppercase">M/V MUGOTE</p>
-              <h3 className="text-2xl font-black uppercase tracking-tighter italic text-[#001233]">DEMANDE ENREGISTRÉE</h3>
-            </div>
-
-            <div className="bg-slate-50 p-6 sm:p-8 rounded-3xl space-y-6 text-left border border-slate-150">
-              <div className="flex justify-between items-center text-xs font-black uppercase text-slate-400 pb-4 border-b border-slate-200">
-                <span>RÉFÉRENCE TRANSACTION</span>
-                <span className="font-mono text-[#001233] text-sm bg-gold/10 px-3 py-1 rounded-lg border border-gold/20">{transactionId}</span>
-              </div>
-              
-              <div className="space-y-4 text-slate-700 text-[12px] sm:text-[13px] font-medium leading-relaxed">
-                <p className="font-black text-slate-900 text-sm">
-                  Votre demande de réservation a bien été reçue avec succès et est actuellement en cours de traitement.
-                </p>
-                <p>
-                  Nous vous prions de patienter pendant la vérification de votre paiement à partir du TID (numéro de transaction) fourni. Une fois la transaction confirmée et la réservation validée, votre billet électronique sera automatiquement généré.
-                </p>
-                <p>
-                  Nous vous invitons à consulter régulièrement l’onglet <span className="font-black text-[#001233]">« BILLETS »</span> dans la barre de navigation afin de vérifier l’état de votre réservation. Dès que le billet sera validé, vous pourrez le télécharger directement depuis votre espace.
-                </p>
-                <div className="h-px bg-slate-200 my-4" />
-                <p className="font-black text-[#001233] text-center italic text-xs tracking-wide">
-                  Merci de votre confiance et bon voyage avec AMR MUGOTE ET SES FRÈRES.
-                </p>
-              </div>
-            </div>
-
-            <button 
-              onClick={() => handleManualConfirm(transactionId, true)}
-              className="w-full py-5 bg-[#001233] text-white hover:bg-[#002255] font-black uppercase tracking-[0.3em] rounded-2xl shadow-xl shadow-black/20 hover:scale-[1.01] active:scale-95 transition-all text-[11px]"
-            >
-              Consulter mon Espace Billets
-            </button>
-          </motion.div>
-        )}
       </AnimatePresence>
     </motion.div>
   );
