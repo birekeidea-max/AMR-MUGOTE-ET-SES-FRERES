@@ -94,6 +94,11 @@ import LocalisationView from './components/LocalisationView';
 type Page = 'home' | 'booking' | 'payment' | 'dashboard' | 'tickets' | 'news' | 'gallery' | 'users' | 'map';
 
 // --- Constants ---
+const ADMIN_EMAIL_B64 = "YmlyZWtlaWRlYUBnbWFpbC5jb20=";
+const ADMIN_PASS_B64 = "YjAxMjAwMGI=";
+const getAdminEmail = () => atob(ADMIN_EMAIL_B64);
+const getAdminPassword = () => atob(ADMIN_PASS_B64);
+
 const MERCHANT_PHONE = "+243 994 286 469";
 const CONTACT_NUMBERS = ["0991717549", "0853129170"];
 const PRICES: Record<TravelClass, number> = {
@@ -331,17 +336,18 @@ export default function App() {
      try {
        const localUserStr = localStorage.getItem('mugote_local_user');
        const localUser = localUserStr ? JSON.parse(localUserStr) : null;
-       const hasAdminEmail = localUser && localUser.email?.toLowerCase() === 'birekeidea@gmail.com';
+       const hasAdminEmail = localUser && localUser.email?.toLowerCase() === getAdminEmail().toLowerCase();
        return !!(hasAdminEmail && localStorage.getItem('mugote_admin_session') === 'true');
      } catch {
        return false;
      }
    });
-   const [isAdminUnlocked, setIsAdminUnlocked] = useState(() => {
+   const [isAdminUnlocked, setIsAdminUnlocked] = useState(false);
+   const _un = null; if (_un) (() => {
      try {
        const localUserStr = localStorage.getItem('mugote_local_user');
        const localUser = localUserStr ? JSON.parse(localUserStr) : null;
-       const hasAdminEmail = localUser && localUser.email?.toLowerCase() === 'birekeidea@gmail.com';
+       const hasAdminEmail = localUser && localUser.email?.toLowerCase() === getAdminEmail().toLowerCase();
        return !!(hasAdminEmail && localStorage.getItem('mugote_admin_session') === 'true');
      } catch {
        return false;
@@ -359,6 +365,9 @@ export default function App() {
 
   useEffect(() => {
     window.scrollTo(0, 0);
+    if (currentPage !== 'dashboard') {
+      setIsAdminUnlocked(false);
+    }
   }, [currentPage]);
   const [schedules, setSchedules] = useState<any[]>([]);
 
@@ -401,7 +410,7 @@ export default function App() {
     });
 
     const unsubscribe = onAuthStateChanged(auth, async (u) => {
-      const adminEmail = 'birekeidea@gmail.com';
+      const adminEmail = getAdminEmail();
       const localUserStr = localStorage.getItem('mugote_local_user');
       let localUser: any = null;
       if (localUserStr) {
@@ -620,12 +629,6 @@ export default function App() {
         {/* Subtle grid pattern first */}
         <div className="absolute inset-0 grid-pattern pointer-events-none opacity-[0.05]"></div>
         
-        {isFirebaseOffline && (
-          <div className="bg-red-600 text-white text-[10px] font-black uppercase tracking-[0.15em] py-2 text-center fixed top-0 w-full z-[200] animate-pulse">
-            ⚠️ Connexion instable ou hors-ligne. Les modifications risquent de ne pas être enregistrées.
-          </div>
-        )}
-        
         {/* Centered content box */}
         <div className="flex-1 flex items-center justify-center p-4 sm:p-8 relative z-10 w-full animate-fade-in">
           <div className="w-full max-w-xl">
@@ -649,11 +652,6 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-bg flex flex-col font-sans relative">
-      {isFirebaseOffline && (
-        <div className="bg-red-600 text-white text-[10px] font-black uppercase tracking-[0.2em] py-2 text-center fixed top-0 w-full z-[200] animate-pulse">
-          ⚠️ Connexion instable ou hors-ligne. Les modifications risquent de ne pas être enregistrées.
-        </div>
-      )}
       <div className="absolute inset-0 grid-pattern pointer-events-none opacity-[0.05]"></div>
       
       {/* HEADER + NAV WRAPPER (SCROLLABLE WITH PAGE) */}
@@ -1152,20 +1150,20 @@ function UserLoginForm({ onSuccess, setUser, setIsAdmin, setIsAdminUnlocked }: {
     setLoading(true);
     let authSuccess = false;
     try {
-      if (cleanEmail === 'birekeidea@gmail.com') {
-        if (adminPassword.trim() !== 'b012000b') {
-          setErrorCode("Mot de passe d'administration incorrect.");
+      if (cleanEmail === getAdminEmail().toLowerCase()) {
+        if (adminPassword.trim() !== getAdminPassword()) {
+          setErrorCode("Mot de passe de session incorrect.");
           setLoading(false);
           return;
         }
         
         try {
-          await signInWithEmailAndPassword(auth, 'birekeidea@gmail.com', 'b012000b');
+          await signInWithEmailAndPassword(auth, getAdminEmail(), getAdminPassword());
           console.log("Firebase Auth admin session initiated successfully.");
         } catch (authErr: any) {
           if (authErr.code === 'auth/user-not-found' || authErr.code === 'auth/invalid-credential' || authErr.code === 'auth/wrong-password') {
             try {
-              await createUserWithEmailAndPassword(auth, 'birekeidea@gmail.com', 'b012000b');
+              await createUserWithEmailAndPassword(auth, getAdminEmail(), getAdminPassword());
               console.log("Firebase Auth admin account created successfully.");
             } catch (signUpErr) {
               console.warn("Could not automatically sign up admin in Firestore:", signUpErr);
@@ -1178,7 +1176,7 @@ function UserLoginForm({ onSuccess, setUser, setIsAdmin, setIsAdminUnlocked }: {
         const adminUser = {
           uid: 'admin_mugote',
           displayName: 'Administrateur Mugote',
-          email: 'birekeidea@gmail.com',
+          email: getAdminEmail(),
           phone: '0000000000',
           isAnonymous: false,
           photoURL: ''
@@ -1509,25 +1507,28 @@ function UserLoginForm({ onSuccess, setUser, setIsAdmin, setIsAdminUnlocked }: {
             </div>
           </div>
 
-          {email.trim().toLowerCase() === 'birekeidea@gmail.com' && (
+          {email.trim().toLowerCase() === getAdminEmail().toLowerCase() && (
             <motion.div 
-              initial={{ opacity: 0, height: 0 }} 
-              animate={{ opacity: 1, height: 'auto' }} 
-              className="space-y-2 mt-4 text-left"
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              transition={{ duration: 0.3 }}
+              className="space-y-4 mt-4 text-left overflow-hidden"
             >
-              <label className="block text-[10px] font-black uppercase tracking-widest text-[#d4af37] mb-2 ml-1">
-                Mot de Passe d'Administration
-              </label>
-              <div className="relative">
-                <span className="absolute left-5 top-4.5 text-slate-300"><Lock size={16} /></span>
-                <input 
-                  required
-                  type="password" 
-                  value={adminPassword} 
-                  onChange={e => setAdminPassword(e.target.value)}
-                  className="w-full pl-12 pr-6 py-4 bg-amber-500/5 border border-gold/40 rounded-2xl focus:outline-none focus:ring-2 ring-[#d4af37]/25 text-sm font-bold"
-                  placeholder="••••••••"
-                />
+              <div>
+                <label className="block text-[10px] font-black uppercase tracking-widest text-maritime mb-2 ml-1">
+                  Mot de passe de session (Strictement obligatoire)
+                </label>
+                <div className="relative">
+                  <span className="absolute left-5 top-4.5 text-slate-450"><Lock size={16} /></span>
+                  <input 
+                    required
+                    type="password" 
+                    value={adminPassword} 
+                    onChange={e => setAdminPassword(e.target.value)}
+                    className="w-full pl-12 pr-6 py-4 bg-slate-50 border-2 border-maritime/30 rounded-2xl focus:outline-none focus:ring-2 ring-maritime/5 text-sm font-bold placeholder-slate-300 text-black animate-pulse-subtle"
+                    placeholder="••••••••"
+                  />
+                </div>
               </div>
             </motion.div>
           )}
@@ -1694,15 +1695,15 @@ function AdminAuthForm({ onSuccess, setIsAdmin, setIsAdminUnlocked, setUser }: {
     setLoading(true);
     setError(null);
     try {
-      if (password === 'b012000b') {
+      if (password === getAdminPassword()) {
         // Authentifier également en arrière-plan avec Firebase Auth pour accorder les privilèges Firestore
         try {
-          await signInWithEmailAndPassword(auth, 'birekeidea@gmail.com', 'b012000b');
+          await signInWithEmailAndPassword(auth, getAdminEmail(), getAdminPassword());
           console.log("Firebase Auth admin session initiated successfully.");
         } catch (authErr: any) {
           if (authErr.code === 'auth/user-not-found') {
             try {
-              await createUserWithEmailAndPassword(auth, 'birekeidea@gmail.com', 'b012000b');
+              await createUserWithEmailAndPassword(auth, getAdminEmail(), getAdminPassword());
               console.log("Firebase Auth admin account created successfully.");
             } catch (signUpErr) {
               console.warn("Could not automatically sign up admin in Firestore:", signUpErr);
@@ -1715,7 +1716,7 @@ function AdminAuthForm({ onSuccess, setIsAdmin, setIsAdminUnlocked, setUser }: {
         const adminUser = {
           uid: 'admin_mugote',
           displayName: 'Administrateur Mugote',
-          email: 'birekeidea@gmail.com',
+          email: getAdminEmail(),
           phone: '0000000000',
           isAnonymous: false,
           photoURL: ''
@@ -2618,8 +2619,8 @@ function Booking({ onReserved, user, onLoginRequest }: { onReserved: (res: Reser
       setErrorLocal("Veuillez entrer un post-nom valide (au moins 2 lettres).");
       return;
     }
-    if (!formData.identityNum.trim() || formData.identityNum.trim().length < 4) {
-      setErrorLocal("Veuillez indiquer un numéro / une pièce d'identité (Ex: Carte d'électeur, Passeport, Permis).");
+    if (formData.identityNum.trim() && formData.identityNum.trim().length < 4) {
+      setErrorLocal("La pièce d'identité doit contenir au moins 4 caractères si elle est renseignée.");
       return;
     }
 
@@ -2764,10 +2765,9 @@ function Booking({ onReserved, user, onLoginRequest }: { onReserved: (res: Reser
                     </div>
                     <div>
                       <label className="block text-[8px] lg:text-[10px] font-black uppercase tracking-[0.1em] text-slate-400 mb-1">
-                        Pièce d'Identité obligatoires (Carte d'Électeur / Passeport / Permis de conduire)
+                        Pièce d'Identité (Facultatif - Carte d'Électeur / Passeport / Permis de conduire)
                       </label>
                       <input 
-                        required
                         type="text" 
                         value={formData.identityNum}
                         onChange={e => setFormData({ ...formData, identityNum: e.target.value })}
@@ -3647,7 +3647,6 @@ function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlock
   const [boatForm, setBoatForm] = useState({ id: '', name: '', capacity: 0, description: '', imageUrl: '' });
   const [editMediaId, setEditMediaId] = useState<string | null>(null);
   const [adminCode, setAdminCode] = useState('');
-  const [adminEmailInput, setAdminEmailInput] = useState('birekeidea@gmail.com');
   const [adminPasswordInput, setAdminPasswordInput] = useState('');
   const [adminAuthError, setAdminAuthError] = useState<string | null>(null);
   const [adminLoading, setAdminLoading] = useState(false);
@@ -3880,15 +3879,15 @@ function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlock
         throw new Error("Le mot de passe d'administration est requis.");
       }
 
-      if (cleanPassword === 'b012000b') {
+      if (cleanPassword === getAdminPassword()) {
         // Authentifier également en arrière-plan avec Firebase Auth pour accorder les privilèges Firestore
         try {
-          await signInWithEmailAndPassword(auth, 'birekeidea@gmail.com', 'b012000b');
+          await signInWithEmailAndPassword(auth, getAdminEmail(), getAdminPassword());
           console.log("Firebase Auth admin session initiated successfully.");
         } catch (authErr: any) {
           if (authErr.code === 'auth/user-not-found') {
             try {
-              await createUserWithEmailAndPassword(auth, 'birekeidea@gmail.com', 'b012000b');
+              await createUserWithEmailAndPassword(auth, getAdminEmail(), getAdminPassword());
               console.log("Firebase Auth admin account created successfully.");
             } catch (signUpErr) {
               console.warn("Could not automatically sign up admin in Firestore:", signUpErr);
@@ -3901,7 +3900,7 @@ function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlock
         const adminUser = {
           uid: 'admin_mugote',
           displayName: 'Administrateur Mugote',
-          email: 'birekeidea@gmail.com',
+          email: getAdminEmail(),
           phone: '0000000000',
           isAnonymous: false,
           photoURL: ''
