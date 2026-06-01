@@ -99,6 +99,28 @@ const ADMIN_PASS_B64 = "YjAxMjAwMGI=";
 const getAdminEmail = () => atob(ADMIN_EMAIL_B64);
 const getAdminPassword = () => atob(ADMIN_PASS_B64);
 
+const isEmbedVideo = (url: string) => {
+  const l = (url || '').toLowerCase();
+  return l.includes('youtube.com') || l.includes('youtu.be') || l.includes('vimeo.com');
+};
+
+const getEmbedUrl = (url: string) => {
+  if (!url) return '';
+  const ytRegex = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/;
+  const ytMatch = url.match(ytRegex);
+  if (ytMatch && ytMatch[1]) {
+    return `https://www.youtube.com/embed/${ytMatch[1]}`;
+  }
+  
+  const vimeoRegex = /vimeo\.com\/(?:video\/)?([0-9]+)/;
+  const vimeoMatch = url.match(vimeoRegex);
+  if (vimeoMatch && vimeoMatch[1]) {
+    return `https://player.vimeo.com/video/${vimeoMatch[1]}`;
+  }
+  
+  return url;
+};
+
 const MERCHANT_PHONE = "+243 994 286 469";
 const CONTACT_NUMBERS = ["0991717549", "0853129170"];
 const PRICES: Record<TravelClass, number> = {
@@ -2183,7 +2205,7 @@ function Home({ onBook, onNavigate, siteSettings, schedules }: { onBook: () => v
       const newsItems = snapshot.docs.map(doc => {
         const data = doc.data();
         const type = (data.type || '').toLowerCase();
-        const url = data.url || data.videoUrl || data.imageUrl || data.image || data.video || data.contentUrl || '';
+        const url = data.processedUrl || data.url || data.videoUrl || data.imageUrl || data.image || data.video || data.contentUrl || '';
         const isVideo = type === 'video' || !!(data.videoUrl || data.video) || (url && (url.toLowerCase().match(/\.(mp4|webm|ogg|mov|mkv|3gp|m4v|avi)(\?.*)?$/i) || url.toLowerCase().includes('youtube.com') || url.toLowerCase().includes('youtu.be') || url.toLowerCase().includes('vimeo.com') || (url.toLowerCase().includes('firebasestorage.googleapis.com') && (url.toLowerCase().includes('.mov') || url.toLowerCase().includes('.mp4') || url.toLowerCase().includes('video') || url.toLowerCase().includes('.webm') || url.toLowerCase().includes('.avi')))));
         
         return {
@@ -2194,7 +2216,7 @@ function Home({ onBook, onNavigate, siteSettings, schedules }: { onBook: () => v
           processedDesc: data.desc || data.content || data.description || data.text || '',
           sortDate: data.publishedAt || data.updatedAt || data.createdAt || { seconds: 0 }
         };
-      });
+      }).filter((item: any) => item.title && item.title.trim() !== "");
 
       const sortedNews = newsItems.sort((a, b) => {
         const ta = a.sortDate?.seconds || 0;
@@ -2416,32 +2438,42 @@ function Home({ onBook, onNavigate, siteSettings, schedules }: { onBook: () => v
                     {/* Media Attachments Section (Fully visible! Natural uncropped aspect ratios) */}
                     {hasMedia && (
                       <div className="px-6 sm:px-8 pb-6 w-full">
-                        <div className="aspect-video sm:aspect-[16/10] rounded-2xl overflow-hidden bg-slate-900 shadow-inner relative flex items-center justify-center border border-slate-150 w-full">
+                        <div className="aspect-video sm:aspect-[16/10] rounded-2xl overflow-hidden bg-slate-50 relative flex items-center justify-center border border-slate-200 w-full">
                           {isVideo ? (
-                            <video 
-                              key={item.processedUrl}
-                              src={item.processedUrl || undefined} 
-                              className="w-full h-full object-contain bg-black" 
-                              controls
-                              autoPlay={false}
-                              muted={false}
-                              playsInline
-                            >
-                              {item.processedUrl && (
-                                <>
-                                  <source src={item.processedUrl} type="video/mp4" />
-                                  <source src={item.processedUrl} type="video/quicktime" />
-                                </>
-                              )}
-                              Votre navigateur ne supporte pas la lecture de vidéos.
-                            </video>
+                            isEmbedVideo(item.processedUrl) ? (
+                              <iframe
+                                src={getEmbedUrl(item.processedUrl)}
+                                className="w-full h-full border-0 bg-transparent"
+                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                allowFullScreen
+                                title={item.title}
+                              />
+                            ) : (
+                              <video 
+                                key={item.processedUrl}
+                                src={item.processedUrl || undefined} 
+                                className="w-full h-full object-cover" 
+                                controls
+                                autoPlay={false}
+                                muted={false}
+                                playsInline
+                              >
+                                {item.processedUrl && (
+                                  <>
+                                    <source src={item.processedUrl} type="video/mp4" />
+                                    <source src={item.processedUrl} type="video/quicktime" />
+                                  </>
+                                )}
+                                Votre navigateur ne supporte pas la lecture de vidéos.
+                              </video>
+                            )
                           ) : (
-                            <div className="w-full h-full flex overflow-x-auto snap-x snap-mandatory no-scrollbar bg-slate-900">
+                            <div className="w-full h-full flex overflow-x-auto snap-x snap-mandatory no-scrollbar bg-slate-50">
                               {(item.media && item.media.length > 0 ? item.media : [item.processedUrl]).map((img: string, idx: number) => (
                                 <img 
                                   key={idx} 
                                   src={img || undefined} 
-                                  className="w-full h-full object-contain snap-center flex-shrink-0" 
+                                  className="w-full h-full object-cover snap-center flex-shrink-0" 
                                   alt={`${item.title}-${idx}`} 
                                 />
                               ))}
@@ -3654,6 +3686,7 @@ function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlock
   const [searchTerm, setSearchTerm] = useState('');
   const [newsList, setNewsList] = useState<any[]>([]);
   const [conversations, setConversations] = useState<any[]>([]);
+  const [cleaningGarbage, setCleaningGarbage] = useState(false);
   const [selectedConv, setSelectedConv] = useState<any | null>(null);
   const [stats, setStats] = useState({ total: 0, pending: 0, validated: 0, validatedRevenue: 0, validatedPassengers: 0 });
   const [newMedia, setNewMedia] = useState({ 
@@ -3819,7 +3852,7 @@ function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlock
       const items = snapshot.docs.map(doc => {
         const data = doc.data();
         const type = (data.type || '').toLowerCase();
-        const url = data.url || data.videoUrl || data.imageUrl || data.image || data.video || data.contentUrl || '';
+        const url = data.processedUrl || data.url || data.videoUrl || data.imageUrl || data.image || data.video || data.contentUrl || '';
         const isVideo = type === 'video' || !!(data.videoUrl || data.video) || (url && (url.toLowerCase().match(/\.(mp4|webm|ogg|mov|mkv|3gp|m4v|avi)(\?.*)?$/i) || url.toLowerCase().includes('youtube.com') || url.toLowerCase().includes('youtu.be') || url.toLowerCase().includes('vimeo.com') || (url.toLowerCase().includes('firebasestorage.googleapis.com') && (url.toLowerCase().includes('.mov') || url.toLowerCase().includes('.mp4') || url.toLowerCase().includes('video') || url.toLowerCase().includes('.webm') || url.toLowerCase().includes('.avi')))));
         
         // Use a very robust date fallback
@@ -3833,7 +3866,7 @@ function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlock
           processedDesc: data.desc || data.content || data.description || data.text || '',
           sortDate
         };
-      });
+      }).filter((item: any) => item.title && item.title.trim() !== "");
 
       setNewsList(items.sort((a, b) => {
         const ta = a.sortDate?.seconds || 0;
@@ -4163,6 +4196,34 @@ function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlock
         await deleteDoc(doc(db, 'news', id));
       } catch (error) {
         handleFirestoreError(error, OperationType.DELETE, 'news');
+      }
+    }
+  };
+
+  const handleCleanGarbage = async () => {
+    if (window.confirm("Voulez-vous lancer un nettoyage automatique de la base de données ? Cela analysera l'ensemble des publications existantes et supprimera définitivement toutes les ordures ou publications corrompues (publications vides, sans titre ou sans contenu valide).")) {
+      setCleaningGarbage(true);
+      try {
+        const querySnapshot = await getDocs(collection(db, 'news'));
+        let deletedCount = 0;
+        for (const document of querySnapshot.docs) {
+          const data = document.data();
+          const title = data.title || '';
+          const desc = data.desc || data.content || data.description || data.text || '';
+          const url = data.processedUrl || data.url || data.videoUrl || data.imageUrl || data.image || data.video || data.contentUrl || '';
+          
+          const isCorrupt = !title.trim() || (!url.trim() && !desc.trim());
+          if (isCorrupt) {
+            await deleteDoc(doc(db, 'news', document.id));
+            deletedCount++;
+          }
+        }
+        alert(`Nettoyage terminé avec succès ! ${deletedCount} publication(s) vide(s) ou corrompue(s) ont été nettoyée(s).`);
+      } catch (error) {
+        console.error("Clean garbage error:", error);
+        alert("Erreur lors du nettoyage de la base de données : " + (error instanceof Error ? error.message : String(error)));
+      } finally {
+        setCleaningGarbage(false);
       }
     }
   };
@@ -4907,7 +4968,7 @@ function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlock
                               const isVideoUrl = isVid(url);
                               return (
                                 <div key={`existing-${i}`} className="relative group flex-shrink-0">
-                                  <div className="w-20 h-20 rounded-xl overflow-hidden border-2 border-emerald-500 shadow-sm bg-black flex items-center justify-center">
+                                  <div className="w-20 h-20 rounded-xl overflow-hidden border-2 border-emerald-500 shadow-sm bg-slate-50 flex items-center justify-center">
                                     {isVideoUrl ? (
                                       <video src={url || undefined} className="w-full h-full object-cover" muted playsInline />
                                     ) : (
@@ -4936,7 +4997,7 @@ function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlock
                                                   isVid(url);
                               return (
                                 <div key={`pending-${i}`} className="relative group flex-shrink-0">
-                                  <div className="w-20 h-20 rounded-xl overflow-hidden border-2 border-slate-200 shadow-sm bg-black flex items-center justify-center">
+                                  <div className="w-20 h-20 rounded-xl overflow-hidden border-2 border-slate-200 shadow-sm bg-slate-50 flex items-center justify-center">
                                     {isVideoFile ? (
                                       <video src={url || undefined} className="w-full h-full object-cover" muted playsInline />
                                     ) : (
@@ -5030,12 +5091,21 @@ function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlock
             <div className="space-y-6">
               <div className="flex justify-between items-center">
                 <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">Contenus en Ligne ({newsList.length})</h4>
-                <button 
-                  onClick={() => window.location.reload()}
-                  className="flex items-center gap-2 text-[9px] font-black uppercase tracking-widest text-maritime bg-maritime/5 px-4 py-2 rounded-full hover:bg-maritime/10 transition-all border border-maritime/10"
-                >
-                  <RotateCw size={12} /> Actualiser tout
-                </button>
+                <div className="flex gap-3">
+                  <button 
+                    onClick={handleCleanGarbage}
+                    disabled={cleaningGarbage}
+                    className="flex items-center gap-2 text-[9px] font-black uppercase tracking-widest text-rose-600 bg-rose-50 px-4 py-2 rounded-full hover:bg-rose-100 transition-all border border-rose-200"
+                  >
+                    {cleaningGarbage ? "Nettoyage..." : "🗑️ Nettoyer Ordures"}
+                  </button>
+                  <button 
+                    onClick={() => window.location.reload()}
+                    className="flex items-center gap-2 text-[9px] font-black uppercase tracking-widest text-maritime bg-maritime/5 px-4 py-2 rounded-full hover:bg-maritime/10 transition-all border border-maritime/10"
+                  >
+                    <RotateCw size={12} /> Actualiser tout
+                  </button>
+                </div>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                 {newsList.map(m => (
@@ -5049,7 +5119,22 @@ function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlock
                       </span>
                     </div>
                     {m.processedType === 'video' ? (
-                      <video src={m.processedUrl || undefined} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
+                      isEmbedVideo(m.processedUrl) ? (
+                        <iframe 
+                          src={getEmbedUrl(m.processedUrl) + "?mute=1"} 
+                          className="w-full h-full border-0 pointer-events-none" 
+                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                          title={m.title}
+                        />
+                      ) : (
+                        <video 
+                          src={m.processedUrl || undefined} 
+                          className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" 
+                          controls
+                          muted
+                          playsInline
+                        />
+                      )
                     ) : m.processedType === 'text' ? (
                       <div className="p-8 h-full flex flex-col justify-center text-center bg-white">
                         <FileText size={32} className="mx-auto text-maritime opacity-10 mb-4" />
@@ -5229,7 +5314,7 @@ function GalleryView({ siteSettings }: { siteSettings: any }) {
       const items = snapshot.docs.map(doc => {
         const data = doc.data();
         const type = (data.type || '').toLowerCase();
-        const url = data.url || data.videoUrl || data.imageUrl || data.image || data.video || data.contentUrl || '';
+        const url = data.processedUrl || data.url || data.videoUrl || data.imageUrl || data.image || data.video || data.contentUrl || '';
         const isVideo = type === 'video' || !!(data.videoUrl || data.video) || (url && (url.toLowerCase().match(/\.(mp4|webm|ogg|mov|mkv|3gp|m4v|avi)(\?.*)?$/i) || url.toLowerCase().includes('youtube.com') || url.toLowerCase().includes('youtu.be') || url.toLowerCase().includes('vimeo.com') || (url.toLowerCase().includes('firebasestorage.googleapis.com') && (url.toLowerCase().includes('.mov') || url.toLowerCase().includes('.mp4') || url.toLowerCase().includes('video') || url.toLowerCase().includes('.webm') || url.toLowerCase().includes('.avi')))));
 
         return {
@@ -5240,7 +5325,7 @@ function GalleryView({ siteSettings }: { siteSettings: any }) {
           processedDesc: data.desc || data.content || data.description || data.text || '',
           sortDate: data.publishedAt || data.updatedAt || data.createdAt || { seconds: 0 }
         };
-      });
+      }).filter((item: any) => item.title && item.title.trim() !== "");
 
       setMedia(items.sort((a, b) => {
         const ta = a.sortDate?.seconds || 0;
@@ -5292,16 +5377,27 @@ function GalleryView({ siteSettings }: { siteSettings: any }) {
               animate={{ opacity: 1, scale: 1 }}
               className="bg-white border border-slate-100 shadow-2xl rounded-3xl overflow-hidden flex flex-col group hover:border-gold/50 transition-all duration-500"
             >
-              <div className="aspect-[16/10] bg-slate-100 relative overflow-hidden">
+              <div className="aspect-[16/10] bg-slate-50 relative overflow-hidden">
                 {m.processedType === 'video' ? (
                   <div className="w-full h-full relative">
-                    <video 
-                      src={m.processedUrl || undefined} 
-                      className="w-full h-full object-cover"
-                      poster={siteSettings.homeDetail}
-                      controls
-                    />
-                    <div className="absolute top-4 right-4 z-10">
+                    {isEmbedVideo(m.processedUrl) ? (
+                      <iframe 
+                        src={getEmbedUrl(m.processedUrl)} 
+                        className="w-full h-full border-0 bg-transparent" 
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                        allowFullScreen
+                        title={m.title}
+                      />
+                    ) : (
+                      <video 
+                        src={m.processedUrl || undefined} 
+                        className="w-full h-full object-cover"
+                        controls
+                        playsInline
+                        preload="metadata"
+                      />
+                    )}
+                    <div className="absolute top-4 right-4 z-10 pointer-events-none">
                        <div className="w-8 h-8 rounded-full bg-gold/90 text-black flex items-center justify-center shadow-lg animate-pulse">
                          <Video size={14} />
                        </div>
@@ -5500,7 +5596,7 @@ function NewsView() {
       const items = snapshot.docs.map(doc => {
         const data = doc.data();
         const type = (data.type || '').toLowerCase();
-        const url = data.url || data.videoUrl || data.imageUrl || data.image || data.video || data.contentUrl || '';
+        const url = data.processedUrl || data.url || data.videoUrl || data.imageUrl || data.image || data.video || data.contentUrl || '';
         const isVideo = type === 'video' || !!(data.videoUrl || data.video) || (url && (url.toLowerCase().match(/\.(mp4|webm|ogg|mov|mkv|3gp|m4v|avi)(\?.*)?$/i) || url.toLowerCase().includes('youtube.com') || url.toLowerCase().includes('youtu.be') || url.toLowerCase().includes('vimeo.com') || (url.toLowerCase().includes('firebasestorage.googleapis.com') && (url.toLowerCase().includes('.mov') || url.toLowerCase().includes('.mp4') || url.toLowerCase().includes('video') || url.toLowerCase().includes('.webm') || url.toLowerCase().includes('.avi')))));
 
         return {
@@ -5511,7 +5607,7 @@ function NewsView() {
           processedDesc: data.desc || data.content || data.description || data.text || '',
           sortDate: data.publishedAt || data.updatedAt || data.createdAt || { seconds: 0 }
         };
-      });
+      }).filter((item: any) => item.title && item.title.trim() !== "");
 
       setNews(items.sort((a, b) => {
         const ta = a.sortDate?.seconds || 0;
@@ -5553,27 +5649,27 @@ function NewsView() {
                 </div>
               </div>
               {(n.processedUrl || n.processedType === 'text') && (
-                <div className="h-72 overflow-hidden bg-slate-900/50 flex items-center justify-center border-t border-white/5 shadow-inner relative">
+                <div className="h-72 overflow-hidden flex items-center justify-center border-t border-white/5 relative w-full">
                   {n.processedType === 'video' ? (
                     <video 
                       key={n.processedUrl}
-                      src={n.processedUrl || undefined} 
-                      className="w-full h-full object-contain bg-black"
+                      src={n.processedUrl || undefined}
+                      className="w-full h-full object-cover"
                       controls
-                      autoPlay={false}
-                      muted={false}
                       playsInline
+                      preload="metadata"
                     >
-                      {n.processedUrl && (
+                      {n.processedUrl ? (
                         <>
                           <source src={n.processedUrl} type="video/mp4" />
                           <source src={n.processedUrl} type="video/quicktime" />
+                          <source src={n.processedUrl} type="video/webm" />
                         </>
-                      )}
+                      ) : null}
                       Votre navigateur ne supporte pas la lecture de vidéos.
                     </video>
                   ) : n.processedType === 'image' ? (
-                    <div className="w-full h-full flex overflow-x-auto snap-x snap-mandatory no-scrollbar bg-slate-900">
+                    <div className="w-full h-full flex overflow-x-auto snap-x snap-mandatory no-scrollbar bg-transparent">
                       {(n.media && n.media.length > 0 ? n.media : [n.processedUrl]).map((img: string, idx: number) => (
                         <img 
                           key={idx} 
