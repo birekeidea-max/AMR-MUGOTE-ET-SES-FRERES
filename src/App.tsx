@@ -1142,6 +1142,35 @@ function UserLoginForm({ onSuccess, setUser, setIsAdmin, setIsAdminUnlocked }: {
       if (setUser) {
         setUser(localUserObj);
       }
+      
+      // Enregistrer directement dans Firestore de manière synchrone pour garantir l’affichage instantané
+      try {
+        await setDoc(doc(db, 'users', fallbackUid), {
+          uid: fallbackUid,
+          email: `${cleanPhone}@mugote.com`,
+          displayName: cleanName,
+          phone: cleanPhone,
+          photoURL: '',
+          isAnonymous: false,
+          lastLogin: serverTimestamp(),
+          isLocalSyncOnly: true
+        }, { merge: true });
+
+        await setDoc(doc(db, 'users_list', fallbackUid), {
+          uid: fallbackUid,
+          email: `${cleanPhone}@mugote.com`,
+          displayName: cleanName,
+          phone: cleanPhone,
+          isAnonymous: false,
+          lastLogin: serverTimestamp(),
+          isLocalSyncOnly: true,
+          usageCount: increment(1)
+        }, { merge: true });
+        console.log("Fallback phone user synchronized to users and users_list collections successfully.");
+      } catch (dbErr) {
+        console.warn("Could not sync fallback phone user to main collections:", dbErr);
+      }
+
       onSuccess();
     } finally {
       setLoading(false);
@@ -1309,6 +1338,35 @@ function UserLoginForm({ onSuccess, setUser, setIsAdmin, setIsAdminUnlocked }: {
       if (setUser) {
         setUser(localUserObj);
       }
+
+      // Enregistrer directement dans Firestore de manière synchrone pour garantir l’affichage instantané
+      try {
+        await setDoc(doc(db, 'users', fallbackUid), {
+          uid: fallbackUid,
+          email: cleanEmail,
+          displayName: cleanName,
+          phone: '',
+          photoURL: '',
+          isAnonymous: false,
+          lastLogin: serverTimestamp(),
+          isLocalSyncOnly: true
+        }, { merge: true });
+
+        await setDoc(doc(db, 'users_list', fallbackUid), {
+          uid: fallbackUid,
+          email: cleanEmail,
+          displayName: cleanName,
+          phone: '',
+          isAnonymous: false,
+          lastLogin: serverTimestamp(),
+          isLocalSyncOnly: true,
+          usageCount: increment(1)
+        }, { merge: true });
+        console.log("Fallback email user synchronized to users and users_list collections successfully.");
+      } catch (dbErr) {
+        console.warn("Could not sync fallback email user to main collections:", dbErr);
+      }
+
       onSuccess();
     } finally {
       setLoading(false);
@@ -2723,6 +2781,34 @@ function Booking({ onReserved, user, onLoginRequest }: { onReserved: (res: Reser
 
     try {
       const docRef = await addDoc(collection(db, 'reservations'), resData);
+      
+      // Assurer la création de l'utilisateur dans 'users' et 'users_list' pour qu'il soit immédiatement répertorié
+      try {
+        await setDoc(doc(db, 'users', user.uid), {
+          uid: user.uid,
+          email: formData.email.trim() || 'Anonyme',
+          displayName: `${formData.fullName.trim()} ${formData.lastName.trim()}`.trim() || 'Passager',
+          phone: formData.phone.trim() || '',
+          isAnonymous: false,
+          lastLogin: serverTimestamp(),
+          isLocalSyncOnly: (user as any).isLocalSyncOnly ?? false
+        }, { merge: true });
+
+        await setDoc(doc(db, 'users_list', user.uid), {
+          uid: user.uid,
+          email: formData.email.trim() || 'Anonyme',
+          displayName: `${formData.fullName.trim()} ${formData.lastName.trim()}`.trim() || 'Passager',
+          phone: formData.phone.trim() || '',
+          isAnonymous: false,
+          lastLogin: serverTimestamp(),
+          isLocalSyncOnly: (user as any).isLocalSyncOnly ?? false,
+          usageCount: increment(1)
+        }, { merge: true });
+        console.log("Passenger synchronized to users and users_list collections successfully on booking creation.");
+      } catch (userErr) {
+        console.warn("Non-blocking passenger sync to users_list failed:", userErr);
+      }
+
       onReserved({ ...resData, id: docRef.id });
     } catch (error: any) {
       console.error("Firestore reservation error:", error);
@@ -3901,11 +3987,82 @@ function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlock
     return () => { unsubRes(); unsubUsers(); unsubNews(); unsubConv(); unsubFleet(); };
   }, [isAdminUnlocked]);
 
-  useEffect(() => {
-    if (isAdmin && !isAdminUnlocked) {
-      // Logic for unlocking could be here if needed for sync
+  const getSecondsFromCreatedAt = (createdAt: any): number => {
+    if (!createdAt) return Math.floor(Date.now() / 1000);
+    if (typeof createdAt === 'number') {
+      return createdAt > 100000000000 ? Math.floor(createdAt / 1000) : createdAt;
     }
-  }, [isAdmin, isAdminUnlocked]);
+    if (createdAt.seconds !== undefined) {
+      return createdAt.seconds;
+    }
+    if (typeof createdAt.getTime === 'function') {
+      return Math.floor(createdAt.getTime() / 1000);
+    }
+    if (createdAt.toDate && typeof createdAt.toDate === 'function') {
+      return Math.floor(createdAt.toDate().getTime() / 1000);
+    }
+    const parsed = Date.parse(createdAt);
+    if (!isNaN(parsed)) {
+      return Math.floor(parsed / 1000);
+    }
+    return Math.floor(Date.now() / 1000);
+  };
+
+  useEffect(() => {
+    if (!isAdminUnlocked || reservations.length === 0 || usersList.length === 0) return;
+
+    // Background Repairing of missing historical users
+    const syncMissingUsers = async () => {
+      for (const r of reservations) {
+        if (!r.userId) continue;
+        const exists = usersList.some(u => 
+          u.uid === r.userId || 
+          (u.email && r.email && u.email.toLowerCase() === r.email.toLowerCase()) ||
+          (u.phone && r.phone && u.phone === r.phone)
+        );
+
+        if (!exists) {
+          console.log("Background repairing: Synchronizing missing historical user from reservation:", r.userId);
+          const nameVal = `${r.fullName || ''} ${r.lastName || ''}`.trim() || 'Passager';
+          const emailVal = r.email || `${r.phone || r.userId}@mugote.com`;
+          const phoneVal = r.phone || '';
+
+          try {
+            const secs = getSecondsFromCreatedAt(r.createdAt);
+            await setDoc(doc(db, 'users', r.userId), {
+              uid: r.userId,
+              email: emailVal,
+              displayName: nameVal,
+              phone: phoneVal,
+              photoURL: '',
+              isAnonymous: false,
+              lastLogin: { seconds: secs },
+              isLocalSyncOnly: true
+            }, { merge: true });
+
+            await setDoc(doc(db, 'users_list', r.userId), {
+              uid: r.userId,
+              email: emailVal,
+              displayName: nameVal,
+              phone: phoneVal,
+              isAnonymous: false,
+              lastLogin: { seconds: secs },
+              isLocalSyncOnly: true,
+              usageCount: 1
+            }, { merge: true });
+          } catch (err) {
+            console.warn("Could not repair sync user:", err);
+          }
+        }
+      }
+    };
+
+    const timer = setTimeout(() => {
+      syncMissingUsers();
+    }, 2000);
+
+    return () => clearTimeout(timer);
+  }, [isAdminUnlocked, reservations, usersList]);
 
   const handleAdminUnlockSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -3965,12 +4122,38 @@ function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlock
     }
   };
 
+  const getUnifiedUsers = () => {
+    const list = [...usersList];
+    reservations.forEach(r => {
+      if (!r.userId) return;
+      const exists = list.some(u => 
+        u.uid === r.userId || 
+        (u.phone && r.phone && u.phone === r.phone) ||
+        (u.email && r.email && u.email.toLowerCase() === r.email.toLowerCase())
+      );
+      if (!exists) {
+        list.push({
+          id: r.userId,
+          uid: r.userId,
+          displayName: `${r.fullName} ${r.lastName}`.trim() || 'Passager',
+          phone: r.phone || '',
+          email: r.email || 'Anonyme',
+          isAnonymous: false,
+          lastLogin: r.createdAt ? { seconds: getSecondsFromCreatedAt(r.createdAt) } : null,
+          usageCount: 1,
+          isVirtualFromReservation: true
+        });
+      }
+    });
+    return list;
+  };
+
   const copyToClipboard = (type: 'reservations' | 'users') => {
     let text = "";
     if (type === 'users') {
       text = "Email, Derniere Connexion\n";
-      usersList.forEach(u => {
-        text += `${u.email}, ${u.lastLogin ? new Date(u.lastLogin.seconds * 1000).toLocaleString() : 'N/A'}\n`;
+      getUnifiedUsers().forEach(u => {
+        text += `${u.email}, ${u.lastLogin ? (u.lastLogin.seconds ? new Date(u.lastLogin.seconds * 1000).toLocaleString() : new Date(u.lastLogin).toLocaleString()) : 'N/A'}\n`;
       });
     } else {
       text = "Client, Itinerance, Date, Status, Transaction\n";
@@ -3986,8 +4169,8 @@ function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlock
     let csvContent = "data:text/csv;charset=utf-8,";
     if (type === 'users') {
       csvContent += "Email,DerniereConnexion\n";
-      usersList.forEach(u => {
-        csvContent += `${u.email},${u.lastLogin ? new Date(u.lastLogin.seconds * 1000).toISOString() : 'N/A'}\n`;
+      getUnifiedUsers().forEach(u => {
+        csvContent += `${u.email},${u.lastLogin ? (u.lastLogin.seconds ? new Date(u.lastLogin.seconds * 1000).toISOString() : new Date(u.lastLogin).toISOString()) : 'N/A'}\n`;
       });
     } else {
       csvContent += "Client,Itinerance,Date,Status,Transaction\n";
@@ -4644,7 +4827,7 @@ function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlock
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
-                  {usersList.map((u, i) => {
+                  {getUnifiedUsers().map((u, i) => {
                     const userReservations = reservations.filter(r => r.userId === u.uid || (u.phone && r.phone === u.phone));
                     const totalRes = userReservations.length;
                     const validatedResCount = userReservations.filter(r => r.status === 'VALIDATED').length;
@@ -4703,7 +4886,7 @@ function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlock
                   })}
                 </tbody>
               </table>
-              {usersList.length === 0 && <div className="p-20 text-center text-slate-400 font-bold uppercase tracking-widest text-[10px]">Aucun utilisateur enregistré.</div>}
+              {getUnifiedUsers().length === 0 && <div className="p-20 text-center text-slate-400 font-bold uppercase tracking-widest text-[10px]">Aucun utilisateur enregistré.</div>}
             </div>
           </div>
         ) : tab === 'fleet' ? (
