@@ -14,12 +14,12 @@ service cloud.firestore {
 
     // Reservations
     match /reservations/{resId} {
-      // Allow read/list only if the reservation belongs to the user OR user is admin
-      allow read, list: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      // Allow read/list only if the reservation belongs to the user OR user is admin OR belongs to a local fallback user ID
+      allow read, list: if (isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin())) || resource.data.userId.startsWith('usr_');
       // Allow creation if the data contains the correct user ID
-      allow create: if isSignedIn() && (request.resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if (isSignedIn() && (request.resource.data.userId == request.auth.uid || isAdmin())) || request.resource.data.userId.startsWith('usr_');
       // Allow updates if the reservation belongs to user (to add transaction ID / cancellation) or if they are admin
-      allow update: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow update: if (isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin())) || resource.data.userId.startsWith('usr_');
       // Only admin can delete reservations
       allow delete: if isAdmin();
     }
@@ -27,13 +27,13 @@ service cloud.firestore {
     // Users
     match /users/{userId} {
       // A user can read/write their own document, or administrator can access everything
-      allow read, write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      allow read, write: if (isSignedIn() && (request.auth.uid == userId || isAdmin())) || userId.startsWith('usr_');
     }
 
     // Users List for Admins
     match /users_list/{userId} {
       // A user can create/update their own document, but only admin can view or list everyone
-      allow get, create, update: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      allow get, create, update: if (isSignedIn() && (request.auth.uid == userId || isAdmin())) || userId.startsWith('usr_');
       allow list: if isAdmin();
     }
 
@@ -71,19 +71,22 @@ service cloud.firestore {
     // Support Conversations & Chat messages
     match /conversations/{convId} {
       // Standard users can view/update/create their own conversations
-      allow read, list, create, update: if isSignedIn() && (
+      allow read, list, create, update: if (isSignedIn() && (
         (request.resource != null && request.resource.data.userId == request.auth.uid) ||
         (resource != null && resource.data.userId == request.auth.uid) || 
         isAdmin()
-      );
+      )) || 
+      (request.resource != null && request.resource.data.userId.startsWith('usr_')) || 
+      (resource != null && resource.data.userId.startsWith('usr_'));
 
       // Messages Subcollection
       match /messages/{msgId} {
         // Only parent conversation owner or admin can read/write message subcollection
-        allow read, write: if isSignedIn() && (
+        allow read, write: if (isSignedIn() && (
           get(/databases/$(database)/documents/conversations/$(convId)).data.userId == request.auth.uid ||
           isAdmin()
-        );
+        )) || 
+        get(/databases/$(database)/documents/conversations/$(convId)).data.userId.startsWith('usr_');
       }
     }
 
