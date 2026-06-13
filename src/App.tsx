@@ -86,6 +86,7 @@ import { Reservation, TravelClass, Itinerary, ShipName } from './types';
 import { cn, formatDate, formatPrice } from './lib/utils';
 import { QRCodeSVG } from 'qrcode.react';
 import QRCode from 'qrcode';
+import { Html5QrcodeScanner } from 'html5-qrcode';
 import { jsPDF } from 'jspdf';
 import UsersListView from './components/UsersListView';
 import LocalisationView from './components/LocalisationView';
@@ -384,6 +385,59 @@ export default function App() {
     logo: '' // Fallback for the "baton" (mugote) image
   });
   const [isFirebaseOffline, setIsFirebaseOffline] = useState(false);
+
+  // Progressive Web App Installation States & Logic
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [isInstallable, setIsInstallable] = useState(false);
+  const [isInstallModalOpen, setIsInstallModalOpen] = useState(false);
+  const [userPlatform, setUserPlatform] = useState<'ios' | 'android' | 'desktop' | 'generic'>('generic');
+
+  useEffect(() => {
+    // Detect device OS platform
+    const ua = navigator.userAgent.toLowerCase();
+    if (/iphone|ipad|ipod/.test(ua)) {
+      setUserPlatform('ios');
+    } else if (/android/.test(ua)) {
+      setUserPlatform('android');
+    } else if (/chrome|safari|firefox|edge|opera/.test(ua)) {
+      setUserPlatform('desktop');
+    } else {
+      setUserPlatform('generic');
+    }
+
+    // Capture browser install trigger
+    const handleBeforeInstallPrompt = (e: any) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+      setIsInstallable(true);
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+
+    // Filter out if already running in installation window (standalone mode)
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone;
+    if (isStandalone) {
+      setIsInstallable(false);
+    }
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    };
+  }, []);
+
+  const handleInstallClick = async () => {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      console.log(`PWA install prompt user choice: ${outcome}`);
+      setDeferredPrompt(null);
+      setIsInstallable(false);
+    } else {
+      // fallback: open user guide tutorial
+      setIsInstallModalOpen(true);
+    }
+  };
+
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -1003,6 +1057,231 @@ export default function App() {
           setCurrentPage('dashboard');
         }}
       />
+
+      {/* Bouton de contrôle flottant (PWA) */}
+      <div className="fixed bottom-6 left-6 z-[90]">
+        <button
+          onClick={() => setIsInstallModalOpen(true)}
+          className="flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-700 hover:to-teal-600 text-white border border-emerald-400/40 rounded-2xl shadow-2xl shadow-black/80 text-[10px] sm:text-xs font-black uppercase tracking-widest transition-all duration-300 hover:scale-105 active:scale-95 cursor-pointer relative overflow-hidden"
+          title="Installer l'application sur votre appareil pour l'avoir hors-ligne"
+        >
+          <span className="absolute -right-2 -top-2 w-8 h-8 bg-white/20 rounded-full blur-sm animate-ping opacity-70"></span>
+          <Smartphone size={16} className="text-white animate-bounce" />
+          <span>📲 TELECHARGER L'APP</span>
+        </button>
+      </div>
+
+      {/* PWA App Installation Tutorial Modal - GUIDÉ COMME UN BÉBÉ */}
+      <AnimatePresence>
+        {isInstallModalOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[200] bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4 sm:p-6 overflow-y-auto"
+          >
+            <motion.div
+              initial={{ scale: 0.95, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.95, y: 20 }}
+              className="bg-white w-full max-w-2xl rounded-[32px] shadow-2xl overflow-hidden flex flex-col border border-slate-100 text-left"
+            >
+              {/* Header */}
+              <div className="p-6 bg-slate-900 text-white flex items-center justify-between border-b border-slate-800">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 bg-gradient-to-br from-yellow-400 to-amber-500 rounded-2xl text-slate-950">
+                    <Ship size={24} className="animate-pulse" />
+                  </div>
+                  <div>
+                    <h2 className="font-extrabold text-sm sm:text-lg uppercase tracking-tight">Installer l'Application</h2>
+                    <p className="text-[9px] text-[#eab308] font-bold uppercase tracking-widest">AMR MUGOTE SUR VOTRE APPAREIL</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setIsInstallModalOpen(false)}
+                  className="p-1.5 bg-white/10 hover:bg-rose-500/20 hover:text-rose-400 text-white rounded-xl transition-all cursor-pointer"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              {/* Body Content */}
+              <div className="p-6 overflow-y-auto space-y-6">
+                
+                {/* Platform Badge Banner */}
+                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex items-center justify-between">
+                  <div className="flex items-center gap-3 text-left">
+                    <span className="text-3xl">📱</span>
+                    <div>
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Votre Appareil Détecté :</p>
+                      <span className="font-extrabold text-sm text-slate-900 uppercase">
+                        {userPlatform === 'ios' ? '🍏 iPhone / iPad (iOS)' : 
+                         userPlatform === 'android' ? '🤖 Téléphone Android' : 
+                         userPlatform === 'desktop' ? '💻 Ordinateur (PC / Mac)' : '📲 Appareil Mobile intelligent'}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="px-3 py-1.5 bg-[#001233]/10 text-[#001233] text-[9px] font-bold uppercase tracking-widest rounded-lg">
+                    Compatible 100%
+                  </div>
+                </div>
+
+                {/* Main Instruction Block */}
+                <div className="space-y-4">
+                  <p className="text-xs sm:text-sm text-slate-600 font-medium">
+                    Suivez ces étapes très simples pour installer l'application sur votre écran d'accueil. Ainsi, elle s'ouvrira comme une vraie application native (sans barre d'adresse de recherche) et fonctionnera avec une rapidité impressionnante !
+                  </p>
+
+                  {/* Android Install Section */}
+                  {userPlatform === 'android' && (
+                    <div className="p-5 bg-emerald-50 rounded-2xl border border-emerald-100 flex flex-col gap-4 text-left">
+                      <div className="flex items-center gap-2">
+                        <span className="text-emerald-700 font-black text-xs sm:text-sm uppercase tracking-wider">Méthode Ultra Rapide (Recommandé)</span>
+                      </div>
+                      {isInstallable && deferredPrompt ? (
+                        <button
+                          onClick={handleInstallClick}
+                          className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black uppercase tracking-widest rounded-xl shadow-lg shadow-emerald-600/30 transition-all hover:scale-[1.02] active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
+                        >
+                          <Rocket size={16} />
+                          Installer maintenant en 1 clic
+                        </button>
+                      ) : (
+                        <div className="space-y-3.5 text-xs text-emerald-800 leading-relaxed font-bold">
+                          <div className="flex items-start gap-2.5">
+                            <span className="bg-emerald-200/60 text-emerald-900 w-5 h-5 rounded-full flex items-center justify-center text-[10px] flex-shrink-0 mt-0.5">1</span>
+                            <p>Appuyez sur les <strong className="text-emerald-950">3 petits points verticaux</strong> en haut à droite de votre navigateur Google Chrome.</p>
+                          </div>
+                          <div className="flex items-start gap-2.5">
+                            <span className="bg-emerald-200/60 text-emerald-900 w-5 h-5 rounded-full flex items-center justify-center text-[10px] flex-shrink-0 mt-0.5">2</span>
+                            <p>Appuyez sur l'option <strong className="text-emerald-950">"Installer l'application"</strong> (ou "Ajouter à l'écran d'accueil").</p>
+                          </div>
+                          <div className="flex items-start gap-2.5">
+                            <span className="bg-emerald-200/60 text-emerald-900 w-5 h-5 rounded-full flex items-center justify-center text-[10px] flex-shrink-0 mt-0.5">3</span>
+                            <p>Validez en cliquant sur <strong className="text-emerald-950">"Installer"</strong>. L'icône dorée de l'AMR Mugote s'ajoutera à vos applications !</p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* iOS/Apple Safari Install Section */}
+                  {userPlatform === 'ios' && (
+                    <div className="p-5 bg-[#001233]/5 rounded-2xl border border-[#001233]/10 space-y-4 text-left">
+                      <span className="text-[#001233] font-black text-xs sm:text-sm uppercase tracking-wider block">Guide d'installation iPhone / iPad 🍏</span>
+                      <div className="space-y-3.5 text-xs text-slate-700 leading-relaxed font-semibold">
+                        <div className="flex items-start gap-2.5">
+                          <span className="bg-[#001233]/10 text-[#001233] w-5 h-5 rounded-full flex items-center justify-center text-[10px] flex-shrink-0 mt-0.5">1</span>
+                          <p>Ouvrez ce lien dans le navigateur par défaut de votre iPhone, <strong className="text-[#001233]">Safari</strong>.</p>
+                        </div>
+                        <div className="flex items-start gap-2.5">
+                          <span className="bg-[#001233]/10 text-[#001233] w-5 h-5 rounded-full flex items-center justify-center text-[10px] flex-shrink-0 mt-0.5">2</span>
+                          <p>Appuyez sur l'icône de <strong className="text-[#001233]">Partager</strong> <Upload size={14} className="inline mx-1 text-[#001233]" /> (le carré avec une flèche pointant vers le haut en bas de votre écran).</p>
+                        </div>
+                        <div className="flex items-start gap-2.5">
+                          <span className="bg-[#001233]/10 text-[#001233] w-5 h-5 rounded-full flex items-center justify-center text-[10px] flex-shrink-0 mt-0.5">3</span>
+                          <p>Faites défiler le menu d'options vers le bas et sélectionnez l'option <strong className="text-[#001233]">"Sur l'écran d'accueil"</strong> (ou <em className="text-slate-500 font-medium">Add to Home Screen</em>).</p>
+                        </div>
+                        <div className="flex items-start gap-2.5">
+                          <span className="bg-[#001233]/10 text-[#001233] w-5 h-5 rounded-full flex items-center justify-center text-[10px] flex-shrink-0 mt-0.5">4</span>
+                          <p>Cliquez sur l'option <strong className="text-[#001233]">"Ajouter"</strong> en haut à droite. Voilà ! L'application est installée sur votre iPhone.</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Desktop Install Section */}
+                  {userPlatform === 'desktop' && (
+                    <div className="p-5 bg-amber-50 rounded-2xl border border-amber-200/60 space-y-4 text-left">
+                      <span className="text-[#ca8a04] font-black text-xs sm:text-sm uppercase tracking-wider block">Méthode Facile pour Ordinateur (PC / Mac / Linux) 💻</span>
+                      {isInstallable && deferredPrompt ? (
+                        <button
+                          onClick={handleInstallClick}
+                          className="w-full py-3.5 bg-[#001233] hover:bg-[#00224d] text-[#eab308] border border-[#eab308]/30 text-xs font-black uppercase tracking-widest rounded-xl shadow-lg transition-all hover:scale-[1.02] active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
+                        >
+                          <Rocket size={16} />
+                          Installer l'application sur mon PC
+                        </button>
+                      ) : (
+                        <div className="space-y-3.5 text-xs text-amber-900 leading-relaxed font-semibold">
+                          <div className="flex items-start gap-2.5">
+                            <span className="bg-amber-100 text-amber-900 w-5 h-5 rounded-full flex items-center justify-center text-[10px] flex-shrink-0 mt-0.5">1</span>
+                            <p>Dans la barre d'adresse de votre navigateur Chrome ou Edge (en haut à droite, là où vous tapez les adresses de sites), recherchez la petite icône avec une <strong className="text-slate-900">petite flèche pointant vers le bas</strong> ou <strong className="text-slate-900">trois carrés avec un "+"</strong>.</p>
+                          </div>
+                          <div className="flex items-start gap-2.5">
+                            <span className="bg-amber-100 text-amber-900 w-5 h-5 rounded-full flex items-center justify-center text-[10px] flex-shrink-0 mt-0.5">2</span>
+                            <p>Cliquez sur cette icône d'installation rapide.</p>
+                          </div>
+                          <div className="flex items-start gap-2.5">
+                            <span className="bg-amber-100 text-amber-900 w-5 h-5 rounded-full flex items-center justify-center text-[10px] flex-shrink-0 mt-0.5">3</span>
+                            <p>Choisissez <strong className="text-slate-900">"Installer"</strong>. Un raccourci s'ajoutera automatiquement sur votre Bureau PC/Mac.</p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Generic Appareil Mobile / fallback */}
+                  {userPlatform === 'generic' && (
+                    <div className="p-5 bg-slate-100 rounded-2xl border border-slate-200 text-xs space-y-4 text-left">
+                      <span className="text-slate-800 font-extrabold uppercase tracking-wider block">Instructions Générales de Téléchargement</span>
+                      <p className="text-slate-600 leading-relaxed font-medium">
+                        Pour tout autre navigateur ou tablette, ouvrez le <strong>Menu options</strong> (souvent représenté par les trois points <strong className="text-slate-800">⋮</strong> ou l'icône de partage) et choisissez l'option <strong className="text-slate-800">"Ajouter à l'écran d'accueil"</strong> ou <strong className="text-slate-800">"Installer l'application"</strong>.
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Share feature so it's shareable with everyone */}
+                <div className="p-4 bg-slate-900 text-white rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-4 text-left">
+                  <div className="space-y-1">
+                    <h5 className="font-extrabold text-[#eab308] text-xs uppercase tracking-wider">📤 Partager avec vos proches</h5>
+                    <p className="text-[10px] text-slate-300 font-semibold leading-relaxed">
+                      Envoyez cette web-app à votre équipe ou vos passagers pour qu'ils puissent également l'installer en quelques secondes.
+                    </p>
+                  </div>
+                  <button
+                    onClick={async () => {
+                      const shareData = {
+                        title: "AMR MUGOTE & FRERES",
+                        text: "Réservez vos navettes lacustres sécurisées entre Bukavu et Goma sur le lac Kivu via l'application officielle AMR Mugote.",
+                        url: window.location.origin
+                      };
+                      if (navigator.share && navigator.canShare && navigator.canShare(shareData)) {
+                        try {
+                          await navigator.share(shareData);
+                        } catch (err) {
+                          console.log("User canceled or sharing failed, falling back to copy", err);
+                        }
+                      } else {
+                        navigator.clipboard.writeText(window.location.origin);
+                        alert("Lien de l'application copié ! Vous pouvez maintenant le coller et l'envoyer par WhatsApp, SMS ou vos réseaux favoris.");
+                      }
+                    }}
+                    className="px-5 py-2.5 bg-gradient-to-r from-[#eab308] to-yellow-500 hover:from-yellow-500 hover:to-amber-500 text-slate-950 text-[10px] font-black uppercase tracking-widest rounded-xl shadow-lg flex items-center gap-2 transition-all shrink-0 cursor-pointer"
+                  >
+                    <Check size={14} className="text-slate-950 font-black" />
+                    Partager l'App
+                  </button>
+                </div>
+
+              </div>
+
+              {/* Close Button Footer */}
+              <div className="p-4 bg-slate-50 border-t border-slate-100 text-center flex justify-end">
+                <button
+                  onClick={() => setIsInstallModalOpen(false)}
+                  className="px-6 py-2 bg-slate-900 hover:bg-slate-800 text-white text-[10px] font-black uppercase tracking-widest rounded-xl transition-all cursor-pointer"
+                >
+                  Fermer
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+
     </div>
   );
 }
@@ -2672,6 +2951,12 @@ function Home({ onBook, onNavigate, siteSettings, schedules }: { onBook: () => v
   );
 }
 
+const SHIP_CLASS_CAPACITIES: Record<ShipName, Record<TravelClass, number>> = {
+  'Mugote 1': { 'VIP': 10, '1ère Classe': 25, '2ème Classe': 60, '3ème Classe': 120 },
+  'Mugote 2': { 'VIP': 15, '1ère Classe': 35, '2ème Classe': 80, '3ème Classe': 150 },
+  'Mugote 3': { 'VIP': 20, '1ère Classe': 45, '2ème Classe': 100, '3ème Classe': 180 }
+};
+
 function Booking({ onReserved, user, onLoginRequest }: { onReserved: (res: Reservation) => void, user: FirebaseUser | null, onLoginRequest: () => void }) {
   const [formData, setFormData] = useState({
     fullName: '',
@@ -2691,6 +2976,43 @@ function Booking({ onReserved, user, onLoginRequest }: { onReserved: (res: Reser
   });
   const [submitting, setSubmitting] = useState(false);
   const [errorLocal, setErrorLocal] = useState<string | null>(null);
+
+  const [bookedCount, setBookedCount] = useState<Record<TravelClass, number>>({
+    'VIP': 0,
+    '1ère Classe': 0,
+    '2ème Classe': 0,
+    '3ème Classe': 0
+  });
+
+  useEffect(() => {
+    if (!formData.travelDate || !formData.ship) return;
+    const q = query(
+      collection(db, 'reservations'),
+      where('travelDate', '==', formData.travelDate),
+      where('ship', '==', formData.ship)
+    );
+    const unsub = onSnapshot(q, (snap) => {
+      const counts: Record<TravelClass, number> = {
+        'VIP': 0,
+        '1ère Classe': 0,
+        '2ème Classe': 0,
+        '3ème Classe': 0
+      };
+      snap.forEach(d => {
+        const data = d.data();
+        if (data.status !== 'REJECTED') {
+          const tc = data.travelClass as TravelClass;
+          if (counts[tc] !== undefined) {
+            counts[tc] += (data.passengersCount || 1);
+          }
+        }
+      });
+      setBookedCount(counts);
+    }, (error) => {
+      console.warn("Could not load real-time quotas", error);
+    });
+    return () => unsub();
+  }, [formData.travelDate, formData.ship]);
 
   useEffect(() => {
     if (user) {
@@ -2740,6 +3062,15 @@ function Booking({ onReserved, user, onLoginRequest }: { onReserved: (res: Reser
 
     if (formData.passengersCount < 1) {
       setErrorLocal("Le nombre de passagers doit être au moins de 1.");
+      return;
+    }
+
+    // Quota capacity check
+    const maxCapacity = SHIP_CLASS_CAPACITIES[formData.ship]?.[formData.travelClass] || 100;
+    const currentBooked = bookedCount[formData.travelClass] || 0;
+    const remaining = maxCapacity - currentBooked;
+    if (formData.passengersCount > remaining) {
+      setErrorLocal(`Désolé, il ne reste plus que ${remaining >= 0 ? remaining : 0} place(s) disponible(s) en ${formData.travelClass} pour ce voyage sur ${formData.ship} le ${formData.travelDate}. (Capacité max: ${maxCapacity} places)`);
       return;
     }
 
@@ -3054,6 +3385,12 @@ function Booking({ onReserved, user, onLoginRequest }: { onReserved: (res: Reser
                         const clsColor = CLASS_COLORS[c];
                         const isActive = formData.travelClass === c;
                         
+                        const maxCap = SHIP_CLASS_CAPACITIES[formData.ship]?.[c] || 100;
+                        const currentBookedCount = bookedCount[c] || 0;
+                        const remSeats = maxCap - currentBookedCount;
+
+                        const labelName = c === '3ème Classe' ? 'Économique' : c === '2ème Classe' ? 'Standard (2e)' : c === '1ère Classe' ? '1ère Classe' : 'VIP';
+                        
                         return (
                           <button
                             key={c}
@@ -3069,8 +3406,18 @@ function Booking({ onReserved, user, onLoginRequest }: { onReserved: (res: Reser
                               backgroundColor: isActive ? clsColor.main : undefined,
                             }}
                           >
-                            <p className={cn("text-[6px] lg:text-[8px] font-black uppercase tracking-tighter leading-none mb-0.5 lg:mb-1", isActive ? "text-white" : "text-slate-400")}>{c}</p>
-                            <p className={cn("text-[10px] lg:text-sm font-black font-mono", isActive ? "text-white" : "text-black")}>{PRICES[c]}$</p>
+                            <p className={cn("text-[6px] lg:text-[8px] font-black uppercase tracking-tighter leading-none mb-0.5 lg:mb-1", isActive ? "text-white" : "text-slate-400")}>{c} ({labelName})</p>
+                            <p className={cn("text-[10px] lg:text-sm font-black font-mono leading-none", isActive ? "text-white" : "text-black")}>{PRICES[c]}$</p>
+                            
+                            {formData.travelDate ? (
+                              <p className={cn("text-[6px] lg:text-[7px] font-black uppercase mt-1 px-1.5 py-0.5 rounded-full tracking-widest", isActive ? "text-white bg-white/20" : remSeats <= 5 ? "text-rose-600 bg-rose-50 border border-rose-100" : "text-slate-500 bg-slate-200/50")}>
+                                {remSeats <= 0 ? "⚠️ Complet" : `${remSeats} places dispo`}
+                              </p>
+                            ) : (
+                              <p className={cn("text-[6px] lg:text-[7px] font-bold uppercase mt-1 px-1.5 py-0.5 rounded-full tracking-widest", isActive ? "text-white bg-white/20" : "text-slate-400 bg-slate-100")}>
+                                Capacité : {maxCap}
+                              </p>
+                            )}
                           </button>
                         );
                       })}
@@ -3764,7 +4111,7 @@ function Payment({ reservation, onComplete, siteSettings }: { reservation: Reser
 }
 
 function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlocked, setIsAdminUnlocked, setUser }: { siteSettings?: { homeBg: string, homeDetail: string }, onNavigate: (page: string) => void, schedules: any[], isAdmin: boolean, isAdminUnlocked: boolean, setIsAdminUnlocked: (val: boolean) => void, setUser?: (u: any) => void }) {
-  const [tab, setTab] = useState<'reservations' | 'users' | 'fleet' | 'media' | 'settings' | 'messages' | 'schedules'>('reservations');
+  const [tab, setTab] = useState<'reservations' | 'users' | 'fleet' | 'media' | 'settings' | 'messages' | 'schedules' | 'scanner'>('reservations');
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [usersList, setUsersList] = useState<any[]>([]);
   const [fleetList, setFleetList] = useState<any[]>([]);
@@ -4549,6 +4896,7 @@ function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlock
             <div className="flex flex-wrap justify-center gap-2">
               {[
                 { id: 'reservations', label: 'Réservations', icon: Ticket },
+                { id: 'scanner', label: 'Scanner Port', icon: Camera },
                 { id: 'users', label: 'Utilisateurs', icon: Users },
                 { id: 'fleet', label: 'Flotte', icon: Anchor },
                 { id: 'schedules', label: 'Horaires', icon: Clock },
@@ -4668,7 +5016,9 @@ function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlock
           </div>
         )}
         <div className="bg-white rounded-[32px] border border-slate-100 shadow-2xl shadow-slate-200/50 overflow-hidden">
-        {tab === 'reservations' ? (
+        {tab === 'scanner' ? (
+          <AdminScannerView reservations={reservations} />
+        ) : tab === 'reservations' ? (
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
@@ -4676,6 +5026,7 @@ function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlock
                   <th className="px-10 py-6 text-[10px] font-extrabold uppercase tracking-[0.2em] text-slate-400">Client (Nom Complet)</th>
                   <th className="px-10 py-6 text-[10px] font-extrabold uppercase tracking-[0.2em] text-slate-400">Détails Voyage</th>
                   <th className="px-10 py-6 text-[10px] font-extrabold uppercase tracking-[0.2em] text-slate-400 text-center">Paiement</th>
+                  <th className="px-10 py-6 text-[10px] font-extrabold uppercase tracking-[0.2em] text-slate-400 text-center">Embarquement</th>
                   <th className="px-10 py-6 text-[10px] font-extrabold uppercase tracking-[0.2em] text-slate-400 text-right">Actions</th>
                 </tr>
               </thead>
@@ -4734,6 +5085,37 @@ function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlock
                         )}>
                           {res.status}
                         </span>
+                      </div>
+                    </td>
+                    <td className="px-10 py-8 text-center">
+                      <div className="flex flex-col items-center gap-2">
+                        <span className={cn(
+                          "px-3 py-1.5 text-[8px] font-black uppercase tracking-widest rounded-full border",
+                          res.boardingStatus === 'BOARDED' 
+                            ? "bg-emerald-50 text-emerald-600 border-emerald-200" 
+                            : "bg-slate-100 text-slate-400 border-slate-200"
+                        )}>
+                          {res.boardingStatus === 'BOARDED' ? '🚢 EMBARQUÉ' : 'Non embarqué'}
+                        </span>
+                        {res.status === 'VALIDATED' && (
+                          <button
+                            onClick={async () => {
+                              const isCurrentlyBoarded = res.boardingStatus === 'BOARDED';
+                              const newStatus = isCurrentlyBoarded ? 'PENDING' : 'BOARDED';
+                              try {
+                                await updateDoc(doc(db, 'reservations', res.id!), {
+                                  boardingStatus: newStatus,
+                                  boardedAt: newStatus === 'BOARDED' ? Date.now() : null
+                                });
+                              } catch (err: any) {
+                                console.warn("Could not update boarding status in table", err);
+                              }
+                            }}
+                            className="text-[8px] font-black uppercase tracking-widest text-[#0047AB] hover:underline"
+                          >
+                            {res.boardingStatus === 'BOARDED' ? 'Débarquer' : 'Embarquer'}
+                          </button>
+                        )}
                       </div>
                     </td>
                     <td className="px-10 py-8 text-right">
@@ -6169,5 +6551,319 @@ function VerificationView({ id, onClose }: { id: string, onClose: () => void }) 
         </div>
       </div>
     </motion.div>
+  );
+}
+
+function playBeep(success: boolean) {
+  try {
+    const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    
+    if (success) {
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(800, ctx.currentTime);
+      gain.gain.setValueAtTime(0.08, ctx.currentTime);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.1);
+      
+      const osc2 = ctx.createOscillator();
+      const gain2 = ctx.createGain();
+      osc2.connect(gain2);
+      gain2.connect(ctx.destination);
+      osc2.type = 'sine';
+      osc2.frequency.setValueAtTime(1000, ctx.currentTime + 0.12);
+      gain2.gain.setValueAtTime(0.08, ctx.currentTime + 0.12);
+      osc2.start(ctx.currentTime + 0.12);
+      osc2.stop(ctx.currentTime + 0.25);
+    } else {
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(150, ctx.currentTime);
+      gain.gain.setValueAtTime(0.12, ctx.currentTime);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.4);
+    }
+  } catch (e) {
+    console.warn("Audio Context beep fail", e);
+  }
+}
+
+interface AdminScannerViewProps {
+  reservations: Reservation[];
+}
+
+function AdminScannerView({ reservations }: AdminScannerViewProps) {
+  const [scannedRes, setScannedRes] = useState<Reservation | null>(null);
+  const [manualId, setManualId] = useState('');
+  const [searchError, setSearchError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [scannedList, setScannedList] = useState<Reservation[]>([]);
+
+  useEffect(() => {
+    const scanner = new Html5QrcodeScanner("admin-qr-reader", {
+      fps: 10,
+      qrbox: { width: 220, height: 220 },
+      rememberLastUsedCamera: true,
+      supportedScanTypes: [0] // Camera scan type only
+    }, false);
+
+    const onScanSuccess = (decodedText: string) => {
+      console.log("Decoded QR:", decodedText);
+      
+      let id = decodedText;
+      if (decodedText.includes('verify=')) {
+        try {
+          const match = decodedText.match(/[?&]verify=([a-zA-Z0-9_\-]+)/);
+          if (match && match[1]) {
+            id = match[1];
+          } else {
+            const url = new URL(decodedText);
+            id = url.searchParams.get('verify') || decodedText;
+          }
+        } catch {
+          const parts = decodedText.split('verify=');
+          if (parts[1]) {
+            id = parts[1].split('&')[0];
+          }
+        }
+      }
+
+      handleSearch(id);
+    };
+
+    const onScanFailure = (error: any) => {
+      // Quietly ignore frame scan logs
+    };
+
+    scanner.render(onScanSuccess, onScanFailure);
+
+    return () => {
+      scanner.clear().catch(err => console.warn("Scanner shutdown notice:", err));
+    };
+  }, [reservations]);
+
+  const handleSearch = (id: string) => {
+    if (!id.trim()) return;
+    const found = reservations.find(r => r.id === id.trim() || r.ticketId === id.trim());
+    if (found) {
+      setScannedRes(found);
+      setSearchError(null);
+      playBeep(true);
+    } else {
+      setScannedRes(null);
+      setSearchError(`Code billet ou ID "${id}" introuvable dans la base d'administration.`);
+      playBeep(false);
+    }
+  };
+
+  const handleManualSearchSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    handleSearch(manualId);
+  };
+
+  const handleBoardPassenger = async () => {
+    if (!scannedRes || !scannedRes.id) return;
+    setLoading(true);
+    try {
+      await updateDoc(doc(db, 'reservations', scannedRes.id), {
+        boardingStatus: 'BOARDED',
+        boardedAt: Date.now()
+      });
+      
+      const updated = {
+        ...scannedRes,
+        boardingStatus: 'BOARDED' as const,
+        boardedAt: Date.now()
+      };
+      setScannedRes(updated);
+      setScannedList(prev => [updated, ...prev.filter(x => x.id !== updated.id)]);
+      
+      playBeep(true);
+    } catch (err: any) {
+      console.error(err);
+      alert("Erreur lors de la validation de l'embarquement : " + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="p-4 sm:p-10 space-y-6 max-w-4xl mx-auto">
+      <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between border-b pb-4 border-slate-100">
+        <div className="text-left">
+          <h3 className="text-xl sm:text-2xl font-black uppercase text-maritime tracking-tight italic">Scanner d'embarquement (Port Goma/Bukavu)</h3>
+          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1 leading-relaxed">
+            Équipe de pont / port : Scannez le code QR ou saisissez le code pour valider l'embarquement en un clic.
+          </p>
+        </div>
+        <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-100 p-2.5 rounded-xl">
+          <div className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-pulse" />
+          <span className="text-[9px] font-black text-emerald-700 uppercase tracking-wider">Lecteur Actif</span>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+        
+        {/* Left Column: Visual QR code scanner finder */}
+        <div className="lg:col-span-5 space-y-4">
+          <div className="bg-slate-950 p-4 rounded-[28px] border border-slate-800 shadow-2xl relative overflow-hidden flex flex-col items-center">
+            <span className="text-gold text-[7px] font-black tracking-[0.3em] uppercase mb-2">Viseur optique instantané</span>
+            
+            <div id="admin-qr-reader" className="w-full max-w-xs aspect-square bg-[#0c101a] rounded-xl overflow-hidden border border-slate-800 shadow-inner">
+            </div>
+
+            <div className="w-full pt-3 text-center text-[7px] font-black text-slate-500 uppercase tracking-widest">
+              <span>Caméra mobile active • Détection en continu</span>
+            </div>
+          </div>
+
+          {/* Saisie de secours */}
+          <div className="bg-slate-50 border border-slate-100 rounded-2xl p-4 space-y-3 text-left">
+            <p className="text-[8px] font-black uppercase text-slate-400 tracking-wider">Saisie manuelle du ID de secours</p>
+            <form onSubmit={handleManualSearchSubmit} className="flex gap-2">
+              <input
+                type="text"
+                placeholder="Ex: AMR-BH9F1..."
+                value={manualId}
+                onChange={e => setManualId(e.target.value)}
+                className="flex-1 px-3 py-2 bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-gold font-bold text-[10px]"
+              />
+              <button
+                type="submit"
+                className="px-3 py-2 bg-maritime text-white uppercase text-[8px] font-black tracking-widest rounded-lg hover:bg-black transition-all"
+              >
+                Rechercher
+              </button>
+            </form>
+            {searchError && (
+              <p className="text-[9px] text-rose-500 font-bold uppercase tracking-wide leading-tight">{searchError}</p>
+            )}
+          </div>
+        </div>
+
+        {/* Right Column: Scanned pass details */}
+        <div className="lg:col-span-7 space-y-4">
+          {scannedRes ? (
+            <div className="bg-white border-2 border-slate-900 rounded-[24px] p-5 sm:p-6 space-y-4 shadow-lg relative overflow-hidden text-left">
+              <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-emerald-500 via-gold to-[#0047AB]" />
+              
+              <div className="flex justify-between items-start gap-4">
+                <div className="space-y-1">
+                  <span className={cn(
+                    "px-2 py-0.5 text-[7px] font-black uppercase tracking-widest rounded border inline-block",
+                    scannedRes.boardingStatus === 'BOARDED' ? "bg-emerald-50 text-emerald-600 border-emerald-100" : "bg-rose-50 text-rose-500 border-rose-100 animate-pulse"
+                  )}>
+                    {scannedRes.boardingStatus === 'BOARDED' ? '🚢 EMBARQUÉ SÉCURISÉ' : 'Non embarqué'}
+                  </span>
+                  <h4 className="text-lg font-black uppercase tracking-tight text-slate-900 leading-tight">{scannedRes.fullName} {scannedRes.lastName}</h4>
+                  <p className="text-[10px] text-slate-400 font-mono mt-0.5">{scannedRes.phone}</p>
+                </div>
+                <div className="text-right flex-shrink-0">
+                  <p className="text-[7px] font-bold text-slate-400 uppercase tracking-widest">Code Billet</p>
+                  <p className="text-sm font-black text-gold font-mono tracking-wider">{scannedRes.ticketId || scannedRes.id?.substring(0,8).toUpperCase()}</p>
+                </div>
+              </div>
+
+              <div className="h-px bg-slate-100 my-2" />
+
+              <div className="grid grid-cols-2 gap-3 text-[10px] lg:text-xs">
+                <div>
+                  <p className="text-[7px] font-bold uppercase text-slate-400 tracking-wider">Itinéraire</p>
+                  <p className="font-black text-slate-900 uppercase italic">{scannedRes.itinerary}</p>
+                </div>
+                <div>
+                  <p className="text-[7px] font-bold uppercase text-slate-400 tracking-wider">Navire</p>
+                  <p className="font-black text-slate-900 uppercase">{scannedRes.ship}</p>
+                </div>
+                <div>
+                  <p className="text-[7px] font-bold uppercase text-slate-400 tracking-wider">Classe Comfort</p>
+                  <p className="font-black text-slate-900 uppercase">{scannedRes.travelClass}</p>
+                </div>
+                <div>
+                  <p className="text-[7px] font-bold uppercase text-slate-400 tracking-wider">Passagers (PAX)</p>
+                  <p className="font-black text-slate-900 font-mono">{scannedRes.passengersCount} PERSONNE(S)</p>
+                </div>
+                <div>
+                  <p className="text-[7px] font-bold uppercase text-slate-400 tracking-wider">Date Voyage</p>
+                  <p className="font-black text-slate-900 font-mono">{scannedRes.travelDate}</p>
+                </div>
+                <div>
+                  <p className="text-[7px] font-bold uppercase text-slate-400 tracking-wider">Statut Paiement</p>
+                  <span className="font-black text-emerald-600 uppercase italic text-[8px] bg-emerald-50 px-1 rounded border border-emerald-100 tracking-wider inline-block">
+                    {scannedRes.status === 'VALIDATED' ? '💸 Payé & Validé' : scannedRes.status}
+                  </span>
+                </div>
+              </div>
+
+              <div className="pt-2">
+                {scannedRes.boardingStatus === 'BOARDED' ? (
+                  <div className="p-3 bg-emerald-50 border border-emerald-100 rounded-xl text-center space-y-0.5">
+                    <p className="text-[10px] font-extrabold text-emerald-700 uppercase">✓ EMBARQUEMENT COMPLÉTÉ</p>
+                    {scannedRes.boardedAt && (
+                      <p className="text-[7px] font-bold text-emerald-500 uppercase tracking-widest font-mono">
+                        Validé le {new Date(scannedRes.boardedAt).toLocaleDateString()} à {new Date(scannedRes.boardedAt).toLocaleTimeString()}
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  <button
+                    onClick={handleBoardPassenger}
+                    disabled={loading || scannedRes.status !== 'VALIDATED'}
+                    className={cn(
+                      "w-full py-3.5 text-white uppercase text-[10px] font-black tracking-widest rounded-xl transition-all shadow-md active:scale-95",
+                      scannedRes.status === 'VALIDATED' 
+                        ? "bg-emerald-600 hover:bg-emerald-700 shadow-emerald-700/20" 
+                        : "bg-slate-300 cursor-not-allowed"
+                    )}
+                  >
+                    {loading ? "Traitement..." : scannedRes.status === 'VALIDATED' ? "🚢 CLIQUEZ POUR EMBARQUER LE PASSAGER" : "ACCÈS DE EMBARQUEMENT REFUSÉ (NON VALIDÉ)"}
+                  </button>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="bg-slate-50 border-2 border-dashed border-slate-200 rounded-[24px] p-10 flex flex-col items-center justify-center text-center space-y-3 opacity-50 text-slate-400">
+              <Camera size={36} className="animate-pulse" />
+              <div className="space-y-1">
+                <p className="text-[9px] font-black uppercase tracking-widest text-slate-600">Scan en veille...</p>
+                <p className="text-[8px] font-bold uppercase tracking-wide max-w-xs mx-auto text-slate-400 leading-normal">
+                  Scannez ou saisissez un billet pour débloquer la validation de l'embarquement
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Scanned List Session details */}
+          <div className="space-y-2 text-left">
+            <h5 className="text-[8px] font-black uppercase text-slate-400 tracking-widest">Historique de la Session locale</h5>
+            {scannedList.length === 0 ? (
+              <p className="text-[8px] font-bold uppercase italic text-slate-400">Aucun embarquement valider durant cette session.</p>
+            ) : (
+              <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
+                {scannedList.map((sc, i) => (
+                  <div key={i} className="p-3 bg-slate-50 border border-slate-100 rounded-lg flex justify-between items-center text-[10px] font-bold uppercase">
+                    <div>
+                      <p className="text-slate-900 font-extrabold">{sc.fullName} {sc.lastName}</p>
+                      <p className="text-[7px] text-slate-400 font-mono mt-0.5">{sc.ship} • {sc.travelClass} • {sc.passengersCount} PAX</p>
+                    </div>
+                    <div className="text-right">
+                      <span className="px-1.5 py-0.5 bg-emerald-50 text-emerald-600 border border-emerald-100 text-[7px] font-black tracking-widest rounded inline-block">
+                        ✓ EMBARQUÉ
+                      </span>
+                      {sc.boardedAt && (
+                        <p className="text-[6px] text-slate-400 font-mono mt-0.5">{new Date(sc.boardedAt).toLocaleTimeString()}</p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+      </div>
+    </div>
   );
 }

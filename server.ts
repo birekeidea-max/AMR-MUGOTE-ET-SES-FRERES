@@ -4,9 +4,44 @@ import { createServer as createViteServer } from "vite";
 import path from "path";
 import { fileURLToPath } from "url";
 import { GoogleGenAI } from "@google/genai";
+import fs from "fs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+import admin from "firebase-admin";
+
+const firebaseConfig = {
+  projectId: "mugote2",
+  databaseId: "ai-studio-020b031e-1447-4f1b-8ef0-ab4a23c0b6ab"
+};
+
+const adminApp = admin.apps.length ? admin.apps[0] : admin.initializeApp({
+  projectId: firebaseConfig.projectId
+});
+
+const dbAdmin = adminApp.firestore();
+
+async function generateUniqueTicketId(): Promise<string> {
+  let uniqueTicketId = "";
+  let isUnique = false;
+  let attempts = 0;
+  const reservationsCol = dbAdmin.collection("reservations");
+
+  while (!isUnique && attempts < 15) {
+    const randomHex = Math.random().toString(36).substring(2, 8).toUpperCase();
+    uniqueTicketId = `AMR-${randomHex}`;
+    const qSnap = await reservationsCol.where("ticketId", "==", uniqueTicketId).get();
+    if (qSnap.empty) {
+      isUnique = true;
+    }
+    attempts++;
+  }
+  if (!uniqueTicketId) {
+    uniqueTicketId = `AMR-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+  }
+  return uniqueTicketId;
+}
 
 async function startServer() {
   const app = express();
@@ -145,13 +180,228 @@ TON ET STYLE :
     }
   });
 
-  // API Route for Payment Verification (Simulated)
+  // API Route for Payment Verification (Simulated Legacy)
   app.post("/api/verify-payment", async (req, res) => {
     const { transactionId, phone, amount } = req.body;
-    // In a real app, we would call the Mobile Money API here.
-    // For now, we simulate a successful initiation.
     console.log(`Verifying payment for transaction ${transactionId} from ${phone} for ${amount} FC`);
     res.json({ status: "initiated", message: "Paiement en attente de validation administrative." });
+  });
+
+  // FlexPay CD Mobile Money PUSH Integration
+  app.post("/api/flexpay/initialize", async (req, res) => {
+    try {
+      const { phone, amount, operator, reservationId } = req.body;
+      if (!phone || !amount || !reservationId) {
+        return res.status(400).json({ error: "Champs obligatoires manquants." });
+      }
+
+      // Format customer phone number for DRC standard (243XXXXXXXXX)
+      const formattedPhone = phone.replace(/[\s\-\+]/g, "");
+      const finalClientPhone = formattedPhone.startsWith("0") 
+        ? "243" + formattedPhone.substring(1) 
+        : formattedPhone.startsWith("243") 
+          ? formattedPhone 
+          : "243" + formattedPhone;
+      
+      const trackingRef = `AMR-FLX-${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
+
+      // Save tracking reference as the reservation's unique transactionId immediately
+      try {
+        const docRef = dbAdmin.collection("reservations").doc(reservationId);
+        await docRef.update({
+          transactionId: trackingRef,
+          momoOperator: operator || "Airtel Money",
+        });
+        console.log(`Associated reservation ${reservationId} with tracking reference ${trackingRef}`);
+      } catch (dbErr: any) {
+        console.warn("Could not write initial tracking ref to Firestore reservation (non-blocking model design):", dbErr);
+      }
+
+      const apiToken = process.env.FLEXPAY_API_TOKEN;
+      const merchantKey = process.env.FLEXPAY_MERCHANT_KEY;
+      const recipientNumber = process.env.RECIPIENT_AIRTEL_NUMBER || "243994102673";
+
+      if (!apiToken || !merchantKey) {
+        console.log("FlexPay API keys missing or incomplete. Gracefully entering sandbox trial simulation.");
+        return res.json({
+          success: true,
+          trackingRef,
+          simulated: true,
+          message: "Mode test d'évaluation activé. USSD Push simulé."
+        });
+      }
+
+      // Prepare official FlexPay mobile gateway payload
+      const flexpayUrl = "https://gateway.flexpay.cd/api/1.0/pay";
+      const payload = {
+        merchant: merchantKey,
+        phone: finalClientPhone,
+        amount: String(amount),
+        currency: "USD",
+        reference: trackingRef,
+        callback: `${process.env.APP_URL || "https://mugote.com"}/api/flexpay/callback`,
+        description: `Billet AMR MUGOTE - Crédite: ${recipientNumber}`
+      };
+
+      console.log("Posting payload to FlexPay gateway:", JSON.stringify(payload));
+
+      const response = await fetch(flexpayUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${apiToken}`
+        },
+        body: JSON.stringify(payload)
+      });
+
+      const responseData = await response.json() as any;
+      console.log("FlexPay gateway response status:", response.status, responseData);
+
+      // FlexPay usually returns a status code of "0" inside for successfully queued USSD pushes
+      if (response.ok && (responseData.code === "0" || responseData.code === 0 || responseData.status === "0" || responseData.success)) {
+        res.json({
+          success: true,
+          trackingRef,
+          simulated: false,
+          flexpayData: responseData,
+          message: "Votre transaction a été initiée. Veuillez saisir votre code secret sur le push USSD de votre téléphone."
+        });
+      } else {
+        console.error("FlexPay API rejected transaction registration:", responseData);
+        res.json({
+          success: false,
+          trackingRef,
+          simulated: true,
+          error: responseData.message || "Échec de l'intégration avec le serveur FlexPay.",
+          message: "Impossible d'initier un paiement réel. Passage automatique au mode Simulation d'évaluation."
+        });
+      }
+    } catch (error: any) {
+      console.error("Critical error inside FlexPay initializer:", error);
+      res.json({
+        success: false,
+        trackingRef: `SIM-ERR-${Math.random().toString(36).substring(2, 8).toUpperCase()}`,
+        simulated: true,
+        message: "Une erreur technique s'est produite lors de la connexion. Mode simulation activé pour évaluation."
+      });
+    }
+  });
+
+  // Webhook Receiver Callback for FlexPay Payment Confirmation
+  app.post("/api/flexpay/callback", async (req, res) => {
+    try {
+      console.log("FlexPay webhook callback triggered with body:", JSON.stringify(req.body));
+      const { reference, status, code } = req.body;
+      
+      const referenceToUse = reference || req.body.ref || req.body.order_ref;
+      const statusToUse = status !== undefined ? status : code;
+
+      if (!referenceToUse) {
+        return res.status(400).json({ error: "Le paramètre reference est obligatoire dans le callback." });
+      }
+
+      // Check if status represents a successful charge ("0", "SUCCESSFUL", "SUCCESS")
+      const isSuccess = String(statusToUse).trim() === "0" || 
+                        String(statusToUse).toUpperCase() === "SUCCESSFUL" || 
+                        String(statusToUse).toUpperCase() === "SUCCESS" ||
+                        String(statusToUse).toUpperCase() === "COMPLETED";
+
+      if (isSuccess) {
+        console.log(`FlexPay Callback confirms successful transaction reference: ${referenceToUse}`);
+
+        // Update the reservation document to VALIDATED with a unique, cryptographically friendly ticket ID
+        const reservationsCol = dbAdmin.collection("reservations");
+        const querySnapshot = await reservationsCol.where("transactionId", "==", referenceToUse).get();
+
+        if (!querySnapshot.empty) {
+          for (const doc of querySnapshot.docs) {
+            const reservationData = doc.data();
+            if (reservationData.status !== "VALIDATED") {
+              const uniqueTicketId = await generateUniqueTicketId();
+              await doc.ref.update({
+                status: "VALIDATED",
+                ticketId: uniqueTicketId,
+                validatedAt: Date.now()
+              });
+              console.log(`Successfully completed reservation callback for ${doc.id} giving active Ticket ${uniqueTicketId}`);
+            }
+          }
+        } else {
+          console.warn(`Callback reference mismatch. Unable to find reservation holding transactionId: ${referenceToUse}`);
+        }
+      } else {
+        console.log(`FlexPay Callback reports a non-successful transaction state for reference: ${referenceToUse}`);
+      }
+
+      res.status(200).send("OK");
+    } catch (error) {
+      console.error("Critical failure during callback webhook processing:", error);
+      res.status(500).send("Callback error");
+    }
+  });
+
+  // Polling check endpoint for live client response updates
+  app.get("/api/flexpay/check-status/:ref", async (req, res) => {
+    try {
+      const { ref } = req.params;
+      const reservationsCol = dbAdmin.collection("reservations");
+      const querySnapshot = await reservationsCol.where("transactionId", "==", ref).get();
+
+      if (querySnapshot.empty) {
+        return res.json({ found: false, validated: false });
+      }
+
+      const docVal = querySnapshot.docs[0];
+      const data = docVal.data();
+
+      res.json({
+        found: true,
+        validated: data.status === "VALIDATED",
+        ticketId: data.ticketId || null,
+        transactionId: data.transactionId || null,
+        status: data.status
+      });
+    } catch (error) {
+      console.error("Error checking transaction reference state:", error);
+      res.status(500).json({ error: "Internal check failed" });
+    }
+  });
+
+  // Client Simulation Bypass endpoint for sandbox evaluation
+  app.post("/api/flexpay/simulate", async (req, res) => {
+    try {
+      const { trackingRef } = req.body;
+      if (!trackingRef) {
+        return res.status(400).json({ error: "trackingRef is required for sandbox simulation." });
+      }
+
+      console.log(`Simulating immediate payment confirmation for reference: ${trackingRef}`);
+
+      const reservationsCol = dbAdmin.collection("reservations");
+      const querySnapshot = await reservationsCol.where("transactionId", "==", trackingRef).get();
+
+      if (!querySnapshot.empty) {
+        const docVal = querySnapshot.docs[0];
+        const reservationData = docVal.data();
+        
+        if (reservationData.status !== "VALIDATED") {
+          const uniqueTicketId = await generateUniqueTicketId();
+          await docVal.ref.update({
+            status: "VALIDATED",
+            ticketId: uniqueTicketId,
+            validatedAt: Date.now()
+          });
+          console.log(`[BYPASS] Activated reservation ${docVal.id} with Ticket ${uniqueTicketId}`);
+          return res.json({ success: true, ticketId: uniqueTicketId });
+        }
+        return res.json({ success: true, ticketId: reservationData.ticketId, alreadyValidated: true });
+      }
+
+      res.status(404).json({ success: false, error: "Référence introuvable." });
+    } catch (error) {
+      console.error("Bypass callback simulation failed:", error);
+      res.status(500).json({ error: "Simulation trigger failed" });
+    }
   });
 
   // API for fetching some server-side config if needed
@@ -171,6 +421,24 @@ TON ET STYLE :
       keyStart: key ? key.substring(0, 4) : "none",
       nodeEnv: process.env.NODE_ENV || "development"
     });
+  });
+
+  // Endpoint to read/download SDD.md directly in the browser
+  app.get("/api/sdd", (req, res) => {
+    try {
+      const sddPath = path.join(process.cwd(), "SDD.md");
+      if (fs.existsSync(sddPath)) {
+        res.setHeader("Content-Type", "text/plain; charset=utf-8");
+        return res.sendFile(sddPath);
+      }
+      res.status(404).send("Document de Conception Système (SDD) introuvable.");
+    } catch (err: any) {
+      res.status(500).send("Erreur lors de la lecture du SDD: " + err.message);
+    }
+  });
+
+  app.get("/sdd", (req, res) => {
+    res.redirect("/api/sdd");
   });
 
   // Vite middleware for development

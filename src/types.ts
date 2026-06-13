@@ -26,6 +26,8 @@ export interface Reservation {
   validatedAt?: number;
   validatedBy?: string;
   ticketId?: string;
+  boardingStatus?: 'PENDING' | 'BOARDED';
+  boardedAt?: number;
 }
 
 export interface News {

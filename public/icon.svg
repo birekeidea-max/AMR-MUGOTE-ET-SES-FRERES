@@ -1,0 +1,71 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <defs>
+    <!-- Background Gradient -->
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#001d3d" />
+      <stop offset="50%" stop-color="#001233" />
+      <stop offset="100%" stop-color="#000814" />
+    </linearGradient>
+    
+    <!-- Gold Premium Gradient -->
+    <linearGradient id="goldGrad" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#b58900" />
+      <stop offset="30%" stop-color="#eab308" />
+      <stop offset="70%" stop-color="#fef08a" />
+      <stop offset="100%" stop-color="#ca8a04" />
+    </linearGradient>
+
+    <!-- Wave Gradient -->
+    <linearGradient id="waveGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#38bdf8" stop-opacity="0.8" />
+      <stop offset="100%" stop-color="#0369a1" stop-opacity="0.3" />
+    </linearGradient>
+    
+    <clipPath id="circleClip">
+      <rect x="0" y="0" width="512" height="512" rx="112" />
+    </clipPath>
+  </defs>
+
+  <!-- Main Background Rounded Corner Container -->
+  <rect width="512" height="512" rx="112" fill="url(#bgGrad)" />
+  <rect width="500" height="500" x="6" y="6" rx="106" fill="none" stroke="url(#goldGrad)" stroke-width="4" stroke-opacity="0.4" />
+
+  <!-- Abstract Sailing Ship Representation (AMR Fleet on Lake Kivu) -->
+  <g clip-path="url(#circleClip)">
+    <!-- Decorative Sun-Burst Background -->
+    <circle cx="256" cy="200" r="80" fill="url(#goldGrad)" opacity="0.15" filter="blur(4px)" />
+    <circle cx="256" cy="200" r="45" fill="url(#goldGrad)" opacity="0.25" />
+
+    <!-- Ship Sails / Abstract Geometry of the Boat -->
+    <!-- Main Sail -->
+    <path d="M246 100 L246 250 L140 250 C190 220 230 170 246 100 Z" fill="url(#goldGrad)" />
+    <!-- Front Sail -->
+    <path d="M266 120 L266 250 L350 250 C310 220 280 180 266 120 Z" fill="url(#goldGrad)" opacity="0.85" />
+    
+    <!-- Flag -->
+    <path d="M246 85 L246 105 L220 95 Z" fill="#ef4444" />
+
+    <!-- Ship Hull (Double Deck Wave Cruiser) -->
+    <path d="M110 255 L402 255 L365 295 L145 295 Z" fill="url(#goldGrad)" />
+    <!-- Cabin Windows (Portholes) -->
+    <circle cx="170" cy="275" r="7" fill="#001233" />
+    <circle cx="210" cy="275" r="7" fill="#001233" />
+    <circle cx="250" cy="275" r="7" fill="#001233" />
+    <circle cx="290" cy="275" r="7" fill="#001233" />
+    <circle cx="330" cy="275" r="7" fill="#001233" />
+
+    <!-- Dynamic lake waves -->
+    <!-- Back Wave -->
+    <path d="M 30 320 Q 143 270 256 320 T 482 320 L 482 482 L 30 482 Z" fill="url(#waveGrad)" opacity="0.5" />
+    <!-- Front Wave -->
+    <path d="M 30 350 Q 143 310 256 350 T 482 350 L 482 482 L 30 482 Z" fill="url(#waveGrad)" />
+
+    <!-- Fine Wave Lines (Golden Reflections on the Water) -->
+    <path d="M 120 375 Q 188 355 256 375 T 392 375" fill="none" stroke="url(#goldGrad)" stroke-width="3" stroke-linecap="round" opacity="0.7" />
+    <path d="M 80 410 Q 168 390 256 410 T 432 410" fill="none" stroke="url(#goldGrad)" stroke-width="2" stroke-linecap="round" opacity="0.4" />
+  </g>
+
+  <!-- Brand Typography -->
+  <text x="256" y="468" font-family="'Inter', 'Helvetica Neue', sans-serif" font-weight="900" font-size="34" fill="#ffffff" letter-spacing="4" text-anchor="middle">AMR MUGOTE</text>
+  <text x="256" y="492" font-family="'Inter', sans-serif" font-weight="700" font-size="14" fill="url(#goldGrad)" letter-spacing="6" text-anchor="middle">FLEUVE &amp; LAC</text>
+</svg>
