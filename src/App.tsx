@@ -26,6 +26,7 @@ import {
   ImagePlus,
   Edit,
   Search,
+  Copy,
   Settings,
   Printer,
   ChevronRightCircle,
@@ -48,7 +49,8 @@ import {
   Camera,
   Check,
   ExternalLink,
-  Download
+  Download,
+  Heart
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { auth, db, handleFirestoreError, OperationType, uploadToStorage } from './lib/firebase';
@@ -2834,8 +2836,9 @@ function Home({ onBook, onNavigate, siteSettings, schedules }: { onBook: () => v
 
                     {/* Comments & Metrics Panel */}
                     <div className="px-6 sm:px-8 py-4 bg-slate-50 border-t border-slate-100 flex flex-col sm:flex-row justify-between items-center text-[10px] sm:text-xs font-bold text-slate-500 w-full gap-2 sm:gap-0">
-                      <div className="flex items-center gap-4">
+                      <div className="flex flex-wrap items-center gap-4">
                         <span className="flex items-center gap-1.5"><Eye size={12} className="text-slate-400" /> {item.views || 0} vues</span>
+                        <MediaLikes newsId={item.id} initialLikes={item.likes || 0} />
                         <NewsComments newsId={item.id} />
                       </div>
                       {item.processedUrl && (
@@ -4119,11 +4122,13 @@ function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlock
   const [boatForm, setBoatForm] = useState({ id: '', name: '', capacity: 0, description: '', imageUrl: '' });
   const [editMediaId, setEditMediaId] = useState<string | null>(null);
   const [adminCode, setAdminCode] = useState('');
+  const [adminEmailInput, setAdminEmailInput] = useState('');
   const [adminPasswordInput, setAdminPasswordInput] = useState('');
   const [adminAuthError, setAdminAuthError] = useState<string | null>(null);
   const [adminLoading, setAdminLoading] = useState(false);
   const [newAdminCode, setNewAdminCode] = useState((siteSettings as any)?.adminCode || '');
   const [searchTerm, setSearchTerm] = useState('');
+  const [userSearchTerm, setUserSearchTerm] = useState('');
   const [newsList, setNewsList] = useState<any[]>([]);
   const [conversations, setConversations] = useState<any[]>([]);
   const [cleaningGarbage, setCleaningGarbage] = useState(false);
@@ -4278,12 +4283,51 @@ function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlock
       });
     });
 
-    // Users List Listener
+    // Users List Listener - listens to both users_list and users collections and merges them in real-time
+    let firestoreUsersList: any[] = [];
+    let firestoreMainUsers: any[] = [];
+
+    const handleMergeUsers = (ulist: any[], mlist: any[]) => {
+      const mergedMap = new Map<string, any>();
+      
+      mlist.forEach(u => {
+        const key = u.uid || u.id;
+        if (key) {
+          mergedMap.set(key, { ...u, uid: key });
+        }
+      });
+      
+      ulist.forEach(u => {
+        const key = u.uid || u.id;
+        if (key) {
+          const existing = mergedMap.get(key) || {};
+          mergedMap.set(key, {
+            ...existing,
+            ...u,
+            uid: key,
+            usageCount: u.usageCount || existing.usageCount || 1
+          });
+        }
+      });
+
+      const merged = Array.from(mergedMap.values());
+      setUsersList(merged);
+    };
+
     const qUsers = query(collection(db, 'users_list'));
     const unsubUsers = onSnapshot(qUsers, (snapshot) => {
-      const items = snapshot.docs.map(doc => ({ ...doc.data() as any, id: doc.id }));
-      items.sort((a, b) => (b.lastLogin?.seconds || 0) - (a.lastLogin?.seconds || 0));
-      setUsersList(items);
+      firestoreUsersList = snapshot.docs.map(doc => ({ ...doc.data() as any, id: doc.id }));
+      handleMergeUsers(firestoreUsersList, firestoreMainUsers);
+    }, (err) => {
+      console.warn("Background users_list snapshot listener error:", err);
+    });
+
+    const qMainUsers = query(collection(db, 'users'));
+    const unsubMainUsers = onSnapshot(qMainUsers, (snapshot) => {
+      firestoreMainUsers = snapshot.docs.map(doc => ({ ...doc.data() as any, id: doc.id }));
+      handleMergeUsers(firestoreUsersList, firestoreMainUsers);
+    }, (err) => {
+      console.warn("Background users snapshot listener error:", err);
     });
 
     // News/Media Listener - No server-side orderBy to catch all legacy docs
@@ -4331,7 +4375,7 @@ function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlock
       setFleetList(items);
     });
 
-    return () => { unsubRes(); unsubUsers(); unsubNews(); unsubConv(); unsubFleet(); };
+    return () => { unsubRes(); unsubUsers(); unsubMainUsers(); unsubNews(); unsubConv(); unsubFleet(); };
   }, [isAdminUnlocked]);
 
   const getSecondsFromCreatedAt = (createdAt: any): number => {
@@ -4417,13 +4461,18 @@ function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlock
     setAdminLoading(true);
     
     try {
+      const cleanEmail = adminEmailInput.trim().toLowerCase();
       const cleanPassword = adminPasswordInput;
+
+      if (!cleanEmail) {
+        throw new Error("L'adresse e-mail administrative est requise.");
+      }
 
       if (!cleanPassword) {
         throw new Error("Le mot de passe d'administration est requis.");
       }
 
-      if (cleanPassword === getAdminPassword()) {
+      if (cleanEmail === getAdminEmail().toLowerCase() && cleanPassword === getAdminPassword()) {
         // Authentifier également en arrière-plan avec Firebase Auth pour accorder les privilèges Firestore
         try {
           await signInWithEmailAndPassword(auth, getAdminEmail(), getAdminPassword());
@@ -4459,7 +4508,7 @@ function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlock
         
         setIsAdminUnlocked(true);
       } else {
-        throw new Error("Mot de passe d'administration incorrect.");
+        throw new Error("Identifiants incorrects : Adresse e-mail ou mot de passe d'administration invalide.");
       }
     } catch (err: any) {
       console.error("Admin unlock auth failed:", err);
@@ -4475,6 +4524,7 @@ function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlock
       if (!r.userId) return;
       const exists = list.some(u => 
         u.uid === r.userId || 
+        u.id === r.userId ||
         (u.phone && r.phone && u.phone === r.phone) ||
         (u.email && r.email && u.email.toLowerCase() === r.email.toLowerCase())
       );
@@ -4492,7 +4542,33 @@ function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlock
         });
       }
     });
+
+    // Sort to show the newest logged-in users first
+    list.sort((a, b) => {
+      const getSeconds = (ts: any) => {
+        if (!ts) return 0;
+        if (ts.seconds !== undefined) return ts.seconds;
+        if (ts._seconds !== undefined) return ts._seconds;
+        if (typeof ts === 'number') return ts;
+        const parsed = Date.parse(ts);
+        return isNaN(parsed) ? 0 : Math.floor(parsed / 1000);
+      };
+      return getSeconds(b.lastLogin) - getSeconds(a.lastLogin);
+    });
+
     return list;
+  };
+
+  const getFilteredUnifiedUsers = () => {
+    const unified = getUnifiedUsers();
+    if (!userSearchTerm.trim()) return unified;
+    const term = userSearchTerm.toLowerCase();
+    return unified.filter(u => 
+      (u.displayName || '').toLowerCase().includes(term) ||
+      (u.email || '').toLowerCase().includes(term) ||
+      (u.phone || '').toLowerCase().includes(term) ||
+      (u.uid || u.id || '').toLowerCase().includes(term)
+    );
   };
 
   const copyToClipboard = (type: 'reservations' | 'users') => {
@@ -4852,9 +4928,22 @@ function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlock
             </div>
             <h3 className="text-xl font-extrabold uppercase tracking-tighter mb-2 italic text-maritime text-center">Accès Base de Données</h3>
             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-8 leading-relaxed text-center">
-              Saisissez votre Mot de Passe d'Administration pour continuer.
+              Saisissez l'Adresse E-mail administrative et le Mot de Passe d'Administration pour continuer.
             </p>
             <form onSubmit={handleAdminUnlockSubmit} className="space-y-4">
+              <div>
+                <label className="block text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1 ml-1">Adresse E-mail Administrative</label>
+                <input 
+                  type="email"
+                  placeholder="birekeidea@gmail.com"
+                  value={adminEmailInput}
+                  onChange={e => setAdminEmailInput(e.target.value)}
+                  className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:border-emerald-500 text-sm font-bold"
+                  autoFocus
+                  required
+                />
+              </div>
+
               <div>
                 <label className="block text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1 ml-1">Mot de Passe d'Administration</label>
                 <input 
@@ -4863,7 +4952,6 @@ function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlock
                   value={adminPasswordInput}
                   onChange={e => setAdminPasswordInput(e.target.value)}
                   className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:border-emerald-500 text-sm font-bold"
-                  autoFocus
                   required
                 />
               </div>
@@ -5177,46 +5265,108 @@ function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlock
           </div>
         ) : tab === 'users' ? (
           <div className="p-12 space-y-8">
-            <div className="flex justify-between items-center">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
               <div>
                 <h3 className="text-2xl font-black uppercase tracking-tighter italic">Liste des Utilisateurs</h3>
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Utilisateurs enregistrés sur la plateforme</p>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Suivi et métriques de connexion des membres enregistrés</p>
               </div>
               <div className="flex gap-2">
                 <button 
                   onClick={() => copyToClipboard('users')}
-                  className="px-6 py-3 bg-slate-100 text-slate-600 rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-slate-200 transition-all"
+                  className="px-6 py-3 bg-slate-100 text-slate-600 rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-slate-200 transition-all cursor-pointer"
                 >
                    Copier Liste
                 </button>
                 <button 
                   onClick={() => exportCSV('users')}
-                  className="px-6 py-3 bg-slate-100 text-slate-600 rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-slate-200 transition-all"
+                  className="px-6 py-3 bg-slate-100 text-slate-600 rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-slate-200 transition-all cursor-pointer"
                 >
                    Exporter CSV
                 </button>
               </div>
             </div>
 
-            <div className="overflow-x-auto border border-slate-100 rounded-[24px]">
+            {/* Statistiques d'Utilisation / Connexion */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+              {[
+                { 
+                  label: "Utilisateurs Connus", 
+                  val: getUnifiedUsers().length, 
+                  desc: "Membres authentifiés et passagers",
+                  color: "border-sky-100 bg-sky-50/20 text-sky-600"
+                },
+                { 
+                  label: "Connexions Totales", 
+                  val: getUnifiedUsers().reduce((sum, u) => sum + (Number(u.usageCount) || 1), 0), 
+                  desc: "Fréquence globale d'utilisation accumulée",
+                  color: "border-emerald-100 bg-emerald-50/20 text-emerald-600"
+                },
+                { 
+                  label: "Avec Réservation", 
+                  val: getUnifiedUsers().filter(u => reservations.some(r => r.userId === u.uid || (u.phone && r.phone === u.phone))).length, 
+                  desc: "Passagers actifs avec billets",
+                  color: "border-purple-100 bg-purple-50/20 text-purple-600"
+                },
+                { 
+                  label: "Activité Récente", 
+                  val: getUnifiedUsers().filter(u => u.lastLogin).length, 
+                  desc: "Membres avec historique enregistré",
+                  color: "border-amber-100 bg-amber-50/20 text-amber-600"
+                }
+              ].map((s, idx) => (
+                <div key={idx} className={`p-6 bg-white border rounded-[24px] shadow-sm flex flex-col justify-between ${s.color}`}>
+                  <div>
+                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-2">{s.label}</span>
+                    <span className="text-4xl font-extrabold tracking-tighter uppercase leading-none block">{s.val}</span>
+                  </div>
+                  <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wide mt-3 leading-tight">{s.desc}</p>
+                </div>
+              ))}
+            </div>
+
+            {/* Barre de Recherche Multi-critères */}
+            <div className="bg-slate-50 p-6 rounded-[24px] border border-slate-100 flex flex-col md:flex-row gap-4 items-center">
+              <div className="relative w-full md:flex-1">
+                <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input 
+                  type="text"
+                  placeholder="Rechercher par Nom, Téléphone, E-mail, Identifiant UID..."
+                  value={userSearchTerm}
+                  onChange={(e) => setUserSearchTerm(e.target.value)}
+                  className="w-full pl-12 pr-6 py-3.5 bg-white border border-slate-200 rounded-xl text-xs font-bold focus:outline-none focus:border-black transition-all"
+                />
+              </div>
+              {userSearchTerm && (
+                <button 
+                  onClick={() => setUserSearchTerm('')}
+                  className="text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-black hover:bg-slate-150 px-4 py-2 rounded-xl transition-all"
+                >
+                  Effacer
+                </button>
+              )}
+            </div>
+
+            {/* Tableau principal des Utilisateurs */}
+            <div className="overflow-x-auto border border-slate-100 rounded-[24px] bg-white shadow-sm">
               <table className="w-full text-left">
                 <thead>
                   <tr className="bg-slate-50 border-b border-slate-100">
-                    <th className="px-8 py-5 text-[10px] font-black uppercase text-slate-400 text-left">Utilisateur</th>
+                    <th className="px-8 py-5 text-[10px] font-black uppercase text-slate-400 text-left">Utilisateur & Identifiants</th>
                     <th className="px-8 py-5 text-[10px] font-black uppercase text-slate-400 text-left">Dernière Connexion</th>
                     <th className="px-8 py-5 text-[10px] font-black uppercase text-slate-400 text-left">Activité / Billets</th>
-                    <th className="px-8 py-5 text-[10px] font-black uppercase text-slate-400 text-left">Vérifié</th>
+                    <th className="px-8 py-5 text-[10px] font-black uppercase text-slate-400 text-left">Compte Vérifié</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
-                  {getUnifiedUsers().map((u, i) => {
+                  {getFilteredUnifiedUsers().map((u, i) => {
                     const userReservations = reservations.filter(r => r.userId === u.uid || (u.phone && r.phone === u.phone));
                     const totalRes = userReservations.length;
                     const validatedResCount = userReservations.filter(r => r.status === 'VALIDATED').length;
                     const pendingResCount = userReservations.filter(r => r.status === 'PENDING').length;
+                    const cleanUid = u.uid || u.id || 'N/A';
 
                     return (
-                      <tr key={u.id} className="hover:bg-slate-50/50 transition-colors">
+                      <tr key={u.id || cleanUid} className="hover:bg-slate-50/50 transition-colors">
                         <td className="px-8 py-5">
                           <div className="flex items-center gap-3">
                               {u.photoURL ? (
@@ -5226,15 +5376,33 @@ function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlock
                                   <User size={16} />
                                 </div>
                               )}
-                            <div className="flex flex-col">
+                            <div className="flex flex-col gap-1">
                                <span className="text-sm font-black uppercase tracking-tight italic">{u.displayName || 'Utilisateur'}</span>
-                               <div className="flex flex-wrap items-center gap-2 mt-1">
+                               <div className="flex flex-wrap items-center gap-2">
                                  {u.phone && (
                                    <span className="text-[9px] font-black uppercase tracking-widest px-1.5 py-0.5 bg-maritime/5 text-maritime rounded-md border border-maritime/10">
                                      Tél: {u.phone}
                                    </span>
                                  )}
                                  <span className="text-[9.5px] font-mono text-slate-400">{u.email || 'Anonyme'}</span>
+                               </div>
+                               
+                               {/* Affichage explicite des identifiants (UID) avec bouton de copie */}
+                               <div className="flex items-center gap-2 mt-1">
+                                 <span className="text-[9px] font-mono select-all bg-slate-50 text-slate-500 border border-slate-200/60 px-2 py-0.5 rounded-md flex items-center gap-1.5" title="Identifiant Firebase UID">
+                                   <span className="text-slate-400 font-bold">UID:</span> {cleanUid}
+                                 </span>
+                                 <button
+                                   onClick={(e) => {
+                                     e.stopPropagation();
+                                     navigator.clipboard.writeText(cleanUid);
+                                     alert(`Identifiant UID spécifié pour ${u.displayName || 'ce visiteur'} copié avec succès !`);
+                                   }}
+                                   className="p-1 hover:bg-slate-100 text-slate-400 hover:text-black rounded transition-all focus:outline-none cursor-pointer"
+                                   title="Copier l'identifiant pour vos archives administratives"
+                                 >
+                                   <Copy size={11} />
+                                 </button>
                                </div>
                             </div>
                           </div>
@@ -5262,13 +5430,17 @@ function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlock
                         ) : (
                           <span className="text-[8px] font-black uppercase px-2 py-1 bg-slate-50 text-slate-400 rounded-md border border-slate-200">NON</span>
                         )}
-                      </td>
-                    </tr>
+                        </td>
+                      </tr>
                     );
                   })}
                 </tbody>
               </table>
-              {getUnifiedUsers().length === 0 && <div className="p-20 text-center text-slate-400 font-bold uppercase tracking-widest text-[10px]">Aucun utilisateur enregistré.</div>}
+              {getFilteredUnifiedUsers().length === 0 && (
+                <div className="p-20 text-center text-slate-400 font-bold uppercase tracking-widest text-[10px]">
+                  {userSearchTerm ? "Aucun utilisateur ne correspond à votre recherche." : "Aucun utilisateur enregistré."}
+                </div>
+              )}
             </div>
           </div>
         ) : tab === 'fleet' ? (
@@ -5912,10 +6084,10 @@ function GalleryView({ siteSettings }: { siteSettings: any }) {
   const filteredMedia = filter === 'all' ? media : media.filter(m => m.processedType === filter);
 
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-12 bg-white p-4 md:p-12 rounded-[40px] border border-slate-100 shadow-2xl">
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-12 bg-slate-950 p-4 md:p-12 rounded-[40px] border border-white/5 shadow-2xl">
       <div className="text-center space-y-6">
         <div className="space-y-2">
-          <h2 className="text-4xl font-extrabold tracking-tighter uppercase italic text-black">Galerie Officielle</h2>
+          <h2 className="text-4xl font-extrabold tracking-tighter uppercase italic text-white underline decoration-gold/30 underline-offset-8">Galerie Officielle</h2>
           <p className="text-[10px] uppercase tracking-[0.4em] text-gold font-black">Expérience immersive Mugote</p>
         </div>
 
@@ -5925,8 +6097,8 @@ function GalleryView({ siteSettings }: { siteSettings: any }) {
               key={f}
               onClick={() => setFilter(f as any)}
               className={cn(
-                "px-5 py-2 rounded-full text-[9px] font-black uppercase tracking-widest transition-all",
-                filter === f ? "bg-black text-white scale-110 shadow-xl" : "text-slate-400 hover:text-black bg-slate-50"
+                "px-5 py-2 rounded-full text-[9px] font-black uppercase tracking-widest transition-all cursor-pointer",
+                filter === f ? "bg-gold text-black scale-110 shadow-xl shadow-gold/10" : "text-slate-400 hover:text-white bg-white/5"
               )}
             >
               {f === 'all' ? 'Tout' : f === 'video' ? 'Vidéos' : f === 'image' ? 'Photos' : 'Textes'}
@@ -5936,9 +6108,9 @@ function GalleryView({ siteSettings }: { siteSettings: any }) {
       </div>
 
       {loading ? (
-        <div className="text-center py-20 text-slate-200 animate-pulse text-[10px] font-black uppercase tracking-widest">Initialisation du flux...</div>
+        <div className="text-center py-20 text-slate-400 animate-pulse text-[10px] font-black uppercase tracking-widest">Initialisation du flux...</div>
       ) : filteredMedia.length === 0 ? (
-        <div className="text-center py-20 text-slate-200 text-[10px] font-black uppercase tracking-widest border border-dashed border-slate-100 rounded-3xl">Aucun contenu trouvé dans cette catégorie</div>
+        <div className="text-center py-20 text-slate-400 text-[10px] font-black uppercase tracking-widest border border-dashed border-white/15 rounded-3xl">Aucun contenu trouvé dans cette catégorie</div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
           {filteredMedia.map((m, i) => (
@@ -5947,9 +6119,9 @@ function GalleryView({ siteSettings }: { siteSettings: any }) {
               key={m.id} 
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
-              className="bg-white border border-slate-100 shadow-2xl rounded-3xl overflow-hidden flex flex-col group hover:border-gold/50 transition-all duration-500"
+              className="bg-black border border-white/5 shadow-2xl rounded-3xl overflow-hidden flex flex-col group hover:border-gold transition-all duration-550"
             >
-              <div className="aspect-[16/10] bg-slate-50 relative overflow-hidden">
+              <div className="aspect-[16/10] bg-slate-900 relative overflow-hidden">
                 {m.processedType === 'video' ? (
                   <div className="w-full h-full relative">
                     {isEmbedVideo(m.processedUrl) ? (
@@ -5999,16 +6171,17 @@ function GalleryView({ siteSettings }: { siteSettings: any }) {
                   </div>
                 )}
               </div>
-              <div className="p-8 flex-1 flex flex-col bg-gradient-to-b from-white/5 to-transparent">
+              <div className="p-8 flex-1 flex flex-col bg-gradient-to-b from-[#001233]/10 to-transparent">
                 <div className="mb-4">
                   <h3 className="text-lg font-black text-white uppercase tracking-tighter leading-none italic group-hover:text-gold transition-colors">{m.title}</h3>
                   <div className="h-1 w-8 bg-gold/20 mt-2 rounded-full" />
                 </div>
-                <p className="text-white/40 text-[10px] font-bold leading-relaxed line-clamp-2 italic">{m.processedDesc}</p>
-                <div className="mt-8 pt-4 border-t border-white/5 flex justify-between items-center text-[8px] font-black text-white/20 uppercase tracking-[0.3em]">
-                  <div className="flex items-center gap-4">
-                    <span className="flex items-center gap-2"><Clock size={10} /> {m.publishedAt ? (m.publishedAt.seconds ? new Date(m.publishedAt.seconds * 1000).toLocaleDateString() : new Date(m.publishedAt).toLocaleDateString()) : 'N/A'}</span>
-                    <span className="flex items-center gap-2 text-gold/40"><Eye size={10} /> {m.views || 0}</span>
+                <p className="text-white/60 text-[10px] font-bold leading-relaxed line-clamp-2 italic">{m.processedDesc}</p>
+                <div className="mt-8 pt-4 border-t border-white/5 flex flex-wrap justify-between items-center text-[8px] font-black uppercase tracking-wider gap-3">
+                  <div className="flex flex-wrap items-center gap-3">
+                    <span className="flex items-center gap-1.5 text-slate-400"><Clock size={10} /> {m.publishedAt ? (m.publishedAt.seconds ? new Date(m.publishedAt.seconds * 1000).toLocaleDateString() : new Date(m.publishedAt).toLocaleDateString()) : 'N/A'}</span>
+                    <span className="flex items-center gap-1.5 text-slate-400"><Eye size={10} /> {m.views || 0} vues</span>
+                    <MediaLikes newsId={m.id} initialLikes={m.likes || 0} />
                   </div>
                   <NewsComments newsId={m.id} />
                 </div>
@@ -6050,7 +6223,8 @@ function NewsComments({ newsId }: { newsId: string }) {
       if (!localStorage.getItem(viewedKey)) {
         try {
           await updateDoc(doc(db, 'news', newsId), {
-            views: increment(1)
+            views: increment(1),
+            viewsCount: increment(1)
           });
           localStorage.setItem(viewedKey, 'true');
         } catch (e) {
@@ -6158,6 +6332,60 @@ function NewsComments({ newsId }: { newsId: string }) {
   );
 }
 
+function MediaLikes({ newsId, initialLikes = 0 }: { newsId: string, initialLikes?: number }) {
+  const [likes, setLikes] = useState(initialLikes);
+  const [hasLiked, setHasLiked] = useState(false);
+
+  useEffect(() => {
+    setHasLiked(localStorage.getItem(`liked_${newsId}`) === 'true');
+    const unsub = onSnapshot(doc(db, 'news', newsId), (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        if (data.likes !== undefined) {
+          setLikes(data.likes);
+        } else if (data.likesCount !== undefined) {
+          setLikes(data.likesCount);
+        }
+      }
+    });
+    return unsub;
+  }, [newsId]);
+
+  const handleLike = async () => {
+    const likedKey = `liked_${newsId}`;
+    const currentlyLiked = localStorage.getItem(likedKey) === 'true';
+    try {
+      if (currentlyLiked) {
+        await updateDoc(doc(db, 'news', newsId), {
+          likes: increment(-1),
+          likesCount: increment(-1)
+        });
+        localStorage.removeItem(likedKey);
+        setHasLiked(false);
+      } else {
+        await updateDoc(doc(db, 'news', newsId), {
+          likes: increment(1),
+          likesCount: increment(1)
+        });
+        localStorage.setItem(likedKey, 'true');
+        setHasLiked(true);
+      }
+    } catch (e) {
+      console.error("Error liking item:", e);
+    }
+  };
+
+  return (
+    <button 
+      onClick={handleLike}
+      className="flex items-center gap-1.5 hover:text-rose-500 text-slate-400 hover:scale-105 active:scale-95 transition-all cursor-pointer font-extrabold uppercase text-[10px] tracking-widest bg-transparent border-0"
+    >
+      <Heart size={12} className={hasLiked ? "text-rose-500 fill-rose-500 scale-110" : "text-slate-400"} />
+      <span>{likes || 0} Likes</span>
+    </button>
+  );
+}
+
 function NewsView() {
   const [news, setNews] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -6214,8 +6442,9 @@ function NewsView() {
                   <span className="text-[9px] font-extrabold uppercase tracking-[0.3em] text-gold block text-center">{n.processedType === 'text' ? 'Actualité' : n.processedType === 'image' ? 'Photo' : 'Vidéo'}</span>
                   <h3 className="text-xl font-extrabold tracking-tighter leading-none text-white group-hover:text-gold transition-colors italic text-center mx-auto">{n.title}</h3>
                   <p className="text-white/60 text-xs font-medium leading-relaxed text-center mx-auto max-w-md">{n.processedDesc}</p>
-                  <div className="flex items-center justify-center gap-4 text-[9px] font-black uppercase tracking-widest text-white/30 pt-4 border-t border-white/5 w-full">
+                  <div className="flex flex-wrap items-center justify-center gap-4 text-[9px] font-black uppercase tracking-widest text-white/30 pt-4 border-t border-white/5 w-full">
                     <span className="flex items-center gap-1.5"><Eye size={12} className="text-gold" /> {n.views || 0} vues</span>
+                    <MediaLikes newsId={n.id} initialLikes={n.likes || 0} />
                     <NewsComments newsId={n.id} />
                   </div>
                 </div>
@@ -6600,6 +6829,10 @@ function AdminScannerView({ reservations }: AdminScannerViewProps) {
   const [searchError, setSearchError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [scannedList, setScannedList] = useState<Reservation[]>([]);
+  
+  // Advanced Scan State Management
+  const [scanStatus, setScanStatus] = useState<'idle' | 'success' | 'alert_reused' | 'alert_unpaid' | 'error_not_found'>('idle');
+  const [statusMessage, setStatusMessage] = useState('');
 
   useEffect(() => {
     const scanner = new Html5QrcodeScanner("admin-qr-reader", {
@@ -6613,7 +6846,18 @@ function AdminScannerView({ reservations }: AdminScannerViewProps) {
       console.log("Decoded QR:", decodedText);
       
       let id = decodedText;
-      if (decodedText.includes('verify=')) {
+      
+      // Parse JSON if the QR contains JSON-structured text (e.g. from bottom ticket barcode)
+      if (decodedText.startsWith('{') && decodedText.endsWith('}')) {
+        try {
+          const parsed = JSON.parse(decodedText);
+          if (parsed.id) {
+            id = parsed.id;
+          }
+        } catch (e) {
+          console.warn("Could not parse JSON ticket payload from QR:", e);
+        }
+      } else if (decodedText.includes('verify=')) {
         try {
           const match = decodedText.match(/[?&]verify=([a-zA-Z0-9_\-]+)/);
           if (match && match[1]) {
@@ -6644,46 +6888,128 @@ function AdminScannerView({ reservations }: AdminScannerViewProps) {
     };
   }, [reservations]);
 
-  const handleSearch = (id: string) => {
-    if (!id.trim()) return;
-    const found = reservations.find(r => r.id === id.trim() || r.ticketId === id.trim());
-    if (found) {
-      setScannedRes(found);
-      setSearchError(null);
+  const handleSearch = async (id: string) => {
+    if (!id || !id.trim()) return;
+    const cleanId = id.trim();
+    
+    setLoading(true);
+    setSearchError(null);
+    setScanStatus('idle');
+    setStatusMessage('');
+
+    try {
+      // 1. Instantly check locally + retrieve freshets snapshot from the database to prevent duplicate bypasses
+      const foundInProps = reservations.find(r => r.id === cleanId || r.ticketId === cleanId);
+      const targetId = foundInProps?.id || cleanId;
+      
+      const docRef = doc(db, 'reservations', targetId);
+      const docSnap = await getDoc(docRef);
+      
+      let ticketData: any = null;
+      if (docSnap.exists()) {
+        ticketData = { ...docSnap.data(), id: docSnap.id };
+      } else if (foundInProps) {
+        ticketData = foundInProps;
+      }
+      
+      if (!ticketData) {
+        setScanStatus('error_not_found');
+        setStatusMessage(`Billet ou identifiant "${cleanId}" introuvable ou invalide dans la base d'administration.`);
+        setScannedRes(null);
+        setSearchError(`Code billet introuvable.`);
+        playBeep(false);
+        return;
+      }
+      
+      setScannedRes(ticketData);
+
+      // 2. Perform the strict requirements validation: exists, paid/validated, and not used yet
+      const isPaid = ticketData.status === 'VALIDATED';
+      const isAlreadyUsed = ticketData.boardingStatus === 'BOARDED';
+
+      if (!isPaid) {
+        // Condition: Payment validation fails
+        setScanStatus('alert_unpaid');
+        setStatusMessage("EMBARQUEMENT REFUSÉ : Le paiement de cette réservation n'est pas validé. Veuillez orienter le passager vers le guichet.");
+        playBeep(false);
+        return;
+      }
+
+      if (isAlreadyUsed) {
+        // Condition: Fraud security check fails (already boarded)
+        setScanStatus('alert_reused');
+        const formattedDate = ticketData.boardedAt ? new Date(ticketData.boardedAt).toLocaleString() : 'N/A';
+        setStatusMessage(`ALERTE DANGER FRAUDE : Ce billet a déjà été utilisé pour l'embarquement le ${formattedDate}. Double accès strictement interdit !`);
+        playBeep(false);
+        return;
+      }
+
+      // 3. Automated marking as completed & used to secure transit
+      const updateTimestamp = Date.now();
+      await updateDoc(doc(db, 'reservations', ticketData.id), {
+        boardingStatus: 'BOARDED',
+        boardedAt: updateTimestamp
+      });
+
+      const updatedTicket = {
+        ...ticketData,
+        boardingStatus: 'BOARDED' as const,
+        boardedAt: updateTimestamp
+      };
+
+      setScannedRes(updatedTicket);
+      setScanStatus('success');
+      setStatusMessage("ACCÈS ACCORDÉ : Billet valide et payé ! Passager autorisé à embarquer, billet marqué comme utilisé avec succès.");
+      setScannedList(prev => [updatedTicket, ...prev.filter(x => x.id !== updatedTicket.id)]);
       playBeep(true);
-    } else {
-      setScannedRes(null);
-      setSearchError(`Code billet ou ID "${id}" introuvable dans la base d'administration.`);
+
+    } catch (err: any) {
+      console.error("Scanning process failed:", err);
+      setScanStatus('error_not_found');
+      setStatusMessage(`Erreur de connexion instantanée lors de la vérification : ${err.message}`);
       playBeep(false);
+    } finally {
+      setLoading(false);
     }
   };
 
   const handleManualSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    handleSearch(manualId);
+    if (manualId.trim()) {
+      handleSearch(manualId);
+    }
   };
 
-  const handleBoardPassenger = async () => {
-    if (!scannedRes || !scannedRes.id) return;
+  // Revert/Cancel boarding function for administrative override
+  const handleCancelBoarding = async (ticket: Reservation) => {
+    if (!ticket || !ticket.id) return;
+    const confirmRevert = window.confirm(`Voulez-vous annuler l'embarquement de ${ticket.fullName} et réactiver ce billet ?`);
+    if (!confirmRevert) return;
+
     setLoading(true);
     try {
-      await updateDoc(doc(db, 'reservations', scannedRes.id), {
-        boardingStatus: 'BOARDED',
-        boardedAt: Date.now()
+      await updateDoc(doc(db, 'reservations', ticket.id), {
+        boardingStatus: 'PENDING',
+        boardedAt: null
       });
-      
-      const updated = {
-        ...scannedRes,
-        boardingStatus: 'BOARDED' as const,
-        boardedAt: Date.now()
+
+      const restoredTicket = {
+        ...ticket,
+        boardingStatus: 'PENDING' as any,
+        boardedAt: undefined
       };
-      setScannedRes(updated);
-      setScannedList(prev => [updated, ...prev.filter(x => x.id !== updated.id)]);
-      
-      playBeep(true);
+
+      if (scannedRes && scannedRes.id === ticket.id) {
+        setScannedRes(restoredTicket);
+        setScanStatus('idle');
+        setStatusMessage('L\'embarquement a été annulé par l\'administrateur. Le billet est à nouveau actif.');
+      }
+
+      setScannedList(prev => prev.map(x => x.id === ticket.id ? restoredTicket : x));
+      alert("Embarquement annulé avec succès. Billet réactivé.");
     } catch (err: any) {
-      console.error(err);
-      alert("Erreur lors de la validation de l'embarquement : " + err.message);
+      console.error("Revert boarding failed:", err);
+      alert("Erreur lors de l'annulation de l'embarquement : " + err.message);
     } finally {
       setLoading(false);
     }
@@ -6693,48 +7019,49 @@ function AdminScannerView({ reservations }: AdminScannerViewProps) {
     <div className="p-4 sm:p-10 space-y-6 max-w-4xl mx-auto">
       <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between border-b pb-4 border-slate-100">
         <div className="text-left">
-          <h3 className="text-xl sm:text-2xl font-black uppercase text-maritime tracking-tight italic">Scanner d'embarquement (Port Goma/Bukavu)</h3>
+          <h3 className="text-xl sm:text-2xl font-black uppercase text-maritime tracking-tight italic">Scanner d'embarquement (Vérification et Embargo Fraude)</h3>
           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1 leading-relaxed">
-            Équipe de pont / port : Scannez le code QR ou saisissez le code pour valider l'embarquement en un clic.
+            Système d'embarquement lacustre automatique connecté en temps réel • Validation en 1 clic
           </p>
         </div>
         <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-100 p-2.5 rounded-xl">
           <div className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-pulse" />
-          <span className="text-[9px] font-black text-emerald-700 uppercase tracking-wider">Lecteur Actif</span>
+          <span className="text-[9px] font-black text-emerald-700 uppercase tracking-wider">Aiguillage optique actif</span>
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
         
-        {/* Left Column: Visual QR code scanner finder */}
+        {/* Left Column: Camera vision interface */}
         <div className="lg:col-span-5 space-y-4">
           <div className="bg-slate-950 p-4 rounded-[28px] border border-slate-800 shadow-2xl relative overflow-hidden flex flex-col items-center">
-            <span className="text-gold text-[7px] font-black tracking-[0.3em] uppercase mb-2">Viseur optique instantané</span>
+            <span className="text-[#eab308] text-[7px] font-black tracking-[0.3em] uppercase mb-2">Lecteur Vidéo QR Code</span>
             
             <div id="admin-qr-reader" className="w-full max-w-xs aspect-square bg-[#0c101a] rounded-xl overflow-hidden border border-slate-800 shadow-inner">
             </div>
 
             <div className="w-full pt-3 text-center text-[7px] font-black text-slate-500 uppercase tracking-widest">
-              <span>Caméra mobile active • Détection en continu</span>
+              <span>Positionnez le QR Code du client face à l'objectif</span>
             </div>
           </div>
 
-          {/* Saisie de secours */}
+          {/* Saisie manuelle de secours */}
           <div className="bg-slate-50 border border-slate-100 rounded-2xl p-4 space-y-3 text-left">
-            <p className="text-[8px] font-black uppercase text-slate-400 tracking-wider">Saisie manuelle du ID de secours</p>
+            <p className="text-[8px] font-black uppercase text-slate-400 tracking-wider">Recherche Manuelle Secours</p>
             <form onSubmit={handleManualSearchSubmit} className="flex gap-2">
               <input
                 type="text"
-                placeholder="Ex: AMR-BH9F1..."
+                placeholder="Identifiant ou ID du Billet..."
                 value={manualId}
                 onChange={e => setManualId(e.target.value)}
                 className="flex-1 px-3 py-2 bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-gold font-bold text-[10px]"
               />
               <button
                 type="submit"
-                className="px-3 py-2 bg-maritime text-white uppercase text-[8px] font-black tracking-widest rounded-lg hover:bg-black transition-all"
+                disabled={loading}
+                className="px-4 py-2 bg-slate-900 text-white uppercase text-[8px] font-black tracking-widest rounded-lg hover:bg-black transition-all"
               >
-                Rechercher
+                Vérifier
               </button>
             </form>
             {searchError && (
@@ -6743,118 +7070,192 @@ function AdminScannerView({ reservations }: AdminScannerViewProps) {
           </div>
         </div>
 
-        {/* Right Column: Scanned pass details */}
+        {/* Right Column: Processing logs & visual indicators */}
         <div className="lg:col-span-7 space-y-4">
+          
+          {/* Main Visual Scan Response Banner */}
+          {scanStatus !== 'idle' && (
+            <div className={cn(
+              "p-5 rounded-2xl border-2 text-left flex flex-col sm:flex-row items-start gap-4 transition-all duration-300",
+              scanStatus === 'success' && "bg-emerald-50/70 border-emerald-500 text-emerald-900",
+              scanStatus === 'alert_reused' && "bg-rose-50 border-rose-500 text-rose-900 animate-bounce",
+              scanStatus === 'alert_unpaid' && "bg-amber-50 border-amber-500 text-amber-900",
+              scanStatus === 'error_not_found' && "bg-slate-100 border-slate-350 text-slate-800",
+              scanStatus === 'loading' && "bg-sky-50 border-sky-400 text-sky-950"
+            )}>
+              <div className="flex-shrink-0 mt-0.5">
+                {scanStatus === 'success' && <CheckCircle2 className="text-emerald-600" size={28} />}
+                {scanStatus === 'alert_reused' && <AlertCircle className="text-rose-600" size={28} />}
+                {scanStatus === 'alert_unpaid' && <AlertCircle className="text-[#eab308]" size={28} />}
+                {scanStatus === 'error_not_found' && <AlertCircle className="text-slate-500" size={28} />}
+                {scanStatus === 'loading' && <RotateCw className="text-sky-500 animate-spin" size={28} />}
+              </div>
+              <div className="space-y-1">
+                <h4 className="text-xs font-black uppercase tracking-widest leading-none">
+                  {scanStatus === 'success' && "EMBARQUEMENT ACCORDÉ"}
+                  {scanStatus === 'alert_reused' && "ALERTE FRAUDE DÉTECTÉE"}
+                  {scanStatus === 'alert_unpaid' && "RÈGLEMENT DE PAIEMENT REQUIS"}
+                  {scanStatus === 'error_not_found' && "TENTATIVE INVALIDE"}
+                  {scanStatus === 'loading' && "VÉRIFICATION INSTANTANÉE..."}
+                </h4>
+                <p className="text-xs font-bold leading-normal">{statusMessage}</p>
+              </div>
+            </div>
+          )}
+
           {scannedRes ? (
             <div className="bg-white border-2 border-slate-900 rounded-[24px] p-5 sm:p-6 space-y-4 shadow-lg relative overflow-hidden text-left">
               <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-emerald-500 via-gold to-[#0047AB]" />
               
-              <div className="flex justify-between items-start gap-4">
+              <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
                 <div className="space-y-1">
                   <span className={cn(
-                    "px-2 py-0.5 text-[7px] font-black uppercase tracking-widest rounded border inline-block",
-                    scannedRes.boardingStatus === 'BOARDED' ? "bg-emerald-50 text-emerald-600 border-emerald-100" : "bg-rose-50 text-rose-500 border-rose-100 animate-pulse"
+                    "px-2.5 py-0.5 text-[7px] font-black uppercase tracking-widest rounded-md border inline-block",
+                    scannedRes.boardingStatus === 'BOARDED' 
+                      ? "bg-emerald-50 text-emerald-600 border-emerald-100" 
+                      : scannedRes.status === 'VALIDATED' 
+                      ? "bg-[#eab308]/10 text-amber-600 border-[#eab308]/20 animate-pulse"
+                      : "bg-rose-50 text-rose-500 border-rose-100"
                   )}>
-                    {scannedRes.boardingStatus === 'BOARDED' ? '🚢 EMBARQUÉ SÉCURISÉ' : 'Non embarqué'}
+                    {scannedRes.boardingStatus === 'BOARDED' ? '🚢 EMBARQUÉ & SÉCURISÉ' : 'Non embarqué'}
                   </span>
                   <h4 className="text-lg font-black uppercase tracking-tight text-slate-900 leading-tight">{scannedRes.fullName} {scannedRes.lastName}</h4>
-                  <p className="text-[10px] text-slate-400 font-mono mt-0.5">{scannedRes.phone}</p>
+                  <p className="text-[10px] text-slate-400 font-mono mt-0.5">Tél Contact: {scannedRes.phone || 'Non renseigné'}</p>
                 </div>
-                <div className="text-right flex-shrink-0">
-                  <p className="text-[7px] font-bold text-slate-400 uppercase tracking-widest">Code Billet</p>
+                <div className="text-left sm:text-right flex-shrink-0">
+                  <p className="text-[7px] font-bold text-slate-400 uppercase tracking-widest">Identifiant du Billet</p>
                   <p className="text-sm font-black text-gold font-mono tracking-wider">{scannedRes.ticketId || scannedRes.id?.substring(0,8).toUpperCase()}</p>
                 </div>
               </div>
 
               <div className="h-px bg-slate-100 my-2" />
 
-              <div className="grid grid-cols-2 gap-3 text-[10px] lg:text-xs">
+              {/* Status Compliance Checklist */}
+              <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 space-y-2 text-[10px] font-bold uppercase transition-all">
+                <h5 className="text-[8px] font-black text-slate-400 tracking-wider">Spécifications d'Accréditation</h5>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  <div className="flex items-center gap-1.5">
+                    <CheckCircle2 size={13} className="text-emerald-500 shrink-0" />
+                    <span className="text-slate-800">1. Billet Trouvé</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    {scannedRes.status === 'VALIDATED' ? (
+                      <CheckCircle2 size={13} className="text-emerald-500 shrink-0" />
+                    ) : (
+                      <AlertCircle size={13} className="text-rose-500 shrink-0" />
+                    )}
+                    <span className={scannedRes.status === 'VALIDATED' ? "text-slate-800" : "text-rose-600"}>
+                      2. Payé ({scannedRes.status})
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    {scannedRes.boardingStatus === 'BOARDED' ? (
+                      <AlertCircle size={13} className="text-rose-500 shrink-0" />
+                    ) : (
+                      <CheckCircle2 size={13} className="text-emerald-500 shrink-0" />
+                    )}
+                    <span className={scannedRes.boardingStatus === 'BOARDED' ? "text-rose-600" : "text-slate-800"}>
+                      {scannedRes.boardingStatus === 'BOARDED' ? "3. Déjà Utilisé !" : "3. Non Utilisé"}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Main Ticket details layout */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-[10px] lg:text-xs pt-1">
                 <div>
                   <p className="text-[7px] font-bold uppercase text-slate-400 tracking-wider">Itinéraire</p>
                   <p className="font-black text-slate-900 uppercase italic">{scannedRes.itinerary}</p>
                 </div>
                 <div>
-                  <p className="text-[7px] font-bold uppercase text-slate-400 tracking-wider">Navire</p>
+                  <p className="text-[7px] font-bold uppercase text-slate-400 tracking-wider">Navire Assigné</p>
                   <p className="font-black text-slate-900 uppercase">{scannedRes.ship}</p>
                 </div>
                 <div>
-                  <p className="text-[7px] font-bold uppercase text-slate-400 tracking-wider">Classe Comfort</p>
+                  <p className="text-[7px] font-bold uppercase text-slate-400 tracking-wider">Classe Voyage</p>
                   <p className="font-black text-slate-900 uppercase">{scannedRes.travelClass}</p>
                 </div>
                 <div>
-                  <p className="text-[7px] font-bold uppercase text-slate-400 tracking-wider">Passagers (PAX)</p>
-                  <p className="font-black text-slate-900 font-mono">{scannedRes.passengersCount} PERSONNE(S)</p>
+                  <p className="text-[7px] font-bold uppercase text-slate-400 tracking-wider">Nombre de Places</p>
+                  <p className="font-black text-slate-900 font-mono">{scannedRes.passengersCount} PAX</p>
                 </div>
                 <div>
-                  <p className="text-[7px] font-bold uppercase text-slate-400 tracking-wider">Date Voyage</p>
+                  <p className="text-[7px] font-bold uppercase text-slate-400 tracking-wider">Date Prévue</p>
                   <p className="font-black text-slate-900 font-mono">{scannedRes.travelDate}</p>
                 </div>
                 <div>
-                  <p className="text-[7px] font-bold uppercase text-slate-400 tracking-wider">Statut Paiement</p>
-                  <span className="font-black text-emerald-600 uppercase italic text-[8px] bg-emerald-50 px-1 rounded border border-emerald-100 tracking-wider inline-block">
-                    {scannedRes.status === 'VALIDATED' ? '💸 Payé & Validé' : scannedRes.status}
+                  <p className="text-[7px] font-bold uppercase text-slate-400 tracking-wider">Vérification de Flux</p>
+                  <span className={cn(
+                    "font-black text-[8px] px-1.5 py-0.5 rounded border inline-block uppercase tracking-wider",
+                    scannedRes.status === 'VALIDATED' ? "bg-emerald-50 text-emerald-600 border-emerald-100" : "bg-rose-50 text-rose-500 border-rose-100"
+                  )}>
+                    {scannedRes.status === 'VALIDATED' ? "💸 Payé & Validé" : "❌ Paiement En Attente"}
                   </span>
                 </div>
               </div>
 
-              <div className="pt-2">
-                {scannedRes.boardingStatus === 'BOARDED' ? (
-                  <div className="p-3 bg-emerald-50 border border-emerald-100 rounded-xl text-center space-y-0.5">
-                    <p className="text-[10px] font-extrabold text-emerald-700 uppercase">✓ EMBARQUEMENT COMPLÉTÉ</p>
+              {/* Boarding Stamp if boarded */}
+              {scannedRes.boardingStatus === 'BOARDED' && (
+                <div className="pt-2">
+                  <div className="p-3 bg-emerald-50 border border-emerald-100 rounded-xl text-center space-y-1">
+                    <p className="text-[10px] font-extrabold text-emerald-700 uppercase">✓ EMBARQUEMENT CONFIRMÉ & SÉCURISÉ</p>
                     {scannedRes.boardedAt && (
-                      <p className="text-[7px] font-bold text-emerald-500 uppercase tracking-widest font-mono">
+                      <p className="text-[7.5px] font-bold text-emerald-500 uppercase tracking-widest font-mono">
                         Validé le {new Date(scannedRes.boardedAt).toLocaleDateString()} à {new Date(scannedRes.boardedAt).toLocaleTimeString()}
                       </p>
                     )}
                   </div>
-                ) : (
-                  <button
-                    onClick={handleBoardPassenger}
-                    disabled={loading || scannedRes.status !== 'VALIDATED'}
-                    className={cn(
-                      "w-full py-3.5 text-white uppercase text-[10px] font-black tracking-widest rounded-xl transition-all shadow-md active:scale-95",
-                      scannedRes.status === 'VALIDATED' 
-                        ? "bg-emerald-600 hover:bg-emerald-700 shadow-emerald-700/20" 
-                        : "bg-slate-300 cursor-not-allowed"
-                    )}
-                  >
-                    {loading ? "Traitement..." : scannedRes.status === 'VALIDATED' ? "🚢 CLIQUEZ POUR EMBARQUER LE PASSAGER" : "ACCÈS DE EMBARQUEMENT REFUSÉ (NON VALIDÉ)"}
-                  </button>
-                )}
-              </div>
+                </div>
+              )}
             </div>
           ) : (
-            <div className="bg-slate-50 border-2 border-dashed border-slate-200 rounded-[24px] p-10 flex flex-col items-center justify-center text-center space-y-3 opacity-50 text-slate-400">
-              <Camera size={36} className="animate-pulse" />
+            <div className="bg-slate-50 border-2 border-dashed border-slate-200 rounded-[24px] p-10 flex flex-col items-center justify-center text-center space-y-3 opacity-60 text-slate-400">
+              <Camera size={36} className="animate-pulse text-slate-300" />
               <div className="space-y-1">
-                <p className="text-[9px] font-black uppercase tracking-widest text-slate-600">Scan en veille...</p>
+                <p className="text-[9px] font-black uppercase tracking-widest text-slate-600 animate-pulse">En attente de scan...</p>
                 <p className="text-[8px] font-bold uppercase tracking-wide max-w-xs mx-auto text-slate-400 leading-normal">
-                  Scannez ou saisissez un billet pour débloquer la validation de l'embarquement
+                  Passez le QR Code de réservation ou introduisez l'ID manuellement pour lancer la validation automatique sécurisée
                 </p>
               </div>
             </div>
           )}
 
-          {/* Scanned List Session details */}
-          <div className="space-y-2 text-left">
-            <h5 className="text-[8px] font-black uppercase text-slate-400 tracking-widest">Historique de la Session locale</h5>
+          {/* Scanned List Session history */}
+          <div className="space-y-2 text-left pt-2">
+            <div className="flex justify-between items-center">
+              <h5 className="text-[8px] font-black uppercase text-slate-400 tracking-widest">Embarquements Validés (Session Locale)</h5>
+              {scannedList.length > 0 && (
+                <span className="text-[8px] font-bold text-emerald-500 px-2 py-0.5 bg-emerald-50 rounded border border-emerald-100">{scannedList.length} PASSAGERS</span>
+              )}
+            </div>
             {scannedList.length === 0 ? (
-              <p className="text-[8px] font-bold uppercase italic text-slate-400">Aucun embarquement valider durant cette session.</p>
+              <p className="text-[8px] font-bold uppercase italic text-slate-400 bg-slate-50 p-4 rounded-xl border border-dashed border-slate-100">Aucun embarquement validé durant cette session.</p>
             ) : (
-              <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
+              <div className="space-y-1.5 max-h-56 overflow-y-auto pr-1">
                 {scannedList.map((sc, i) => (
-                  <div key={i} className="p-3 bg-slate-50 border border-slate-100 rounded-lg flex justify-between items-center text-[10px] font-bold uppercase">
+                  <div key={sc.id || i} className="p-3 bg-slate-50 hover:bg-slate-100/70 border border-slate-100 rounded-lg flex justify-between items-center text-[10px] font-bold uppercase transition-all">
                     <div>
                       <p className="text-slate-900 font-extrabold">{sc.fullName} {sc.lastName}</p>
-                      <p className="text-[7px] text-slate-400 font-mono mt-0.5">{sc.ship} • {sc.travelClass} • {sc.passengersCount} PAX</p>
+                      <p className="text-[7.5px] text-slate-400 font-mono mt-0.5">{sc.ship} • {sc.travelClass} • {sc.passengersCount} PAX</p>
                     </div>
-                    <div className="text-right">
-                      <span className="px-1.5 py-0.5 bg-emerald-50 text-emerald-600 border border-emerald-100 text-[7px] font-black tracking-widest rounded inline-block">
-                        ✓ EMBARQUÉ
-                      </span>
-                      {sc.boardedAt && (
-                        <p className="text-[6px] text-slate-400 font-mono mt-0.5">{new Date(sc.boardedAt).toLocaleTimeString()}</p>
-                      )}
+                    <div className="flex items-center gap-2">
+                      <div className="text-right">
+                        <span className="px-1.5 py-0.5 bg-emerald-50 text-emerald-600 border border-emerald-100 text-[6.5px] font-black tracking-widest rounded inline-block">
+                          ✓ EMBARQUÉ
+                        </span>
+                        {sc.boardedAt && (
+                          <p className="text-[6px] text-slate-400 font-mono mt-0.5">{new Date(sc.boardedAt).toLocaleTimeString()}</p>
+                        )}
+                      </div>
+                      
+                      {/* Administrative Rollback Button */}
+                      <button
+                        onClick={() => handleCancelBoarding(sc)}
+                        className="px-2 py-1 bg-white hover:bg-rose-50 text-rose-500 border border-rose-100 hover:border-rose-200 text-[6.5px] font-semibold rounded transition-all cursor-pointer"
+                        title="Annuler l'embarquement et réactiver le billet"
+                      >
+                        Annuler
+                      </button>
                     </div>
                   </div>
                 ))}
