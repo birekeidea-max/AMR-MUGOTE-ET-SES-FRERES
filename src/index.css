@@ -96,5 +96,20 @@
       margin: 1cm;
     }
   }
+
+  @keyframes bounce-laser {
+    0%, 100% {
+      transform: translateY(0);
+      opacity: 0.3;
+    }
+    50% {
+      transform: translateY(280px);
+      opacity: 1;
+    }
+  }
+
+  .animate-bounce-laser {
+    animation: bounce-laser 2.5s infinite ease-in-out;
+  }
 }
 

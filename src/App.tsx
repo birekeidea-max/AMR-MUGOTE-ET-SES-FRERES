@@ -92,6 +92,7 @@ import { Html5QrcodeScanner } from 'html5-qrcode';
 import { jsPDF } from 'jspdf';
 import UsersListView from './components/UsersListView';
 import LocalisationView from './components/LocalisationView';
+import DocumentScannerWidget from './components/DocumentScannerWidget';
 
 // --- Types ---
 type Page = 'home' | 'booking' | 'payment' | 'dashboard' | 'tickets' | 'news' | 'gallery' | 'users' | 'map';
@@ -2674,6 +2675,11 @@ function Home({ onBook, onNavigate, siteSettings, schedules }: { onBook: () => v
             <span className="text-[10px] font-bold uppercase tracking-widest leading-none">{item.label}</span>
           </div>
         ))}
+      </section>
+
+      {/* Document Scanner Section */}
+      <section className="max-w-7xl mx-auto px-8 py-4">
+        <DocumentScannerWidget />
       </section>
 
       {/* Services Section */}
