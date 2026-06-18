@@ -50,7 +50,9 @@ import {
   Check,
   ExternalLink,
   Download,
-  Heart
+  Heart,
+  Maximize2,
+  Minimize2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { auth, db, handleFirestoreError, OperationType, uploadToStorage } from './lib/firebase';
@@ -2294,6 +2296,7 @@ function AdminChatView({ conversation }: { conversation: any }) {
 
 function ChatWidget({ user }: { user: FirebaseUser | null }) {
   const [isOpen, setIsOpen] = useState(false);
+  const [isMaximized, setIsMaximized] = useState(false);
   const [messages, setMessages] = useState<any[]>([]);
   const [inputText, setInputText] = useState('');
   const [sending, setSending] = useState(false);
@@ -2360,14 +2363,10 @@ function ChatWidget({ user }: { user: FirebaseUser | null }) {
     }
     // Also use scrollIntoView as fallback
     scrollEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
-  }, [messages, isOpen]);
+  }, [messages, guestMessages, sending, isOpen]);
 
-  const handleSend = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!inputText.trim() || sending) return;
-
-    const text = inputText;
-    setInputText('');
+  const sendDirectMessage = async (text: string) => {
+    if (!text.trim() || sending) return;
     setSending(true);
 
     if (!user) {
@@ -2449,69 +2448,148 @@ function ChatWidget({ user }: { user: FirebaseUser | null }) {
     }
   };
 
+  const handleSend = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!inputText.trim() || sending) return;
+    const text = inputText;
+    setInputText('');
+    await sendDirectMessage(text);
+  };
+
+  const handleSuggestionClick = async (text: string) => {
+    await sendDirectMessage(text);
+  };
+
   const displayMessages = user ? messages : guestMessages;
+
+  const suggestions = [
+    { label: "💳 Tarifs", text: "Quels sont les tarifs des billets (VIP, 1ère classe et 2ème classe) ?" },
+    { label: "🕒 Horaires", text: "Quels sont les horaires de départ quotidiens de Goma et Bukavu ?" },
+    { label: "📍 Navigation", text: "Où se trouve précisément le Port Mugote de Bukavu ? Donnez-moi son adresse exacte." },
+    { label: "⛵ Comment réserver ?", text: "Comment puis-je réserver et payer mon billet sur la plateforme ?" }
+  ];
 
   return (
     <div className="fixed bottom-6 right-6 z-[100]">
       <AnimatePresence>
         {isOpen && (
            <motion.div 
-             initial={{ opacity: 0, y: 20, scale: 0.9 }}
+             initial={{ opacity: 0, y: 20, scale: 0.95 }}
              animate={{ opacity: 1, y: 0, scale: 1 }}
-             exit={{ opacity: 0, y: 20, scale: 0.9 }}
-             className="bg-white w-[320px] md:w-[380px] h-[480px] md:h-[600px] max-h-[80vh] shadow-2xl rounded-[32px] border border-slate-100 flex flex-col mb-4 overflow-hidden"
+             exit={{ opacity: 0, y: 20, scale: 0.95 }}
+             className={cn(
+               "bg-white shadow-2xl rounded-[32px] border border-slate-200/80 flex flex-col mb-4 overflow-hidden transition-all duration-300 ease-out",
+               isMaximized 
+                 ? "w-[360px] md:w-[780px] h-[600px] md:h-[820px] max-h-[85vh]" 
+                 : "w-[360px] md:w-[480px] h-[540px] md:h-[680px] max-h-[80vh]"
+             )}
            >
-             <div className="p-6 bg-black text-white flex justify-between items-center">
+             {/* Chat Header */}
+             <div className="p-6 bg-black text-white flex justify-between items-center select-none shadow-md">
                <div className="flex items-center gap-3">
-                 <div className="w-8 h-8 bg-gold rounded-full flex items-center justify-center text-black">
-                   <Ship size={16} />
+                 <div className="w-9 h-9 bg-gold rounded-full flex items-center justify-center text-black shadow-inner">
+                   <Ship size={18} />
                  </div>
                  <div>
-                   <h4 className="text-[10px] font-black uppercase tracking-widest leading-none mb-1">Mugote Assistant</h4>
-                   <p className="text-[8px] opacity-70 font-bold uppercase tracking-wider">Navire en ligne</p>
+                   <h4 className="text-[11px] font-black uppercase tracking-widest leading-none mb-1">Mugote Assistant AI</h4>
+                   <p className="text-[9px] opacity-75 font-bold uppercase tracking-wider flex items-center gap-1.5">
+                     <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-ping"></span>
+                     <span>Navire en ligne • Support H24</span>
+                   </p>
                  </div>
                </div>
-               <button onClick={() => setIsOpen(false)} className="p-2 hover:bg-white/10 rounded-xl transition-colors">
-                 <X size={20} />
-               </button>
+               
+               <div className="flex items-center gap-1.5">
+                 {/* Expand / Collapse Button */}
+                 <button 
+                   onClick={() => setIsMaximized(!isMaximized)} 
+                   title={isMaximized ? "Réduire l'affichage" : "Agrandir l'assistant"}
+                   className="p-2 hover:bg-white/10 rounded-xl transition-all duration-150 text-slate-300 hover:text-white active:scale-95 cursor-pointer"
+                 >
+                   {isMaximized ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
+                 </button>
+                 {/* Close Button */}
+                 <button 
+                   onClick={() => { setIsOpen(false); setIsMaximized(false); }} 
+                   className="p-2 hover:bg-white/10 rounded-xl transition-all duration-150 text-slate-300 hover:text-white active:scale-95 cursor-pointer"
+                 >
+                   <X size={18} />
+                 </button>
+               </div>
              </div>
 
+             {/* Message Flow Area */}
              <div ref={scrollContainerRef} className="flex-1 overflow-y-auto p-6 space-y-4 bg-slate-50/50">
                {displayMessages.length === 0 ? (
-                 <div className="text-center py-20 space-y-4 opacity-20">
-                   <MessageSquareText size={48} className="mx-auto" />
-                   <p className="text-[10px] font-bold uppercase tracking-[.3em]">Posez vos questions !</p>
+                 <div className="text-center py-24 space-y-4 opacity-30">
+                   <MessageSquareText size={52} className="mx-auto text-slate-400" />
+                   <p className="text-[11px] font-extrabold text-slate-500 uppercase tracking-[.3em]">Posez toutes vos questions !</p>
                  </div>
                ) : (
                  displayMessages.map((m, i) => (
                    <motion.div 
-                    initial={{ opacity: 0, x: m.senderRole === 'USER' ? 10 : -10 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    key={i} 
-                    className={cn(
-                      "max-w-[85%] p-4 text-[11px] leading-relaxed shadow-sm",
-                      m.senderRole === 'USER' 
-                        ? "bg-black text-white ml-auto rounded-3xl rounded-tr-none font-medium" 
-                        : "bg-white text-slate-700 border border-slate-100 rounded-3xl rounded-tl-none font-bold"
-                    )}
+                     initial={{ opacity: 0, y: 10 }}
+                     animate={{ opacity: 1, y: 0 }}
+                     transition={{ duration: 0.2 }}
+                     key={i} 
+                     className={cn(
+                       "max-w-[85%] p-4 text-xs md:text-[13px] leading-relaxed shadow-xs whitespace-pre-wrap break-words border",
+                       m.senderRole === 'USER' 
+                         ? "bg-black text-white border-black ml-auto rounded-[22px] rounded-tr-none font-medium selection:bg-gold/30" 
+                         : "bg-white text-slate-900 border-slate-200/75 rounded-[22px] rounded-tl-none font-semibold selection:bg-slate-200"
+                     )}
                    >
                      {m.text}
                    </motion.div>
                  ))
                )}
+
+               {sending && (
+                 <motion.div
+                   initial={{ opacity: 0, y: 5 }}
+                   animate={{ opacity: 1, y: 0 }}
+                   className="max-w-[85%] p-3.5 text-xs bg-white text-slate-600 border border-slate-200 rounded-[22px] rounded-tl-none font-bold mr-auto flex items-center gap-2 shadow-xs"
+                 >
+                   <span>L'assistant est en train d'écrire</span>
+                   <span className="flex gap-1 items-center ml-1">
+                     <span className="w-1.5 h-1.5 bg-black rounded-full animate-bounce [animation-delay:-0.3s]"></span>
+                     <span className="w-1.5 h-1.5 bg-black rounded-full animate-bounce [animation-delay:-0.15s]"></span>
+                     <span className="w-1.5 h-1.5 bg-black rounded-full animate-bounce"></span>
+                   </span>
+                 </motion.div>
+               )}
                <div ref={scrollEndRef} />
              </div>
 
+             {/* Auto suggestive quick actions */}
+             {!sending && (
+               <div className="flex gap-2 overflow-x-auto px-4 py-2 bg-white border-t border-b border-slate-100 scrollbar-none items-center">
+                 <span className="text-[9px] text-slate-400 uppercase font-black tracking-wider whitespace-nowrap px-1">Questions fréquentes :</span>
+                 {suggestions.map((s, index) => (
+                   <button
+                     key={index}
+                     type="button"
+                     onClick={() => handleSuggestionClick(s.text)}
+                     className="px-3 py-1.5 bg-slate-50 hover:bg-black hover:text-white rounded-full text-[9px] font-black uppercase tracking-wider text-slate-600 transition-all border border-slate-200 whitespace-nowrap cursor-pointer shadow-xs active:scale-95"
+                   >
+                     {s.label}
+                   </button>
+                 ))}
+               </div>
+             )}
+
+             {/* Input Form Footer */}
              <form onSubmit={handleSend} className="p-4 bg-white border-t border-slate-100 flex gap-2">
                <input 
                  value={inputText}
                  onChange={(e) => setInputText(e.target.value)}
-                 placeholder="Tapez votre message..."
-                 className="flex-1 bg-slate-50 rounded-2xl px-5 py-3 text-xs focus:outline-none focus:ring-2 ring-black/5"
+                 disabled={sending}
+                 placeholder="Tapez votre message ici..."
+                 className="flex-1 bg-slate-50 hover:bg-slate-100/60 focus:bg-white rounded-2xl px-5 py-3.5 text-xs md:text-[13px] border border-transparent focus:border-slate-200 focus:outline-none focus:ring-4 focus:ring-black/5 disabled:opacity-50 transition-all duration-150"
                />
                <button 
                  disabled={sending || !inputText.trim()}
-                 className="w-12 h-12 bg-black text-white flex items-center justify-center rounded-2xl shadow-xl shadow-black/20 hover:scale-105 active:scale-95 transition-all disabled:opacity-30"
+                 className="w-12 h-12 bg-black hover:bg-slate-900 text-white flex items-center justify-center rounded-2xl shadow-xl shadow-black/10 hover:scale-105 active:scale-95 transition-all disabled:opacity-30 disabled:hover:scale-100 cursor-pointer"
                >
                  <Send size={18} />
                </button>

@@ -78,15 +78,19 @@ async function startServer() {
       const historyItems = history || [];
       
       for (const h of historyItems) {
-        // AI and ADMIN roles represent the responder/model; USER represents the human client
-        const role = (h.role === 'AI' || h.role === 'ADMIN') ? 'model' : 'user';
-        rawContents.push({ role, parts: [{ text: h.text || "" }] });
+        const text = h.text || h.message || "";
+        if (!text || !text.trim()) continue; // Skip empty messages that crash Gemini
+        
+        // Match standard senderRole or role tags
+        const rName = (h.role || h.senderRole || "").toString().toUpperCase();
+        const role = (rName === 'AI' || rName === 'ADMIN' || rName === 'MODEL') ? 'model' : 'user';
+        rawContents.push({ role, parts: [{ text: text.trim() }] });
       }
 
       // Add the current message if it's not already the last turn
       const lastHistoryMessage = rawContents.length > 0 ? rawContents[rawContents.length - 1].parts[0].text : "";
-      if (lastHistoryMessage !== message) {
-        rawContents.push({ role: 'user', parts: [{ text: message }] });
+      if (lastHistoryMessage !== message.trim()) {
+        rawContents.push({ role: 'user', parts: [{ text: message.trim() }] });
       }
 
       // Merge consecutive entries of the same role (e.g., user -> user or model -> model)
@@ -106,7 +110,7 @@ async function startServer() {
       }
 
       if (contents.length === 0) {
-        contents.push({ role: 'user', parts: [{ text: message }] });
+        contents.push({ role: 'user', parts: [{ text: message.trim() }] });
       }
 
       const modelName = "gemini-3.5-flash";
