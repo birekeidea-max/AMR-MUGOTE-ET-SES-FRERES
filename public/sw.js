@@ -62,7 +62,8 @@ self.addEventListener("fetch", (event) => {
             return cachedResponse;
           }
           // Si rien d'arrière n'existe dans le cache, retourner un fallback
-          if (event.request.headers.get("accept").includes("text/html")) {
+          const acceptHeader = event.request.headers.get("accept");
+          if (acceptHeader && acceptHeader.includes("text/html")) {
             return caches.match("/");
           }
         });

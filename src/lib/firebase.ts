@@ -2,15 +2,63 @@ import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import { getFirestore, enableIndexedDbPersistence } from 'firebase/firestore';
 import { getStorage, ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
-import firebaseConfig from '../../firebase-applet-config.json';
+import { getAnalytics, logEvent, Analytics } from 'firebase/analytics';
+import firebaseConfigJson from '../../firebase-applet-config.json';
+
+// Exact Firebase config provided by user with the corrected uppercase X in API Key from image
+const firebaseConfig = {
+  apiKey: "AIzaSyA4pBmVjX08ph7JdvJbmurOa_rMNYpy1MA",
+  authDomain: "mugote2.firebaseapp.com",
+  projectId: "mugote2",
+  storageBucket: "mugote2.firebasestorage.app",
+  messagingSenderId: "131875304989",
+  appId: "1:131875304989:web:e0a83c6073e2ace063b8f4",
+  measurementId: "G-BG9Q2L3LMG",
+  firestoreDatabaseId: (firebaseConfigJson as any).firestoreDatabaseId || "ai-studio-020b031e-1447-4f1b-8ef0-ab4a23c0b6ab"
+};
 
 // Log config keys for diagnostic (not values)
 console.log('Firebase Config Keys:', Object.keys(firebaseConfig));
 
 const app = initializeApp(firebaseConfig);
-export const db = getFirestore(app, (firebaseConfig as any).firestoreDatabaseId);
+export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
 export const auth = getAuth(app);
 export const storage = getStorage(app);
+
+// Safe Google Analytics initialization
+// In sandboxed frames, test environments, or under aggressive ad blockers, getAnalytics() can throw.
+// Wrapping it in a try-catch ensures the app remains fully functional and never crashes on load.
+export let analytics: Analytics | null = null;
+try {
+  if (typeof window !== 'undefined') {
+    analytics = getAnalytics(app);
+  }
+} catch (e) {
+  console.warn("Google Analytics could not be initialized (likely restricted by sandbox iframe or blocker):", e);
+}
+
+/**
+ * Fonction globale pour envoyer les crashs et exceptions à Google Analytics.
+ * Elle remplace Crashlytics qui n'est pas disponible nativement sur le Web.
+ * 
+ * @param {any} error - L'objet d'erreur ou le message du plantage.
+ * @param {string} context - Le contexte ou le composant où l'erreur a eu lieu.
+ */
+export const logWebCrash = (error: any, context: string = "Non spécifié") => {
+  console.error(`[Web Crash - ${context}]:`, error);
+  if (analytics) {
+    try {
+      const errMsg = error instanceof Error ? error.message : String(error);
+      logEvent(analytics, 'exception', {
+        description: errMsg,
+        fatal: true, // Marque l'erreur comme critique (plantage)
+        error_context: context
+      });
+    } catch (e) {
+      console.warn("Failed to log exception to Google Analytics:", e);
+    }
+  }
+};
 
 // Enable offline persistence
 try {
@@ -112,8 +160,17 @@ export function handleFirestoreError(error: any, operationType: OperationType, p
   
   console.error('Firestore Error details:', errInfo);
   
+  // Track this database exception with Google Analytics
+  try {
+    logWebCrash(error || message, `Firestore: ${operationType} ${path || ''}`);
+  } catch (analyticsErr) {
+    console.warn("Could not log Firestore error to analytics:", analyticsErr);
+  }
+  
   // Create a clean error message for the UI
   const finalError = new Error(message);
   (finalError as any).code = code;
   throw finalError;
 }
+
+export default app;

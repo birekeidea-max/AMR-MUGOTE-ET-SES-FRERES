@@ -74,23 +74,24 @@ async function startServer() {
 
       console.log("Chat Request Message:", message);
       
+      const messageStr = String(message || "").trim();
       const rawContents = [];
       const historyItems = history || [];
       
       for (const h of historyItems) {
-        const text = h.text || h.message || "";
-        if (!text || !text.trim()) continue; // Skip empty messages that crash Gemini
+        const text = String(h.text || h.message || "").trim();
+        if (!text) continue; // Skip empty messages that crash Gemini
         
         // Match standard senderRole or role tags
         const rName = (h.role || h.senderRole || "").toString().toUpperCase();
         const role = (rName === 'AI' || rName === 'ADMIN' || rName === 'MODEL') ? 'model' : 'user';
-        rawContents.push({ role, parts: [{ text: text.trim() }] });
+        rawContents.push({ role, parts: [{ text }] });
       }
 
       // Add the current message if it's not already the last turn
       const lastHistoryMessage = rawContents.length > 0 ? rawContents[rawContents.length - 1].parts[0].text : "";
-      if (lastHistoryMessage !== message.trim()) {
-        rawContents.push({ role: 'user', parts: [{ text: message.trim() }] });
+      if (lastHistoryMessage !== messageStr) {
+        rawContents.push({ role: 'user', parts: [{ text: messageStr }] });
       }
 
       // Merge consecutive entries of the same role (e.g., user -> user or model -> model)
@@ -110,7 +111,7 @@ async function startServer() {
       }
 
       if (contents.length === 0) {
-        contents.push({ role: 'user', parts: [{ text: message.trim() }] });
+        contents.push({ role: 'user', parts: [{ text: messageStr }] });
       }
 
       const modelName = "gemini-3.5-flash";

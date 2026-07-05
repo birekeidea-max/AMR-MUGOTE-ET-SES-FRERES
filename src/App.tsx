@@ -96,6 +96,42 @@ import UsersListView from './components/UsersListView';
 import LocalisationView from './components/LocalisationView';
 import DocumentScannerWidget from './components/DocumentScannerWidget';
 
+// --- Safe localStorage Polyfill for sandboxed iframe environments ---
+let safeLocalStorage: Storage;
+try {
+  const testKey = '__storage_test_key__';
+  window.localStorage.setItem(testKey, testKey);
+  window.localStorage.removeItem(testKey);
+  safeLocalStorage = window.localStorage;
+} catch (e) {
+  console.warn("localStorage is not accessible in this context. Falling back to secure in-memory storage.", e);
+  const memStore: Record<string, string> = {};
+  safeLocalStorage = {
+    length: 0,
+    clear() {
+      for (const k in memStore) {
+        delete memStore[k];
+      }
+      this.length = 0;
+    },
+    getItem(key: string) {
+      return memStore[key] !== undefined ? memStore[key] : null;
+    },
+    key(index: number) {
+      return Object.keys(memStore)[index] || null;
+    },
+    removeItem(key: string) {
+      delete memStore[key];
+      this.length = Object.keys(memStore).length;
+    },
+    setItem(key: string, value: string) {
+      memStore[key] = String(value);
+      this.length = Object.keys(memStore).length;
+    }
+  } as Storage;
+}
+const localStorage = safeLocalStorage;
+
 // --- Types ---
 type Page = 'home' | 'booking' | 'payment' | 'dashboard' | 'tickets' | 'news' | 'gallery' | 'users' | 'map';
 
@@ -465,9 +501,26 @@ export default function App() {
         console.warn("Firestore status:", error.message);
       }
     }
+    
+    // Test initial connection status on boot
     testConnection();
-    const interval = setInterval(testConnection, 60000); // Check every minute
-    return () => clearInterval(interval);
+
+    // Use native, free browser event listeners for offline/online status to avoid exhausting database read quotas under high traffic
+    const handleOnline = () => {
+      setIsFirebaseOffline(false);
+      testConnection(); // Verify server connectivity when back online
+    };
+    const handleOffline = () => {
+      setIsFirebaseOffline(true);
+    };
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
   }, []);
 
   useEffect(() => {
@@ -4203,7 +4256,7 @@ function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlock
   const [usersList, setUsersList] = useState<any[]>([]);
   const [fleetList, setFleetList] = useState<any[]>([]);
   const [scheduleForm, setScheduleForm] = useState({ id: '', from: '', to: '', time: '', ship: '', days: '' });
-  const [boatForm, setBoatForm] = useState({ id: '', name: '', capacity: 0, description: '', imageUrl: '' });
+  const [boatForm, setBoatForm] = useState({ id: '', name: '', capacity: 0, description: '', imageUrl: '', lat: -2.4930, lng: 28.8590, status: 'À quai' });
   const [editMediaId, setEditMediaId] = useState<string | null>(null);
   const [adminCode, setAdminCode] = useState('');
   const [adminEmailInput, setAdminEmailInput] = useState('');
@@ -4948,6 +5001,9 @@ function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlock
         capacity: Number(boatForm.capacity),
         description: boatForm.description,
         imageUrl: boatForm.imageUrl,
+        lat: Number(boatForm.lat !== undefined ? boatForm.lat : -2.4930),
+        lng: Number(boatForm.lng !== undefined ? boatForm.lng : 28.8590),
+        status: boatForm.status || 'À quai',
         updatedAt: serverTimestamp()
       };
 
@@ -4958,7 +5014,7 @@ function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlock
         await addDoc(collection(db, 'fleet'), boatData);
         alert("Bateau ajouté à la flotte !");
       }
-      setBoatForm({ id: '', name: '', capacity: 0, description: '', imageUrl: '' });
+      setBoatForm({ id: '', name: '', capacity: 0, description: '', imageUrl: '', lat: -2.4930, lng: 28.8590, status: 'À quai' });
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, 'fleet');
     }
@@ -5555,6 +5611,18 @@ function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlock
                       className="w-full px-6 py-3 border border-slate-200 rounded-xl focus:border-maritime outline-none text-sm font-bold"
                     />
                   </div>
+                  <div>
+                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 block">Statut de Navigation (Temps Réel)</label>
+                    <select
+                      value={boatForm.status}
+                      onChange={e => setBoatForm({...boatForm, status: e.target.value})}
+                      className="w-full px-6 py-3 border border-slate-200 rounded-xl focus:border-maritime outline-none text-xs font-bold bg-white"
+                    >
+                      <option value="À quai">À quai (Port MUGOTE)</option>
+                      <option value="En navigation">En navigation (Sur le Lac Kivu)</option>
+                      <option value="En maintenance">En maintenance / Standby</option>
+                    </select>
+                  </div>
                 </div>
                 <div className="space-y-4">
                    <div>
@@ -5596,6 +5664,30 @@ function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlock
                       </button>
                     </div>
                   </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 block">Latitude GPS</label>
+                      <input 
+                        type="number"
+                        step="0.000001"
+                        required
+                        value={boatForm.lat}
+                        onChange={e => setBoatForm({...boatForm, lat: Number(e.target.value)})}
+                        className="w-full px-6 py-3 border border-slate-200 rounded-xl focus:border-maritime outline-none text-xs font-mono font-bold"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 block">Longitude GPS</label>
+                      <input 
+                        type="number"
+                        step="0.000001"
+                        required
+                        value={boatForm.lng}
+                        onChange={e => setBoatForm({...boatForm, lng: Number(e.target.value)})}
+                        className="w-full px-6 py-3 border border-slate-200 rounded-xl focus:border-maritime outline-none text-xs font-mono font-bold"
+                      />
+                    </div>
+                  </div>
                   <div>
                     <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 block">Description</label>
                     <textarea 
@@ -5612,7 +5704,7 @@ function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlock
                   {boatForm.id && (
                     <button 
                       type="button"
-                      onClick={() => setBoatForm({ id: '', name: '', capacity: 0, description: '', imageUrl: '' })}
+                      onClick={() => setBoatForm({ id: '', name: '', capacity: 0, description: '', imageUrl: '', lat: -2.4930, lng: 28.8590, status: 'À quai' })}
                       className="px-8 py-4 bg-slate-100 text-slate-400 font-black uppercase tracking-widest text-[10px] rounded-2xl hover:bg-slate-200"
                     >
                       Annuler
@@ -5641,11 +5733,43 @@ function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlock
                     </div>
                     <div className="px-6 pb-6">
                       <h4 className="text-lg font-extrabold uppercase tracking-tighter italic mb-2">{boat.name}</h4>
-                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest line-clamp-2 mb-6 h-8">{boat.description || 'Navire de transport sécurisé.'}</p>
+                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest line-clamp-2 mb-3 h-8">{boat.description || 'Navire de transport sécurisé.'}</p>
+                      
+                      {/* Live parameters */}
+                      <div className="bg-slate-50 rounded-2xl p-3 border border-slate-100 space-y-1.5 text-[9px] font-bold uppercase tracking-wide text-slate-500 mb-5">
+                        <div className="flex justify-between">
+                          <span className="text-slate-400 text-[8px]">Statut :</span>
+                          <span className={cn(
+                            "px-1.5 py-0.5 rounded text-[8px] font-black uppercase",
+                            boat.status === 'En navigation' ? "bg-sky-100 text-sky-700" :
+                            boat.status === 'En maintenance' ? "bg-amber-100 text-amber-700" :
+                            "bg-emerald-100 text-emerald-700"
+                          )}>
+                            {boat.status || 'À quai'}
+                          </span>
+                        </div>
+                        <div className="flex justify-between font-mono text-[8.5px]">
+                          <span className="text-slate-400 text-[8px] font-sans">GPS Lat :</span>
+                          <span className="text-slate-700 font-bold">{(boat.lat !== undefined ? Number(boat.lat) : -2.4930).toFixed(4)}</span>
+                        </div>
+                        <div className="flex justify-between font-mono text-[8.5px]">
+                          <span className="text-slate-400 text-[8px] font-sans">GPS Lng :</span>
+                          <span className="text-slate-700 font-bold">{(boat.lng !== undefined ? Number(boat.lng) : 28.8590).toFixed(4)}</span>
+                        </div>
+                      </div>
                       
                       <div className="flex gap-2">
                         <button 
-                          onClick={() => setBoatForm(boat)}
+                          onClick={() => setBoatForm({
+                            id: boat.id,
+                            name: boat.name,
+                            capacity: boat.capacity,
+                            description: boat.description || '',
+                            imageUrl: boat.imageUrl || '',
+                            lat: boat.lat !== undefined ? boat.lat : -2.4930,
+                            lng: boat.lng !== undefined ? boat.lng : 28.8590,
+                            status: boat.status || 'À quai'
+                          })}
                           className="flex-1 py-3 bg-slate-50 text-slate-600 hover:bg-black hover:text-white rounded-xl text-[9px] font-black uppercase tracking-widest transition-all"
                         >
                           Modifier
@@ -6604,6 +6728,9 @@ function MyTickets({ user, siteSettings }: { user: FirebaseUser | null, siteSett
     );
     const unsubscribe = onSnapshot(q, (snapshot) => {
       setTickets(snapshot.docs.map(doc => ({ ...doc.data() as Reservation, id: doc.id })));
+      setLoading(false);
+    }, (error) => {
+      console.warn("MyTickets query failed gracefully:", error);
       setLoading(false);
     });
     return unsubscribe;

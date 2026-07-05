@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { MapPin, Navigation, Compass, Info, RefreshCw, Check, ShieldAlert, Map as MapIcon, Compass as CompassIcon, Car, ExternalLink } from 'lucide-react';
+import { MapPin, Navigation, Compass, Info, RefreshCw, Check, ShieldAlert, Map as MapIcon, Compass as CompassIcon, Car, ExternalLink, Ship, Anchor } from 'lucide-react';
 import { APIProvider, Map, AdvancedMarker, Pin } from '@vis.gl/react-google-maps';
+import { db } from '../lib/firebase';
+import { collection, query, onSnapshot } from 'firebase/firestore';
+import { cn } from '../lib/utils';
 
 // AMR MUGOTE Port exact coordinates in Bukavu (Lake Kivu shoreline, Kadutu near Beach Muhanzi)
 const PORT_COORDS = { lat: -2.4930, lng: 28.8590 };
@@ -37,6 +40,26 @@ export default function LocalisationView() {
   const [locating, setLocating] = useState(false);
   const [distanceKm, setDistanceKm] = useState<number | null>(null);
   const [directions, setDirections] = useState<string[]>([]);
+  const [boats, setBoats] = useState<any[]>([]);
+
+  // Realtime listener for the fleet collection
+  useEffect(() => {
+    const q = query(collection(db, 'fleet'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const list = snapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          ...data
+        };
+      });
+      setBoats(list);
+    }, (error) => {
+      console.warn("Could not listen to fleet in LocalisationView:", error);
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   // Geolocation is only requested when the user clicks the action button to comply with browser sandboxing
   useEffect(() => {
@@ -257,6 +280,20 @@ export default function LocalisationView() {
                     </Pin>
                   </AdvancedMarker>
 
+                  {/* Fleet Boats Markers */}
+                  {boats.map((boat, idx) => {
+                    const boatLat = boat.lat !== undefined ? Number(boat.lat) : PORT_COORDS.lat + (idx + 1) * 0.003;
+                    const boatLng = boat.lng !== undefined ? Number(boat.lng) : PORT_COORDS.lng + (idx + 1) * 0.005;
+                    const statusColor = boat.status === 'En navigation' ? '#0284c7' : boat.status === 'En maintenance' ? '#d97706' : '#10b981';
+                    return (
+                      <AdvancedMarker key={boat.id} position={{ lat: boatLat, lng: boatLng }} title={`${boat.name} - ${boat.status || 'À quai'}`}>
+                        <Pin background={statusColor} borderColor="#FFFFFF" glyphColor="#FFFFFF" scale={1.1}>
+                          ⛵
+                        </Pin>
+                      </AdvancedMarker>
+                    );
+                  })}
+
                   {/* User Marker if active */}
                   {userLocation && (
                     <AdvancedMarker position={userLocation} title="Votre Position">
@@ -304,6 +341,76 @@ export default function LocalisationView() {
                     <Info size={10} /> Carte Google désactivée (Clé API manquante)
                   </div>
                 </div>
+              </div>
+            )}
+          </div>
+
+          {/* Real-time Fleet Tracking Panel */}
+          <div className="bg-white rounded-[32px] p-8 border border-slate-150 shadow-xl space-y-6">
+            <div className="flex justify-between items-center border-b border-slate-100 pb-4">
+              <h3 className="text-md font-black uppercase tracking-tight text-[#001233] flex items-center gap-2">
+                <Ship size={18} className="text-gold animate-bounce" />
+                Suivi de la Flotte en Temps Réel
+              </h3>
+              <span className="inline-flex items-center gap-1.5 text-[9px] font-black uppercase bg-sky-50 text-sky-600 border border-sky-100 px-3 py-1 rounded-full animate-pulse">
+                <span className="w-1.5 h-1.5 rounded-full bg-sky-500 animate-ping" />
+                Mise à Jour Live
+              </span>
+            </div>
+
+            {boats.length === 0 ? (
+              <div className="py-10 text-center text-slate-400 text-xs font-bold uppercase tracking-wider">
+                Aucun navire en service actuellement
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {boats.map((boat, idx) => {
+                  const boatLat = boat.lat !== undefined ? Number(boat.lat) : PORT_COORDS.lat + (idx + 1) * 0.003;
+                  const boatLng = boat.lng !== undefined ? Number(boat.lng) : PORT_COORDS.lng + (idx + 1) * 0.005;
+                  
+                  // Compute distance
+                  let distText = '';
+                  if (userLocation) {
+                    const d = getDistanceFromLatLonInKm(userLocation.lat, userLocation.lng, boatLat, boatLng);
+                    distText = d < 1 ? `${(d * 1000).toFixed(0)} m de vous` : `${d.toFixed(2)} km de vous`;
+                  } else {
+                    const d = getDistanceFromLatLonInKm(PORT_COORDS.lat, PORT_COORDS.lng, boatLat, boatLng);
+                    distText = d < 0.1 ? `À quai au Port` : `${d.toFixed(2)} km du Port`;
+                  }
+
+                  return (
+                    <div key={boat.id || idx} className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex gap-4 items-center hover:bg-slate-100/50 transition-all">
+                      <div className={cn(
+                        "w-12 h-12 rounded-xl flex items-center justify-center shrink-0 shadow-sm",
+                        boat.status === 'En navigation' ? "bg-sky-500/10 text-sky-500 animate-pulse" :
+                        boat.status === 'En maintenance' ? "bg-amber-500/10 text-amber-500" :
+                        "bg-emerald-500/10 text-emerald-500"
+                      )}>
+                        <Ship size={20} />
+                      </div>
+                      <div className="flex-1 min-w-0 space-y-1">
+                        <div className="flex justify-between items-start gap-2">
+                          <h4 className="text-xs font-black uppercase text-slate-800 truncate leading-tight">{boat.name}</h4>
+                          <span className={cn(
+                            "px-1.5 py-0.5 rounded text-[7px] font-black uppercase shrink-0 tracking-wide border",
+                            boat.status === 'En navigation' ? "bg-sky-50 text-sky-600 border-sky-100" :
+                            boat.status === 'En maintenance' ? "bg-amber-50 text-amber-600 border-amber-100" :
+                            "bg-emerald-50 text-emerald-600 border-emerald-100"
+                          )}>
+                            {boat.status || 'À quai'}
+                          </span>
+                        </div>
+                        <p className="text-[9px] text-slate-400 font-mono tracking-tighter">
+                          GPS: {boatLat.toFixed(5)}, {boatLng.toFixed(5)}
+                        </p>
+                        <div className="flex items-center gap-1 text-[9px] font-bold text-[#001233] uppercase">
+                          <CompassIcon size={10} className="text-gold shrink-0 animate-spin-slow" />
+                          <span>{distText}</span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
