@@ -623,6 +623,19 @@ export default function App() {
       keywordsMeta.setAttribute('content', keywords);
     }
 
+    const pageUrl = currentPage === 'home' ? baseUrl : `${baseUrl}/?page=${currentPage}`;
+
+    // Update Canonical URL dynamically
+    let canonicalLink = document.querySelector('link[rel="canonical"]');
+    if (canonicalLink) {
+      canonicalLink.setAttribute('href', pageUrl);
+    } else {
+      canonicalLink = document.createElement('link');
+      canonicalLink.setAttribute('rel', 'canonical');
+      canonicalLink.setAttribute('href', pageUrl);
+      document.head.appendChild(canonicalLink);
+    }
+
     // Update Open Graph tags
     const ogTitle = document.querySelector('meta[property="og:title"]');
     if (ogTitle) ogTitle.setAttribute('content', pageTitle);
@@ -631,7 +644,7 @@ export default function App() {
     if (ogDesc) ogDesc.setAttribute('content', pageDesc);
 
     const ogUrl = document.querySelector('meta[property="og:url"]');
-    if (ogUrl) ogUrl.setAttribute('content', `${baseUrl}/${currentPage === 'home' ? '' : currentPage}`);
+    if (ogUrl) ogUrl.setAttribute('content', pageUrl);
 
     // Update Twitter Cards
     const twitterTitle = document.querySelector('meta[name="twitter:title"]');
@@ -639,6 +652,9 @@ export default function App() {
 
     const twitterDesc = document.querySelector('meta[name="twitter:description"]');
     if (twitterDesc) twitterDesc.setAttribute('content', pageDesc);
+
+    const twitterUrl = document.querySelector('meta[name="twitter:url"]');
+    if (twitterUrl) twitterUrl.setAttribute('content', pageUrl);
 
     // Update/Inject JSON-LD Structured Schema
     let schemaScript = document.getElementById('schema-jsonld') as HTMLScriptElement;

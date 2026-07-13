@@ -452,6 +452,80 @@ TON ET STYLE :
     res.send("google-site-verification: googlec0e88496e42691d5.html");
   });
 
+  // Route pour sitemap.xml
+  app.get("/sitemap.xml", (req, res) => {
+    try {
+      const publicPath = path.join(process.cwd(), "public", "sitemap.xml");
+      const distPath = path.join(process.cwd(), "dist", "sitemap.xml");
+      let xmlContent = "";
+      if (fs.existsSync(publicPath)) {
+        xmlContent = fs.readFileSync(publicPath, "utf-8");
+      } else if (fs.existsSync(distPath)) {
+        xmlContent = fs.readFileSync(distPath, "utf-8");
+      } else {
+        const baseUrl = "https://amr-mugote-et-ses-freres.vercel.app";
+        const today = new Date().toISOString().split('T')[0];
+        xmlContent = `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+    <url>
+        <loc>${baseUrl}/</loc>
+        <lastmod>${today}</lastmod>
+        <changefreq>daily</changefreq>
+        <priority>1.0</priority>
+    </url>
+    <url>
+        <loc>${baseUrl}/?page=booking</loc>
+        <lastmod>${today}</lastmod>
+        <changefreq>weekly</changefreq>
+        <priority>0.9</priority>
+    </url>
+    <url>
+        <loc>${baseUrl}/?page=news</loc>
+        <lastmod>${today}</lastmod>
+        <changefreq>daily</changefreq>
+        <priority>0.8</priority>
+    </url>
+    <url>
+        <loc>${baseUrl}/?page=gallery</loc>
+        <lastmod>${today}</lastmod>
+        <changefreq>monthly</changefreq>
+        <priority>0.7</priority>
+    </url>
+    <url>
+        <loc>${baseUrl}/?page=map</loc>
+        <lastmod>${today}</lastmod>
+        <changefreq>daily</changefreq>
+        <priority>0.8</priority>
+    </url>
+</urlset>`;
+      }
+      res.setHeader("Content-Type", "application/xml; charset=utf-8");
+      res.send(xmlContent);
+    } catch (err: any) {
+      res.status(500).send("Erreur lors de la génération du sitemap: " + err.message);
+    }
+  });
+
+  // Route pour robots.txt
+  app.get("/robots.txt", (req, res) => {
+    try {
+      const publicPath = path.join(process.cwd(), "public", "robots.txt");
+      const distPath = path.join(process.cwd(), "dist", "robots.txt");
+      let textContent = "";
+      if (fs.existsSync(publicPath)) {
+        textContent = fs.readFileSync(publicPath, "utf-8");
+      } else if (fs.existsSync(distPath)) {
+        textContent = fs.readFileSync(distPath, "utf-8");
+      } else {
+        textContent = "User-agent: *\nAllow: /\n\nSitemap: https://amr-mugote-et-ses-freres.vercel.app/sitemap.xml";
+      }
+      res.setHeader("Content-Type", "text/plain; charset=utf-8");
+      res.send(textContent);
+    } catch (err: any) {
+      res.status(500).send("Erreur lors de la lecture de robots.txt: " + err.message);
+    }
+  });
+
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({

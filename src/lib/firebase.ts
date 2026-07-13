@@ -108,7 +108,11 @@ export const logWebCrash = (error: any, context: string = "Non spécifié") => {
     return;
   }
 
-  console.error(`[Web Crash - ${context}]:`, error);
+  if (context.includes('Global') || context.includes('Rejection') || context.includes('Window')) {
+    console.warn(`[Web Warn - ${context}]:`, error);
+  } else {
+    console.error(`[Web Crash - ${context}]:`, error);
+  }
   if (analytics) {
     try {
       logEvent(analytics, 'exception', {
