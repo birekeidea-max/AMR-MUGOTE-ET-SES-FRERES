@@ -446,6 +446,12 @@ TON ET STYLE :
     res.redirect("/api/sdd");
   });
 
+  // Route de vérification de site Google Search Console
+  app.get("/googlec0e88496e42691d5.html", (req, res) => {
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    res.send("google-site-verification: googlec0e88496e42691d5.html");
+  });
+
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
