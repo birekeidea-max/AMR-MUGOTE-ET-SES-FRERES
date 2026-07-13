@@ -31,7 +31,16 @@ export const storage = getStorage(app);
 export let analytics: Analytics | null = null;
 try {
   if (typeof window !== 'undefined') {
-    analytics = getAnalytics(app);
+    const hostname = window.location.hostname || "";
+    const isLocal = hostname.includes('localhost') || hostname.includes('127.0.0.1');
+    const isStudioPreview = hostname.includes('.run.app');
+    const isOffline = !navigator.onLine;
+
+    if (!isLocal && !isStudioPreview && !isOffline) {
+      analytics = getAnalytics(app);
+    } else {
+      console.log("[Firebase] Skipping Google Analytics initialization in local, sandbox (AI Studio), or offline environment.");
+    }
   }
 } catch (e) {
   console.warn("Google Analytics could not be initialized (likely restricted by sandbox iframe or blocker):", e);
@@ -45,6 +54,9 @@ try {
  * @param {string} context - Le contexte ou le composant où l'erreur a eu lieu.
  */
 export const logWebCrash = (error: any, context: string = "Non spécifié") => {
+  if (!error) {
+    return;
+  }
   let errMsg = "";
   let errCode = "";
   let errStack = "";
@@ -81,7 +93,16 @@ export const logWebCrash = (error: any, context: string = "Non spécifié") => {
     fullText.includes('analytics/') ||
     fullText.includes('app-offline') ||
     fullText.includes('app offline') ||
-    fullText.includes('offline')
+    fullText.includes('offline') ||
+    fullText.includes('network') ||
+    fullText.includes('fetch') ||
+    fullText.includes('permission') ||
+    fullText.includes('unimplemented') ||
+    fullText.includes('unavailable') ||
+    fullText.includes('failed-precondition') ||
+    fullText.includes('storage/') ||
+    fullText.includes('auth/') ||
+    fullText.includes('istrusted')
   ) {
     console.warn(`[Firebase Background Activity Suppressed]: ${errMsg || String(error)} (${context})`);
     return;

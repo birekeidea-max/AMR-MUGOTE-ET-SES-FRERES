@@ -6,6 +6,65 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     
+    <!-- Suppression précoce des erreurs d'arrière-plan Firebase hors-ligne / Installations -->
+    <script>
+      (function() {
+        var suppressPattern = /installations\/app-offline|installations\/validation-failed|installations\/|analytics\/|app-offline|app offline|offline|network|fetch|permission|unimplemented|unavailable|failed-precondition|storage\/|auth\/|istrusted/i;
+        
+        window.addEventListener('error', function(event) {
+          var errorObj = event.error;
+          var msg = event.message || '';
+          var fullText = [
+            msg,
+            errorObj ? (errorObj.message || '') : '',
+            errorObj ? (errorObj.description || '') : '',
+            errorObj ? String(errorObj) : '',
+            errorObj && typeof errorObj === 'object' ? (errorObj.stack || '') : ''
+          ].join(' ').toLowerCase();
+
+          if (suppressPattern.test(fullText) || !msg) {
+            event.preventDefault();
+            event.stopPropagation();
+            return;
+          }
+        }, true);
+
+        window.addEventListener('unhandledrejection', function(event) {
+          var reason = event.reason;
+          var message = '';
+          var code = '';
+          if (reason) {
+            if (typeof reason === 'object') {
+              message = reason.message || reason.description || '';
+              code = reason.code || '';
+              if (!message || message === '[object Object]') {
+                try {
+                  message = JSON.stringify(reason);
+                } catch (e) {
+                  message = String(reason);
+                }
+              }
+            } else {
+              message = String(reason);
+            }
+          }
+
+          var fullText = [
+            message,
+            code,
+            String(reason),
+            reason && typeof reason === 'object' ? (reason.stack || '') : ''
+          ].join(' ').toLowerCase();
+
+          if (suppressPattern.test(fullText) || message === '{}' || message === '{"isTrusted":true}' || (reason && typeof reason === 'object' && Object.keys(reason).length === 0 && !reason.message)) {
+            event.preventDefault();
+            event.stopPropagation();
+            return;
+          }
+        }, true);
+      })();
+    </script>
+    
     <!-- SEO Technique / Moteurs de recherche -->
     <title>AMR MUGOTE ET SES FRÈRES - Réservation Maritime Bukavu ⇄ Goma (Lac Kivu)</title>
     <meta name="description" content="Plateforme officielle de réservation de billets de transport maritime sur le Lac Kivu entre Bukavu et Goma. Paiement sécurisé Mobile Money (M-Pesa, Airtel, Orange via FlexPay) et e-billets avec QR Code." />

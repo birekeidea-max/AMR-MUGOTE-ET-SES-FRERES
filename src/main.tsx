@@ -7,6 +7,7 @@ import { logWebCrash } from './lib/firebase.ts';
 // Catch and report unhandled runtime errors globally to Google Analytics
 try {
   window.addEventListener('error', (event) => {
+    if (event.defaultPrevented) return;
     const errorObj = event.error;
     const msg = event.message || '';
     const fullText = [
@@ -24,7 +25,17 @@ try {
       fullText.includes('analytics/') ||
       fullText.includes('app-offline') ||
       fullText.includes('app offline') ||
-      fullText.includes('offline')
+      fullText.includes('offline') ||
+      fullText.includes('network') ||
+      fullText.includes('fetch') ||
+      fullText.includes('permission') ||
+      fullText.includes('unimplemented') ||
+      fullText.includes('unavailable') ||
+      fullText.includes('failed-precondition') ||
+      fullText.includes('storage/') ||
+      fullText.includes('auth/') ||
+      fullText.includes('istrusted') ||
+      !msg
     ) {
       // Ignore background firebase installations/analytics errors and prevent browser noise
       event.preventDefault();
@@ -34,24 +45,34 @@ try {
   });
 
   window.addEventListener('unhandledrejection', (event) => {
+    if (event.defaultPrevented) return;
     const reason = event.reason;
+    if (!reason) {
+      event.preventDefault();
+      return;
+    }
+
     let message = '';
     let code = '';
 
-    if (reason) {
-      if (typeof reason === 'object') {
-        message = reason.message || reason.description || '';
-        code = reason.code || '';
-        if (!message || message === '[object Object]') {
-          try {
-            message = JSON.stringify(reason);
-          } catch (e) {
-            message = String(reason);
-          }
+    if (typeof reason === 'object') {
+      message = reason.message || reason.description || '';
+      code = reason.code || '';
+      if (!message || message === '[object Object]') {
+        try {
+          message = JSON.stringify(reason);
+        } catch (e) {
+          message = String(reason);
         }
-      } else {
-        message = String(reason);
       }
+    } else {
+      message = String(reason);
+    }
+
+    // Ignore empty or browser-internal trusted rejection events without information
+    if (message === '{}' || message === '{"isTrusted":true}' || (typeof reason === 'object' && Object.keys(reason).length === 0 && !reason.message)) {
+      event.preventDefault();
+      return;
     }
 
     const fullText = [
@@ -69,7 +90,16 @@ try {
       fullText.includes('analytics/') ||
       fullText.includes('app-offline') ||
       fullText.includes('app offline') ||
-      fullText.includes('offline')
+      fullText.includes('offline') ||
+      fullText.includes('network') ||
+      fullText.includes('fetch') ||
+      fullText.includes('permission') ||
+      fullText.includes('unimplemented') ||
+      fullText.includes('unavailable') ||
+      fullText.includes('failed-precondition') ||
+      fullText.includes('storage/') ||
+      fullText.includes('auth/') ||
+      fullText.includes('istrusted')
     ) {
       event.preventDefault(); // Prevent standard browser warning/noise
       return;

@@ -753,6 +753,14 @@ export default function App() {
     if (verify) {
       setVerifyId(verify);
     }
+
+    const pageParam = params.get('page');
+    if (pageParam) {
+      const validPublicPages: Page[] = ['home', 'booking', 'news', 'gallery', 'map'];
+      if (validPublicPages.includes(pageParam as Page)) {
+        setCurrentPage(pageParam as Page);
+      }
+    }
   }, []);
 
   useEffect(() => {
