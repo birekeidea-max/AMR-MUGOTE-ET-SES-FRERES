@@ -45,10 +45,40 @@ try {
  * @param {string} context - Le contexte ou le composant où l'erreur a eu lieu.
  */
 export const logWebCrash = (error: any, context: string = "Non spécifié") => {
+  let errMsg = "";
+  let errCode = "";
+
+  if (error) {
+    if (typeof error === 'object') {
+      errMsg = error.message || error.description || "";
+      errCode = error.code || "";
+      if (!errMsg || errMsg === '[object Object]') {
+        try {
+          errMsg = JSON.stringify(error);
+        } catch (e) {
+          errMsg = String(error);
+        }
+      }
+    } else {
+      errMsg = String(error);
+    }
+  }
+
+  // Ignore harmless, non-fatal background Firebase installations/analytics offline/permission errors
+  if (
+    errMsg.includes('installations/app-offline') ||
+    errMsg.includes('installations/validation-failed') ||
+    errCode.includes('installations/') ||
+    errMsg.includes('analytics/') ||
+    errMsg.includes('App offline')
+  ) {
+    console.warn(`[Firebase Background Activity Suppressed]: ${errMsg} (${context})`);
+    return;
+  }
+
   console.error(`[Web Crash - ${context}]:`, error);
   if (analytics) {
     try {
-      const errMsg = error instanceof Error ? error.message : String(error);
       logEvent(analytics, 'exception', {
         description: errMsg,
         fatal: true, // Marque l'erreur comme critique (plantage)
