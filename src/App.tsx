@@ -433,6 +433,230 @@ export default function App() {
   const [isInstallModalOpen, setIsInstallModalOpen] = useState(false);
   const [userPlatform, setUserPlatform] = useState<'ios' | 'android' | 'desktop' | 'generic'>('generic');
 
+  // Dynamic SEO, GEO, and Schema.org Metadata synchronizer for SPA routing
+  useEffect(() => {
+    const siteName = "AMR MUGOTE ET SES FRÈRES";
+    const baseUrl = "https://amr-mugote-et-ses-freres.vercel.app";
+    
+    let pageTitle = "";
+    let pageDesc = "";
+    let keywords = "";
+    let schemaMarkup: any = null;
+
+    switch (currentPage) {
+      case 'home':
+        pageTitle = `${siteName} - Réservation Maritime Bukavu ⇄ Goma (Lac Kivu)`;
+        pageDesc = "Plateforme officielle de réservation de billets de transport maritime sur le Lac Kivu entre Bukavu et Goma. Paiement sécurisé Mobile Money (M-Pesa, Airtel, Orange via FlexPay) et e-billets avec QR Code.";
+        keywords = "AMR Mugote, réservation maritime, Lac Kivu, Bukavu, Goma, billet de bateau, FlexPay, Mobile Money, e-billet, QR Code, voyage Congo, transport lacustre";
+        schemaMarkup = {
+          "@context": "https://schema.org",
+          "@graph": [
+            {
+              "@type": "WebSite",
+              "@id": `${baseUrl}/#website`,
+              "url": baseUrl,
+              "name": siteName,
+              "description": pageDesc,
+              "potentialAction": [{
+                "@type": "SearchAction",
+                "target": {
+                  "@type": "EntryPoint",
+                  "urlTemplate": `${baseUrl}/?search={search_term_string}`
+                },
+                "query-input": "required name=search_term_string"
+              }],
+              "inLanguage": "fr-FR"
+            },
+            {
+              "@type": "Organization",
+              "@id": `${baseUrl}/#organization`,
+              "name": siteName,
+              "url": baseUrl,
+              "logo": {
+                "@type": "ImageObject",
+                "@id": `${baseUrl}/#logo`,
+                "url": `${baseUrl}/icon.svg`,
+                "caption": siteName
+              },
+              "sameAs": [
+                "https://github.com/birekeidea-max"
+              ],
+              "contactPoint": {
+                "@type": "ContactPoint",
+                "telephone": "+243994102673",
+                "contactType": "customer service",
+                "email": "birekeidea@gmail.com",
+                "areaServed": "CD",
+                "availableLanguage": "French"
+              }
+            },
+            {
+              "@type": "TravelAgency",
+              "@id": `${baseUrl}/#agency`,
+              "name": siteName,
+              "image": `${baseUrl}/icon.svg`,
+              "priceRange": "$$",
+              "telephone": "+243994102673",
+              "address": {
+                "@type": "PostalAddress",
+                "streetAddress": "Port de Bukavu, Place de l'Indépendance",
+                "addressLocality": "Bukavu",
+                "addressRegion": "Sud-Kivu",
+                "addressCountry": "CD"
+              },
+              "geo": {
+                "@type": "GeoCoordinates",
+                "latitude": "-2.5028",
+                "longitude": "28.8617"
+              }
+            },
+            {
+              "@type": "FAQPage",
+              "mainEntity": [
+                {
+                  "@type": "Question",
+                  "name": "Comment réserver un billet sur AMR Mugote ?",
+                  "acceptedAnswer": {
+                    "@type": "Answer",
+                    "text": "Il vous suffit de vous rendre sur l'onglet 'Réservation', de choisir votre trajet (Bukavu ou Goma), de sélectionner votre navire et votre classe de voyage, puis de procéder au paiement par Mobile Money (M-Pesa, Airtel Money, Orange Money via FlexPay)."
+                  }
+                },
+                {
+                  "@type": "Question",
+                  "name": "Comment se passe la validation des billets à l'embarquement ?",
+                  "acceptedAnswer": {
+                    "@type": "Answer",
+                    "text": "Lors de la validation de votre réservation, vous téléchargez un e-billet contenant un QR Code unique. Au port d'embarquement, le contrôleur scanne votre QR Code via la caméra de son smartphone pour vous enregistrer à bord en temps réel."
+                  }
+                },
+                {
+                  "@type": "Question",
+                  "name": "Quelles sont les classes disponibles sur les navires d'AMR Mugote ?",
+                  "acceptedAnswer": {
+                    "@type": "Answer",
+                    "text": "Les traversées proposent quatre classes ajustées à vos besoins : la classe VIP (confort haut de gamme), la 1ère classe (standard de qualité), la 2ème classe (économique et spacieuse) et la 3ème classe."
+                  }
+                }
+              ]
+            }
+          ]
+        };
+        break;
+      case 'booking':
+        pageTitle = `Réserver un Billet de Bateau - ${siteName}`;
+        pageDesc = "Sélectionnez votre trajet (Bukavu ⇄ Goma), choisissez votre navire favori, votre classe de voyage (VIP, Standard, Économique) et réservez votre billet en temps réel.";
+        keywords = "réservation bateau, billet Kivu, réserver billet Bukavu Goma, voyage lac Kivu, horaires bateaux";
+        schemaMarkup = {
+          "@context": "https://schema.org",
+          "@type": "Service",
+          "name": "Service de Réservation de Billet de Transport Maritime",
+          "provider": {
+            "@type": "TravelAgency",
+            "name": siteName,
+            "url": baseUrl
+          },
+          "serviceType": "Transport de passagers",
+          "areaServed": {
+            "@type": "Place",
+            "name": "Lac Kivu (Bukavu et Goma)"
+          },
+          "offers": {
+            "@type": "AggregateOffer",
+            "priceCurrency": "USD",
+            "lowPrice": "5",
+            "highPrice": "50",
+            "offerCount": "4"
+          }
+        };
+        break;
+      case 'payment':
+        pageTitle = `Paiement et Validation - ${siteName}`;
+        pageDesc = "Validez en toute sécurité vos paiements par M-Pesa, Airtel Money ou Orange Money grâce à l'intégration FlexPay.";
+        keywords = "paiement Mobile Money, FlexPay DRC, M-Pesa Bukavu, Airtel Money Goma, valider paiement";
+        break;
+      case 'dashboard':
+        pageTitle = `Tableau de Bord Administrateur - ${siteName}`;
+        pageDesc = "Console de gestion d'AMR MUGOTE : suivi des finances, pilotage de la flotte de navires, planification d'horaires et actualités.";
+        keywords = "admin panel, dashboard maritime, gestion flotte, administration Mugote";
+        break;
+      case 'tickets':
+        pageTitle = `Mes Billets Électroniques & QR Codes - ${siteName}`;
+        pageDesc = "Retrouvez et téléchargez l'ensemble de vos billets de transport maritime réservés, munis de QR Codes de sécurité uniques.";
+        keywords = "mes billets, e-billet PDF, QR Code embarquement, téléchargement reçu";
+        break;
+      case 'news':
+        pageTitle = `Actualités et Informations du Lac Kivu - ${siteName}`;
+        pageDesc = "Consultez les derniers avis de voyage, consignes de sécurité, météo lacustre et nouveautés sur la flotte d'AMR MUGOTE.";
+        keywords = "actualités Kivu, météo lac Kivu, avis de départ, communiqués de presse";
+        break;
+      case 'gallery':
+        pageTitle = `Médiathèque et Galerie de la Flotte - ${siteName}`;
+        pageDesc = "Visualisez en photos et vidéos de haute qualité nos navires modernes desservant les lignes maritimes Bukavu-Goma.";
+        keywords = "photos bateaux, galerie Mugote, navires lac Kivu, vidéo flotte";
+        break;
+      case 'map':
+        pageTitle = `Géolocalisation GPS et Suivi en Temps Réel - ${siteName}`;
+        pageDesc = "Consultez en direct la carte GPS interactive du Lac Kivu avec la position géolocalisée et le statut de nos navires en voyage.";
+        keywords = "GPS bateau, suivi temps réel, carte Lac Kivu, itinéraire Bukavu Goma";
+        break;
+      case 'users':
+        pageTitle = `Gestion des Comptes & Droits - ${siteName}`;
+        pageDesc = "Console d'accréditation et de gestion des rôles pour les passagers, contrôleurs de billets et administrateurs d'AMR MUGOTE.";
+        keywords = "gestion utilisateurs, comptes passagers, rôles contrôleurs";
+        break;
+      default:
+        pageTitle = `${siteName} - Transport Maritime sur le Lac Kivu`;
+        pageDesc = "Plateforme officielle de réservation de billets de bateau entre Bukavu et Goma.";
+        keywords = "AMR Mugote, transport lac Kivu";
+    }
+
+    // Update Meta and Document Attributes
+    document.title = pageTitle;
+    
+    const descMeta = document.querySelector('meta[name="description"]');
+    if (descMeta) {
+      descMeta.setAttribute('content', pageDesc);
+    }
+    
+    const keywordsMeta = document.querySelector('meta[name="keywords"]');
+    if (keywordsMeta) {
+      keywordsMeta.setAttribute('content', keywords);
+    }
+
+    // Update Open Graph tags
+    const ogTitle = document.querySelector('meta[property="og:title"]');
+    if (ogTitle) ogTitle.setAttribute('content', pageTitle);
+
+    const ogDesc = document.querySelector('meta[property="og:description"]');
+    if (ogDesc) ogDesc.setAttribute('content', pageDesc);
+
+    const ogUrl = document.querySelector('meta[property="og:url"]');
+    if (ogUrl) ogUrl.setAttribute('content', `${baseUrl}/${currentPage === 'home' ? '' : currentPage}`);
+
+    // Update Twitter Cards
+    const twitterTitle = document.querySelector('meta[name="twitter:title"]');
+    if (twitterTitle) twitterTitle.setAttribute('content', pageTitle);
+
+    const twitterDesc = document.querySelector('meta[name="twitter:description"]');
+    if (twitterDesc) twitterDesc.setAttribute('content', pageDesc);
+
+    // Update/Inject JSON-LD Structured Schema
+    let schemaScript = document.getElementById('schema-jsonld') as HTMLScriptElement;
+    if (schemaMarkup) {
+      if (!schemaScript) {
+        schemaScript = document.createElement('script');
+        schemaScript.id = 'schema-jsonld';
+        schemaScript.type = 'application/ld+json';
+        document.head.appendChild(schemaScript);
+      }
+      schemaScript.textContent = JSON.stringify(schemaMarkup);
+    } else {
+      if (schemaScript) {
+        schemaScript.remove();
+      }
+    }
+  }, [currentPage]);
+
   useEffect(() => {
     // Detect device OS platform
     const ua = navigator.userAgent.toLowerCase();

@@ -1,0 +1,18 @@
+/* TEAM */
+Chef de projet & Concepteur : BIREKE IDEA (Étudiant en Sciences Informatiques, Université Catholique de Bukavu)
+Contact : birekeidea@gmail.com
+GitHub : https://github.com/birekeidea-max
+
+/* THANKS */
+- Université Catholique de Bukavu (UCB)
+- GDG On Campus UCB
+- Programme d'Incubation et d'Innovation Technologique
+
+/* SITE */
+Standards: HTML5, CSS3, ES2022
+Tools: React 19, TypeScript, Vite, Tailwind CSS v4, Framer Motion, Lucide React
+Backend: Node.js + Express
+Database: Google Cloud Firestore
+Authentication: Firebase Auth
+Hosting: Vercel / Google Cloud Run
+Language: French (fr)

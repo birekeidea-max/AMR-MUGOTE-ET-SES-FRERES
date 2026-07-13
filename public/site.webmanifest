@@ -1,0 +1,19 @@
+{
+  "short_name": "AMR Mugote",
+  "name": "AMR MUGOTE & FRERES - Transport Lacustre",
+  "description": "Plateforme officielle de réservation de billets et de transport lacustre entre Bukavu et Goma sur le Lac Kivu.",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#001233",
+  "theme_color": "#001233",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "categories": ["travel", "transportation", "productivity"]
+}

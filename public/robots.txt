@@ -1,0 +1,41 @@
+# https://www.robotstxt.org/robotstxt.html
+
+# Autoriser tous les robots d'indexation classiques (Google, Bing, Yahoo, etc.)
+User-agent: *
+Allow: /
+Disallow: /admin/
+Disallow: /api/
+
+# Autoriser spécifiquement et explicitement tous les robots d'IA pour le GEO (Generative Engine Optimization)
+User-agent: GPTBot
+Allow: /
+
+User-agent: ChatGPT-User
+Allow: /
+
+User-agent: Google-Extended
+Allow: /
+
+User-agent: Anthropic-AI
+Allow: /
+
+User-agent: Claude-Web
+Allow: /
+
+User-agent: Cohere-AI
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: YouBot
+Allow: /
+
+User-agent: FacebookBot
+Allow: /
+
+User-agent: Omgilibot
+Allow: /
+
+# Référencement du sitemap XML officiel
+Sitemap: https://amr-mugote-et-ses-freres.vercel.app/sitemap.xml

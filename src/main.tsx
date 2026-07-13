@@ -7,28 +7,26 @@ import { logWebCrash } from './lib/firebase.ts';
 // Catch and report unhandled runtime errors globally to Google Analytics
 try {
   window.addEventListener('error', (event) => {
-    let errorMsg = '';
     const errorObj = event.error;
-    if (errorObj && typeof errorObj === 'object') {
-      errorMsg = errorObj.message || errorObj.description || '';
-      if (!errorMsg || errorMsg === '[object Object]') {
-        try {
-          errorMsg = JSON.stringify(errorObj);
-        } catch (e) {
-          errorMsg = String(errorObj);
-        }
-      }
-    } else {
-      errorMsg = event.message || String(errorObj || '');
-    }
+    const msg = event.message || '';
+    const fullText = [
+      msg,
+      errorObj ? (errorObj.message || '') : '',
+      errorObj ? (errorObj.description || '') : '',
+      errorObj ? String(errorObj) : '',
+      errorObj && typeof errorObj === 'object' ? (errorObj.stack || '') : ''
+    ].join(' ').toLowerCase();
 
     if (
-      errorMsg.includes('installations/app-offline') || 
-      errorMsg.includes('installations/validation-failed') ||
-      errorMsg.includes('analytics/') ||
-      errorMsg.includes('App offline')
+      fullText.includes('installations/app-offline') ||
+      fullText.includes('installations/validation-failed') ||
+      fullText.includes('installations/') ||
+      fullText.includes('analytics/') ||
+      fullText.includes('app-offline') ||
+      fullText.includes('app offline') ||
+      fullText.includes('offline')
     ) {
-      // Ignore background firebase installations/analytics errors
+      // Ignore background firebase installations/analytics errors and prevent browser noise
       event.preventDefault();
       return;
     }
@@ -56,13 +54,22 @@ try {
       }
     }
 
+    const fullText = [
+      message,
+      code,
+      String(reason),
+      reason && typeof reason === 'object' ? (reason.stack || '') : ''
+    ].join(' ').toLowerCase();
+
     // Ignore harmless, non-fatal background Firebase installations/analytics offline errors
     if (
-      message.includes('installations/app-offline') ||
-      message.includes('installations/validation-failed') ||
-      code.includes('installations/') ||
-      message.includes('analytics/') ||
-      message.includes('App offline')
+      fullText.includes('installations/app-offline') ||
+      fullText.includes('installations/validation-failed') ||
+      fullText.includes('installations/') ||
+      fullText.includes('analytics/') ||
+      fullText.includes('app-offline') ||
+      fullText.includes('app offline') ||
+      fullText.includes('offline')
     ) {
       event.preventDefault(); // Prevent standard browser warning/noise
       return;

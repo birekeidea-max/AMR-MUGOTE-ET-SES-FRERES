@@ -47,11 +47,13 @@ try {
 export const logWebCrash = (error: any, context: string = "Non spécifié") => {
   let errMsg = "";
   let errCode = "";
+  let errStack = "";
 
   if (error) {
     if (typeof error === 'object') {
       errMsg = error.message || error.description || "";
       errCode = error.code || "";
+      errStack = error.stack || "";
       if (!errMsg || errMsg === '[object Object]') {
         try {
           errMsg = JSON.stringify(error);
@@ -64,15 +66,24 @@ export const logWebCrash = (error: any, context: string = "Non spécifié") => {
     }
   }
 
+  const fullText = [
+    errMsg,
+    errCode,
+    errStack,
+    String(error)
+  ].join(' ').toLowerCase();
+
   // Ignore harmless, non-fatal background Firebase installations/analytics offline/permission errors
   if (
-    errMsg.includes('installations/app-offline') ||
-    errMsg.includes('installations/validation-failed') ||
-    errCode.includes('installations/') ||
-    errMsg.includes('analytics/') ||
-    errMsg.includes('App offline')
+    fullText.includes('installations/app-offline') ||
+    fullText.includes('installations/validation-failed') ||
+    fullText.includes('installations/') ||
+    fullText.includes('analytics/') ||
+    fullText.includes('app-offline') ||
+    fullText.includes('app offline') ||
+    fullText.includes('offline')
   ) {
-    console.warn(`[Firebase Background Activity Suppressed]: ${errMsg} (${context})`);
+    console.warn(`[Firebase Background Activity Suppressed]: ${errMsg || String(error)} (${context})`);
     return;
   }
 
