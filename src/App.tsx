@@ -96,6 +96,7 @@ import UsersListView from './components/UsersListView';
 import LocalisationView from './components/LocalisationView';
 import DocumentScannerWidget from './components/DocumentScannerWidget';
 import JsonLdSchema from './components/JsonLdSchema';
+import FAQ from './components/FAQ';
 
 // --- Safe localStorage Polyfill for sandboxed iframe environments ---
 let safeLocalStorage: Storage;
@@ -3338,6 +3339,9 @@ function Home({ onBook, onNavigate, siteSettings, schedules }: { onBook: () => v
           ))}
         </div>
       </section>
+
+      {/* Foire Aux Questions (FAQ) */}
+      <FAQ />
     </motion.div>
   );
 }
