@@ -11,32 +11,44 @@ const JsonLdSchema: React.FC = () => {
     "logo": "https://amr-mugote-et-ses-freres.vercel.app/logo.png",
     "image": "https://amr-mugote-et-ses-freres.vercel.app/cover.jpg",
     "priceRange": "$$",
+    "telephone": ["+243994102673", "+243816680709"],
+    
+    // Point d'établissement principal (Siège / Point d'embarquement principal)
     "address": {
       "@type": "PostalAddress",
+      "streetAddress": "Avenue Michombero, Quartier Nkafu, Commune de Kadutu (En diagonale avec le marché Beach Muhazi)",
       "addressLocality": "Bukavu",
       "addressRegion": "Sud-Kivu",
       "addressCountry": "CD"
     },
-    "areaServed": [
+    
+    // Vos points de présence physiques
+    "location": [
       {
-        "@type": "AdministrativeArea",
-        "name": "Bukavu"
+        "@type": "Place",
+        "name": "AMR MUGOTE - Port de Bukavu (Beach Muhazi)",
+        "telephone": "+243994102673",
+        "address": {
+          "@type": "PostalAddress",
+          "streetAddress": "Avenue Michombero, Quartier Nkafu, Commune de Kadutu (En diagonale avec le marché Beach Muhazi)",
+          "addressLocality": "Bukavu",
+          "addressRegion": "Sud-Kivu",
+          "addressCountry": "CD"
+        }
       },
       {
-        "@type": "AdministrativeArea",
-        "name": "Goma"
-      },
-      {
-        "@type": "AdministrativeArea",
-        "name": "Lac Kivu"
+        "@type": "Place",
+        "name": "AMR MUGOTE - Port de Goma",
+        "telephone": "+243816680709",
+        "address": {
+          "@type": "PostalAddress",
+          "streetAddress": "Port de Goma",
+          "addressLocality": "Goma",
+          "addressRegion": "Nord-Kivu",
+          "addressCountry": "CD"
+        }
       }
-    ],
-    "offers": {
-      "@type": "Offer",
-      "description": "Réservation de billets de voyage par bateau rapide et grand bateau entre Bukavu et Goma",
-      "priceCurrency": "USD",
-      "areaServed": "Lac Kivu"
-    }
+    ]
   };
 
   return (
