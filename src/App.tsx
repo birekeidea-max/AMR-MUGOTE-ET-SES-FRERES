@@ -95,6 +95,7 @@ import { jsPDF } from 'jspdf';
 import UsersListView from './components/UsersListView';
 import LocalisationView from './components/LocalisationView';
 import DocumentScannerWidget from './components/DocumentScannerWidget';
+import JsonLdSchema from './components/JsonLdSchema';
 
 // --- Safe localStorage Polyfill for sandboxed iframe environments ---
 let safeLocalStorage: Storage;
@@ -1008,6 +1009,7 @@ export default function App() {
   if (!user && !verifyId) {
     return (
       <div className="min-h-screen bg-[#001233] flex flex-col justify-between font-sans relative overflow-hidden">
+        <JsonLdSchema />
         {/* Subtle grid pattern first */}
         <div className="absolute inset-0 grid-pattern pointer-events-none opacity-[0.05]"></div>
         
@@ -1034,6 +1036,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-bg flex flex-col font-sans relative">
+      <JsonLdSchema />
       <div className="absolute inset-0 grid-pattern pointer-events-none opacity-[0.05]"></div>
       
       {/* HEADER + NAV WRAPPER (SCROLLABLE WITH PAGE) */}
