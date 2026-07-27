@@ -305,41 +305,17 @@ export default function LocalisationView() {
                 </Map>
               </APIProvider>
             ) : (
-              /* Fallback GPS radar simulator and installation guide */
-              <div className="w-full h-full flex flex-col items-center justify-center p-8 text-center bg-radial from-slate-100 to-slate-200 relative text-[#001233]">
-                {/* Visual Compass Radar */}
-                <div className="relative mb-6">
-                  {/* Outer spinning ring */}
-                  <div className="w-36 h-36 rounded-full border-4 border-dashed border-[#001233]/20 flex items-center justify-center animate-spin-slow absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
-                  {/* Inner glowing core */}
-                  <div className="w-24 h-24 rounded-full bg-gold/10 border-4 border-gold text-gold flex items-center justify-center shadow-xl shadow-gold/10 relative">
-                    <Compass size={40} className="animate-pulse" />
-                  </div>
-                </div>
-
-                <div className="max-w-md space-y-4">
-                  <h3 className="text-lg font-black uppercase tracking-tight text-[#001233]">Boussole GPS active</h3>
-                  <p className="text-xs uppercase text-slate-500 tracking-wide font-medium leading-relaxed">
-                    Visualisation radar orientée vers le <span className="font-extrabold text-[#001233]">Port MUGOTE de Bukavu</span>.
-                  </p>
-                  
-                  {/* Distance bubble if GPS is loaded but maps API key is lacking */}
-                  {userLocation && distanceKm !== null ? (
-                    <div className="bg-gold/10 border border-gold/30 rounded-2xl p-4 text-center mt-2 max-w-sm mx-auto">
-                      <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">M/V MUGOTE RADAR</p>
-                      <p className="text-2xl font-black italic text-[#001233] mt-1">{distanceKm.toFixed(2)} KM</p>
-                      <p className="text-[9px] text-[#001233]/70 font-semibold uppercase mt-1">Vous vous séparez du point d'embarquement</p>
-                    </div>
-                  ) : (
-                    <p className="text-[10px] text-slate-400 italic">
-                      Activez votre localisation ci-contre pour afficher la boussole de guidage.
-                    </p>
-                  )}
-
-                  {/* Secret guidance badge */}
-                  <div className="inline-flex items-center gap-2 bg-slate-200/60 text-slate-600 font-extrabold text-[9px] uppercase px-3 py-1 rounded-lg border border-slate-300 mt-2">
-                    <Info size={10} /> Carte Google désactivée (Clé API manquante)
-                  </div>
+              /* Interactive OpenStreetMap View */
+              <div className="w-full h-full relative">
+                <iframe
+                  src="https://www.openstreetmap.org/export/embed.html?bbox=28.8400%2C-2.5050%2C28.8780%2C-2.4810&amp;layer=mapnik&amp;marker=-2.4930%2C28.8590"
+                  className="w-full h-full border-0"
+                  title="Carte Port AMR MUGOTE Bukavu"
+                  loading="lazy"
+                />
+                <div className="absolute top-3 right-3 bg-[#001233]/90 text-white backdrop-blur-md px-3 py-1.5 rounded-xl border border-white/20 text-[10px] font-black uppercase shadow-lg flex items-center gap-1.5">
+                  <MapPin size={12} className="text-gold" />
+                  <span>Port AMR MUGOTE - Beach Muhanzi</span>
                 </div>
               </div>
             )}
@@ -448,28 +424,7 @@ export default function LocalisationView() {
         </div>
       </div>
       
-      {/* Key Setup Instructions for Developers if key is missing */}
-      {!hasValidKey && (
-        <div className="bg-amber-50 rounded-2xl p-6 border border-amber-200 space-y-4">
-          <div className="flex gap-3 items-start">
-            <ShieldAlert className="text-amber-600 flex-shrink-0 mt-0.5" size={20} />
-            <div className="space-y-2">
-              <h4 className="text-xs sm:text-sm font-black uppercase text-amber-800">
-                Guide d'activation Google Maps
-              </h4>
-              <p className="text-[11px] text-amber-700 uppercase leading-relaxed font-semibold">
-                Pour débloquer la carte routière Google interactive en direct à Bukavu, l'administrateur système peut renseigner son jeton Maps :
-              </p>
-              <ol className="text-[11px] text-amber-600 uppercase list-decimal list-inside space-y-1 pl-1 font-bold">
-                <li>Générez une clé API sur Google Cloud console.</li>
-                <li>Ouvrez les Paramètres (l'icône engrenage en haut à droite).</li>
-                <li>Allez dans Secrets (Secrets) et ajoutez <code className="bg-amber-100 text-amber-900 px-1 py-0.5 rounded text-[10px]">GOOGLE_MAPS_PLATFORM_KEY</code> avec le jeton de sécurité.</li>
-                <li>L'application s'actualisera avec la carte satellite routière en temps réel !</li>
-              </ol>
-            </div>
-          </div>
-        </div>
-      )}
+
     </div>
   );
 }
