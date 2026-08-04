@@ -3162,14 +3162,20 @@ function Home({ onBook, onNavigate, siteSettings, schedules }: { onBook: () => v
                     </div>
 
                     {/* Content Section */}
-                    <div className="p-6 sm:p-8 space-y-4 text-center w-full">
-                      <h5 className="text-[#001233] text-xl sm:text-2xl font-black uppercase tracking-tight italic text-center">
-                        {item.title}
-                      </h5>
-                      <p className="text-slate-700 text-sm sm:text-base leading-relaxed whitespace-pre-line font-medium text-center max-w-2xl mx-auto">
-                        {item.processedDesc}
-                      </p>
-                    </div>
+                    {(item.title?.trim() || item.processedDesc?.trim()) && (
+                      <div className="p-6 sm:p-8 space-y-4 text-center w-full">
+                        {item.title?.trim() && (
+                          <h5 className="text-[#001233] text-xl sm:text-2xl font-black uppercase tracking-tight italic text-center">
+                            {item.title}
+                          </h5>
+                        )}
+                        {item.processedDesc?.trim() && (
+                          <p className="text-slate-700 text-sm sm:text-base leading-relaxed whitespace-pre-line font-medium text-center max-w-2xl mx-auto">
+                            {item.processedDesc}
+                          </p>
+                        )}
+                      </div>
+                    )}
 
                     {/* Media Attachments Section (Fully visible! Natural uncropped aspect ratios) */}
                     {hasMedia && (
@@ -4553,8 +4559,13 @@ function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlock
            l.includes('video') || l.includes('youtube.com') || l.includes('youtu.be') || l.includes('vimeo.com');
   };
 
-  const compressImage = (file: File, maxWidth: number = 1200, quality: number = 0.6): Promise<Blob> => {
+  const compressImage = (file: File, maxWidth: number = 2048, quality: number = 0.90): Promise<Blob> => {
     return new Promise((resolve) => {
+      // Keep original file if small (<1MB) or GIF to avoid unnecessary processing
+      if (file.type === 'image/gif' || file.size < 1000000) {
+        resolve(file);
+        return;
+      }
       const reader = new FileReader();
       reader.readAsDataURL(file);
       reader.onload = (event) => {
@@ -4566,19 +4577,26 @@ function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlock
           let height = img.height;
 
           if (width > maxWidth) {
-            height = (maxWidth / width) * height;
+            height = Math.round((maxWidth / width) * height);
             width = maxWidth;
           }
 
           canvas.width = width;
           canvas.height = height;
           const ctx = canvas.getContext('2d');
-          ctx?.drawImage(img, 0, 0, width, height);
+          if (ctx) {
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = 'high';
+            ctx.drawImage(img, 0, 0, width, height);
+          }
           canvas.toBlob((blob) => {
             if (blob) resolve(blob);
-          }, 'image/jpeg', quality);
+            else resolve(file);
+          }, file.type === 'image/png' ? 'image/png' : 'image/jpeg', quality);
         };
+        img.onerror = () => resolve(file);
       };
+      reader.onerror = () => resolve(file);
     });
   };
 
@@ -4594,18 +4612,18 @@ function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlock
     setPreviewUrls(prev => [...prev, ...newPreviews]);
 
     // 2. START UPLOADING IMMEDIATELY IN THE BACKGROUND
-    // This happens while the user is typing the title or description
+    // Crisp HD quality preservation for images
     incoming.forEach(async (file, idx) => {
       try {
         const path = `news/${Date.now()}_${idx}_${file.name.replace(/\s+/g, '_')}`;
         let blob: File | Blob = file;
         
-        // Ultra-fast aggressive compression for images only
+        // High quality preservation for photos (max width 2048, quality 0.90)
         if (file.type.startsWith('image/') && file.type !== 'image/gif') {
           try {
-            blob = await compressImage(file, 800, 0.4); // Very small for max speed
+            blob = await compressImage(file, 2048, 0.90);
           } catch (e) {
-            console.warn("Fast compression failed", e);
+            console.warn("HD compression fallback to original file", e);
           }
         }
         
@@ -5030,9 +5048,9 @@ function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlock
         }
       }
 
-      if (!newMedia.title && newMedia.media.length === 0 && !newMedia.url) {
+      if (!newMedia.title && newMedia.media.length === 0 && !newMedia.url && newMedia.pendingFiles.length === 0 && !newMedia.desc) {
           clearInterval(progressInterval);
-          alert("Veuillez sélectionner un fichier ou entrer un texte.");
+          alert("Veuillez sélectionner une photo, une vidéo ou entrer un texte.");
           setUploading(null);
           return;
       }
@@ -5046,8 +5064,8 @@ function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlock
       } else if (newMedia.url) {
         finalType = isVid(newMedia.url) ? 'video' : 'image';
       }
-      const finalTitle = newMedia.title || `Publication du ${new Date().toLocaleDateString()}`;
-      const finalDesc = newMedia.desc || '';
+      const finalTitle = newMedia.title ? newMedia.title.trim() : '';
+      const finalDesc = newMedia.desc ? newMedia.desc.trim() : '';
 
       const mediaData: any = {
         title: finalTitle,
@@ -5221,7 +5239,7 @@ function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlock
           const desc = data.desc || data.content || data.description || data.text || '';
           const url = data.processedUrl || data.url || data.videoUrl || data.imageUrl || data.image || data.video || data.contentUrl || '';
           
-          const isCorrupt = !title.trim() || (!url.trim() && !desc.trim());
+          const isCorrupt = !url.trim() && !desc.trim() && !title.trim();
           if (isCorrupt) {
             await deleteDoc(doc(db, 'news', document.id));
             deletedCount++;
@@ -6239,14 +6257,18 @@ function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlock
 
                     <div className="space-y-6 flex flex-col justify-between">
                       <div className="space-y-4">
+                        <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-4 text-[10px] font-extrabold text-amber-700 uppercase tracking-widest flex items-center gap-2">
+                          <span>💡</span>
+                          <span>Le titre et la description sont facultatifs. Vous pouvez publier uniquement votre photo ou vidéo !</span>
+                        </div>
                         <input 
-                          placeholder="Titre (ex: Mugote 2 à l'embarcadère)"
+                          placeholder="Titre (facultatif - ex: Mugote 2 au Port)"
                           value={newMedia.title}
                           onChange={e => setNewMedia({...newMedia, title: e.target.value})}
                           className="w-full px-8 py-5 bg-white border border-slate-100 rounded-[20px] focus:outline-none focus:ring-4 focus:ring-maritime/5 transition-all text-sm font-bold uppercase tracking-tight italic"
                         />
                         <textarea 
-                          placeholder="Écrivez une description ou un message ici..."
+                          placeholder="Description ou message (facultatif)..."
                           value={newMedia.desc}
                           onChange={e => setNewMedia({...newMedia, desc: e.target.value})}
                           className="w-full px-8 py-6 bg-white border border-slate-100 rounded-[24px] focus:outline-none focus:ring-4 focus:ring-maritime/5 transition-all text-sm font-medium leading-relaxed resize-none h-40"
@@ -6907,8 +6929,12 @@ function NewsView() {
               <div className="p-8 flex-1 flex flex-col justify-between w-full items-center">
                 <div className="space-y-4 w-full flex flex-col items-center">
                   <span className="text-[9px] font-extrabold uppercase tracking-[0.3em] text-gold block text-center">{n.processedType === 'text' ? 'Actualité' : n.processedType === 'image' ? 'Photo' : 'Vidéo'}</span>
-                  <h3 className="text-xl font-extrabold tracking-tighter leading-none text-white group-hover:text-gold transition-colors italic text-center mx-auto">{n.title}</h3>
-                  <p className="text-white/60 text-xs font-medium leading-relaxed text-center mx-auto max-w-md">{n.processedDesc}</p>
+                  {n.title?.trim() && (
+                    <h3 className="text-xl font-extrabold tracking-tighter leading-none text-white group-hover:text-gold transition-colors italic text-center mx-auto">{n.title}</h3>
+                  )}
+                  {n.processedDesc?.trim() && (
+                    <p className="text-white/60 text-xs font-medium leading-relaxed text-center mx-auto max-w-md">{n.processedDesc}</p>
+                  )}
                   <div className="flex flex-wrap items-center justify-center gap-4 text-[9px] font-black uppercase tracking-widest text-white/30 pt-4 border-t border-white/5 w-full">
                     <span className="flex items-center gap-1.5"><Eye size={12} className="text-gold" /> {n.views || 0} vues</span>
                     <MediaLikes newsId={n.id} initialLikes={n.likes || 0} />

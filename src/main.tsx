@@ -35,6 +35,9 @@ try {
       fullText.includes('storage/') ||
       fullText.includes('auth/') ||
       fullText.includes('istrusted') ||
+      fullText.includes('websocket') ||
+      fullText.includes('vite') ||
+      fullText.includes('closed without opened') ||
       !msg
     ) {
       // Ignore background firebase installations/analytics errors and prevent browser noise
@@ -99,7 +102,10 @@ try {
       fullText.includes('failed-precondition') ||
       fullText.includes('storage/') ||
       fullText.includes('auth/') ||
-      fullText.includes('istrusted')
+      fullText.includes('istrusted') ||
+      fullText.includes('websocket') ||
+      fullText.includes('vite') ||
+      fullText.includes('closed without opened')
     ) {
       event.preventDefault(); // Prevent standard browser warning/noise
       return;
