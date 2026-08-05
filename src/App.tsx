@@ -5152,7 +5152,7 @@ function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlock
                 <label className="block text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1 ml-1">Adresse E-mail Administrative</label>
                 <input 
                   type="email"
-                  placeholder="birekeidea@gmail.com"
+                  placeholder="admin@domaine.com"
                   value={adminEmailInput}
                   onChange={e => setAdminEmailInput(e.target.value)}
                   className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:border-emerald-500 text-sm font-bold"
