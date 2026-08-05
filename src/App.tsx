@@ -4052,513 +4052,238 @@ function Booking({ onReserved, user, onLoginRequest }: { onReserved: (res: Reser
 }
 
 function Payment({ reservation, onComplete, siteSettings }: { reservation: Reservation | null, onComplete: () => void, siteSettings: any }) {
-  const [step, setStep] = useState<'processing' | 'stk-input' | 'stk-validating' | 'success'>('processing');
-  const [pin, setPin] = useState('');
-  const [momoTransactionId, setMomoTransactionId] = useState('');
-  const [generatedTicketId, setGeneratedTicketId] = useState('');
-  const [errorLocal, setErrorLocal] = useState<string | null>(null);
-  const [secRemaining, setSecRemaining] = useState(3);
+  const [liveRes, setLiveRes] = useState<Reservation | null>(reservation);
 
-  if (!reservation) return null;
-
-  // Sync / default operator styling
-  const operatorName = reservation.momoOperator || 'M-Pesa';
-  const operatorColors: Record<string, { bg: string, text: string, accent: string }> = {
-    'M-Pesa': { bg: 'bg-[#E11B22]', text: 'text-white', accent: 'bg-[#C11016]' },
-    'Airtel Money': { bg: 'bg-[#FF0000]', text: 'text-white', accent: 'bg-[#CC0000]' },
-    'Orange Money': { bg: 'bg-[#F28500]', text: 'text-black', accent: 'bg-[#E07400]' }
-  };
-  const currentOpStyle = operatorColors[operatorName] || { bg: 'bg-slate-800', text: 'text-white', accent: 'bg-slate-900' };
-
-  // Timer loop for processing state at the beginning
   useEffect(() => {
-    if (step === 'processing') {
-      const interval = setInterval(() => {
-        setSecRemaining((prev) => {
-          if (prev <= 1) {
-            clearInterval(interval);
-            setStep('stk-input');
-            return 3;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-      return () => clearInterval(interval);
-    }
-  }, [step]);
-
-  const handleKeyClick = (num: string) => {
-    setErrorLocal(null);
-    if (pin.length < 6) {
-      setPin(prev => prev + num);
-    }
-  };
-
-  const handleBackspace = () => {
-    setPin(prev => prev.slice(0, -1));
-  };
-
-  const handleStkSubmit = async () => {
-    if (pin.length < 4) {
-      setErrorLocal("Veuillez saisir votre code secret Momo (4 chiffres minimum).");
-      return;
-    }
-
-    setStep('stk-validating');
-    setErrorLocal(null);
-
-    try {
-      // 1. Generate unique local operator reference ID
-      const localRef = `MOM-${operatorName.substring(0,3).toUpperCase()}-${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
-      setMomoTransactionId(localRef);
-
-      // 2. Generate unique Ticket ID with strict loop checking in Firestore
-      let uniqueTicketId = '';
-      let isUnique = false;
-      let attempts = 0;
-
-      while (!isUnique && attempts < 15) {
-        const randomHex = Math.random().toString(36).substring(2, 8).toUpperCase();
-        uniqueTicketId = `AMR-${randomHex}`;
-        const q = query(collection(db, 'reservations'), where('ticketId', '==', uniqueTicketId));
-        const qSnap = await getDocs(q);
-        if (qSnap.empty) {
-          isUnique = true;
-        }
-        attempts++;
+    if (!reservation?.id) return;
+    const docRef = doc(db, 'reservations', reservation.id);
+    const unsubscribe = onSnapshot(docRef, (snapshot) => {
+      if (snapshot.exists()) {
+        setLiveRes({ ...snapshot.data() as Reservation, id: snapshot.id });
       }
+    }, (err) => {
+      console.warn("Realtime listener error on reservation:", err);
+    });
+    return unsubscribe;
+  }, [reservation?.id]);
 
-      if (!uniqueTicketId) {
-        uniqueTicketId = `AMR-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
-      }
+  if (!liveRes) return null;
 
-      setGeneratedTicketId(uniqueTicketId);
-
-      // 3. Update reservation document status directly to VALIDATED
-      const docRef = doc(db, 'reservations', reservation.id!);
-      await updateDoc(docRef, {
-        status: 'VALIDATED',
-        ticketId: uniqueTicketId,
-        transactionId: localRef,
-        validatedAt: Date.now(),
-        momoOperator: operatorName
-      });
-
-      // 4. Trigger automatic background ticket download for optimal UX!
-      const updatedRes: Reservation = {
-        ...reservation,
-        status: 'VALIDATED',
-        ticketId: uniqueTicketId,
-        transactionId: localRef,
-        momoOperator: operatorName
-      };
-      
-      try {
-        await generateTicket(updatedRes, siteSettings || { homeBg: '' });
-      } catch (err) {
-        console.warn("Could not auto-trigger ticket PDF generation:", err);
-      }
-
-      setStep('success');
-    } catch (err: any) {
-      console.error("Simulation database update error:", err);
-      setErrorLocal(err.message || "Erreur lors de la validation du paiement.");
-      setStep('stk-input');
-    }
-  };
+  const currentRes = liveRes;
+  const isPending = currentRes.status === 'PENDING';
+  const isValidated = currentRes.status === 'VALIDATED';
+  const isRejected = currentRes.status === 'REJECTED';
 
   return (
     <motion.div 
       initial={{ opacity: 0, scale: 0.98 }}
       animate={{ opacity: 1, scale: 1 }}
-      className="max-w-4xl mx-auto px-4 py-6"
+      className="max-w-4xl mx-auto px-4 py-8 space-y-8 text-left"
     >
       <AnimatePresence mode="wait">
         
-        {/* Step 1: Processing */}
-        {step === 'processing' && (
+        {/* CASE 1: PENDING VALIDATION SCREEN */}
+        {isPending && (
           <motion.div 
-            key="processing"
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
+            key="pending"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
-            className="bg-slate-900 border border-slate-800 rounded-[35px] sm:rounded-[50px] p-8 sm:p-16 text-center text-white space-y-8 shadow-2xl relative overflow-hidden"
+            className="bg-white rounded-[32px] sm:rounded-[40px] border border-slate-200 shadow-2xl p-6 sm:p-10 space-y-8 relative overflow-hidden"
           >
-            <div className="absolute top-0 right-0 w-80 h-80 bg-gold/10 rounded-full blur-3xl pointer-events-none" />
-            <div className="absolute -bottom-10 -left-10 w-80 h-80 bg-maritime/20 rounded-full blur-3xl pointer-events-none" />
+            {/* Top accent bar */}
+            <div className="absolute top-0 left-0 w-full h-3 bg-gradient-to-r from-amber-500 via-gold to-amber-600 animate-pulse" />
 
-            <div className="relative z-10 space-y-8 max-w-lg mx-auto">
-              <div className="w-24 h-24 bg-white/5 rounded-3xl border border-white/10 flex items-center justify-center mx-auto shadow-xl">
-                <div className="relative">
-                  <div className="absolute inset-0 rounded-full border-4 border-gold/30" />
-                  <div className="w-12 h-12 rounded-full border-4 border-gold border-t-transparent animate-spin" />
-                </div>
+            {/* Header Badge & Title */}
+            <div className="flex flex-col sm:flex-row items-center sm:items-start gap-5 border-b border-slate-100 pb-6 text-center sm:text-left">
+              <div className="w-16 h-16 sm:w-20 sm:h-20 bg-amber-50 text-amber-600 rounded-3xl border border-amber-200 flex items-center justify-center shrink-0 shadow-lg shadow-amber-500/10">
+                <Clock size={36} className="animate-spin" style={{ animationDuration: '8s' }} />
               </div>
-
-              <div className="space-y-3">
-                <span className="text-gold text-[10px] font-black tracking-[0.4em] uppercase">PASSERELLE DE PAIEMENT</span>
-                <h3 className="text-2xl sm:text-4xl font-black uppercase tracking-tighter italic leading-none">INITIATION DU PAIEMENT</h3>
-                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest leading-relaxed">
-                  Appel de l'API de l'opérateur <span className="text-gold font-black">{operatorName}</span> pour le numéro <span className="text-white font-black">{reservation.phone}</span>...
-                </p>
-              </div>
-
-              <div className="space-y-2 bg-white/[0.03] border border-white/10 rounded-2xl p-4 sm:p-6 text-left">
-                <div className="flex justify-between text-[10px] font-black uppercase text-slate-400">
-                  <span>Opérateur</span>
-                  <span className="text-white">{operatorName}</span>
+              <div className="space-y-2">
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-50 border border-amber-200 text-amber-700 text-[10px] font-black uppercase tracking-widest">
+                  <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping" />
+                  ⏳ Demande de réservation enregistrée
                 </div>
-                <div className="h-px bg-white/5 my-2" />
-                <div className="flex justify-between text-[10px] font-black uppercase text-slate-400">
-                  <span>Numéro</span>
-                  <span className="text-white font-mono">{reservation.phone}</span>
-                </div>
-                <div className="h-px bg-white/5 my-2" />
-                <div className="flex justify-between text-[10px] font-black uppercase text-slate-400">
-                  <span>Montant</span>
-                  <span className="text-gold font-mono">{reservation.amount}.00$</span>
-                </div>
-              </div>
-
-              <div className="pt-4 flex items-center justify-center gap-3">
-                <div className="w-2 h-2 bg-gold rounded-full animate-ping" />
-                <p className="text-[9px] font-black tracking-[0.3em] uppercase text-white/50">
-                  Affichage du push sur votre écran dans {secRemaining}s...
+                <h2 className="text-2xl sm:text-3xl font-black text-[#001233] uppercase tracking-tight italic leading-tight">
+                  En Attente de Validation par l'Administration
+                </h2>
+                <p className="text-xs sm:text-sm font-medium text-slate-600">
+                  Merci <span className="font-bold text-black">{currentRes.fullName} {currentRes.lastName}</span> ! Votre réservation a été soumise avec succès.
                 </p>
               </div>
             </div>
-          </motion.div>
-        )}
 
-        {/* Step 2: Smartphone STK Push Input Screen */}
-        {step === 'stk-input' && (
-          <motion.div 
-            key="stk-input"
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95 }}
-            className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center"
-          >
-            {/* Left Column: Explanatory Context Card */}
-            <div className="lg:col-span-5 space-y-6 text-left">
-              <div className="space-y-2">
-                <span className="text-slate-400 text-[10px] font-black tracking-[0.3em] uppercase block">SIMULATEUR SÉCURISÉ</span>
-                <h2 className="text-2xl sm:text-4xl font-black text-maritime uppercase tracking-tighter leading-none italic">
-                  CONTRÔLE DE SÉCURITÉ OPÉRATEUR
-                </h2>
-                <div className="h-1.5 w-16 bg-gold rounded-full" />
+            {/* Main Explanation Box regarding Network Operator Keys & Manual Transfer Verification */}
+            <div className="bg-[#001233] text-white p-6 sm:p-8 rounded-3xl border-2 border-gold/40 shadow-xl space-y-5 relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-64 h-64 bg-gold/5 rounded-full blur-3xl pointer-events-none" />
+
+              <div className="flex items-center gap-3 text-gold">
+                <AlertCircle size={22} className="shrink-0" />
+                <h4 className="text-sm sm:text-base font-black uppercase tracking-wider italic">
+                  Instruction de Confirmation du Virement Mobile
+                </h4>
               </div>
 
-              <p className="text-xs font-medium text-slate-600 leading-relaxed uppercase">
-                Pour des questions de sécurité et de simplification, vous devez valider la requête de paiement STK / PUSH reçue sur la carte SIM de votre téléphone. 
+              <p className="text-xs sm:text-sm font-medium text-slate-200 leading-relaxed">
+                Les clés automatiques des opérateurs réseau étant en cours d'intégration, la validation de votre billet est effectuée **manuellement par l'administrateur** après vérification de votre virement sur l'un de nos numéros officiels :
               </p>
 
-              <div className="p-4 bg-indigo-50 border border-indigo-100 rounded-2xl space-y-3">
-                <h4 className="text-[10px] font-black text-[#001233] uppercase tracking-wider flex items-center gap-2">
-                  <Smartphone size={14} className="text-[#001233]" /> COMMENT PROCÉDER ?
-                </h4>
-                <ul className="space-y-1.5 text-[9px] font-bold text-indigo-900 list-disc list-inside leading-relaxed uppercase">
-                  <li>Regardez le simulateur de smartphone à droite.</li>
-                  <li>Une boîte de dialogue de paiement PIN s'est ouverte.</li>
-                  <li>Saisissez votre code PIN secret sur le clavier virtuel.</li>
-                  <li>Cliquez sur "CONFIRMER LES FONDS".</li>
-                </ul>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+                <div className="bg-white/10 p-4 rounded-2xl border border-white/15 space-y-2">
+                  <div className="flex justify-between items-center text-[10px] font-black text-rose-400 uppercase tracking-widest">
+                    <span>Airtel Money & Orange Money</span>
+                    <span className="bg-rose-500/20 text-rose-300 px-2 py-0.5 rounded-full text-[8px]">Numéro Officiel</span>
+                  </div>
+                  <p className="text-lg sm:text-xl font-black font-mono text-white tracking-wider">
+                    +243 994 102 673
+                  </p>
+                  <p className="text-[9px] text-white/60 font-medium">Transférez le montant exact en indiquant votre nom en motif.</p>
+                </div>
+
+                <div className="bg-white/10 p-4 rounded-2xl border border-white/15 space-y-2">
+                  <div className="flex justify-between items-center text-[10px] font-black text-emerald-400 uppercase tracking-widest">
+                    <span>Vodacom M-Pesa</span>
+                    <span className="bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-full text-[8px]">Numéro Officiel</span>
+                  </div>
+                  <p className="text-lg sm:text-xl font-black font-mono text-white tracking-wider">
+                    +243 816 680 709
+                  </p>
+                  <p className="text-[9px] text-white/60 font-medium">Transférez le montant exact en indiquant votre nom en motif.</p>
+                </div>
               </div>
 
-              {errorLocal && (
-                <div className="p-4 bg-rose-50 border border-rose-100 rounded-2xl text-rose-600 text-[10px] font-black uppercase tracking-wide">
-                  {errorLocal}
-                </div>
-              )}
+              {/* Real-time sync note */}
+              <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-4 flex items-center gap-3 text-amber-200 text-xs font-medium">
+                <div className="w-3 h-3 bg-emerald-500 rounded-full animate-ping shrink-0" />
+                <span>
+                  **Mise à jour en direct** : Gardez cette page ouverte ou consultez votre section <strong>"Mes Billets"</strong>. Dès la confirmation du virement par la direction, votre billet officiel avec QR code sera immédiatement débloqué.
+                </span>
+              </div>
             </div>
 
-            {/* Right Column: Visual Interactive Physical Smartphone Mockup */}
-            <div className="lg:col-span-7 flex justify-center">
-              <div className="w-[330px] h-[670px] bg-slate-900 rounded-[50px] p-3 shadow-2xl border-4 border-slate-700 relative flex flex-col overflow-hidden">
-                
-                {/* Camera punch-hole notch */}
-                <div className="absolute top-4 left-1/2 -translate-x-1/2 w-20 h-5 bg-black rounded-full z-30 flex items-center justify-center">
-                  <div className="w-3.5 h-3.5 rounded-full bg-slate-900 border border-slate-800" />
+            {/* Recap Table */}
+            <div className="bg-slate-50 rounded-2xl p-6 border border-slate-200 space-y-4">
+              <h5 className="text-xs font-black uppercase text-slate-400 tracking-widest">Récapitulatif de la Réservation</h5>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-xs font-bold text-slate-800">
+                <div>
+                  <span className="text-[9px] font-black text-slate-400 uppercase block">Passager</span>
+                  <p className="text-sm font-black text-[#001233]">{currentRes.fullName} {currentRes.lastName}</p>
                 </div>
-
-                {/* Speaker mesh & buttons decoratives */}
-                <div className="absolute top-1 left-1/2 -translate-x-1/2 w-12 h-1 bg-slate-700 rounded-full" />
-                <div className="absolute -left-1 top-24 w-1 h-12 bg-slate-800 rounded-r-md" />
-                <div className="absolute -left-1 top-40 w-1 h-12 bg-slate-800 rounded-r-md" />
-                <div className="absolute -right-1 top-32 w-1 h-16 bg-slate-800 rounded-l-md" />
-
-                {/* Phone screen canvas */}
-                <div className="flex-1 bg-slate-950 rounded-[42px] overflow-hidden border border-slate-800 relative p-4 flex flex-col justify-between pt-10">
-                  
-                  {/* Smartphone top status bar bar */}
-                  <div className="flex justify-between items-center text-[9px] font-black text-slate-300 font-mono px-3 absolute top-3 left-0 w-full z-25">
-                    <span>12:24</span>
-                    <div className="flex items-center gap-1.5">
-                      <span>4G LTE</span>
-                      <div className="w-5 h-2.5 bg-slate-400 rounded-sm relative p-0.5">
-                        <div className="w-full h-full bg-slate-300 rounded-xs" />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Operator branding background header */}
-                  <div className={cn("p-4 rounded-3xl mt-4 text-center space-y-1 py-6", currentOpStyle.bg, currentOpStyle.text)}>
-                    <p className="text-[8px] font-black uppercase tracking-[0.2em] opacity-80">SÉCURISÉ PAR</p>
-                    <h4 className="text-lg font-black tracking-tighter italic uppercase">{operatorName} Payment Gateway</h4>
-                  </div>
-
-                  {/* STK Push simulated USSD dialog */}
-                  <div className="my-auto bg-slate-800/95 border border-slate-700 rounded-3xl p-5 shadow-2xl text-left space-y-4">
-                    <div className="flex justify-between items-center text-[8px] font-black text-gold uppercase tracking-wider">
-                      <span>Message Réseau SIM</span>
-                      <span className="font-mono text-white/50">{reservation.momoOperator} STK v2.1</span>
-                    </div>
-
-                    <div className="h-px bg-slate-700" />
-
-                    <p className="text-[10px] font-bold text-white uppercase leading-normal tracking-wide">
-                      Souhaitez-vous payer le montant de <span className="text-gold font-black font-mono">{reservation.amount}.00 USD</span> pour votre billet electronique chez AMR MUGOTE ?
-                    </p>
-
-                    <div className="space-y-2 text-center pt-2">
-                      <p className="text-[8px] text-slate-400 font-black uppercase">Entrez votre code secret</p>
-                      
-                      {/* Password dots panel */}
-                      <div className="flex justify-center gap-3">
-                        {[0, 1, 2, 3, 4, 5].map((idx) => (
-                          <div key={idx} className="w-8 h-8 rounded-xl bg-slate-900 border border-slate-700 flex items-center justify-center font-bold text-lg text-gold font-mono">
-                            {pin.length > idx ? "•" : ""}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Realistic Touch Button Keypad panel */}
-                  <div className="space-y-2 pb-2">
-                    <div className="grid grid-cols-3 gap-2 justify-center max-w-[240px] mx-auto">
-                      {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((key) => (
-                        <button
-                          key={key}
-                          type="button"
-                          onClick={() => handleKeyClick(key)}
-                          className="w-12 h-12 rounded-full bg-slate-800 hover:bg-slate-700 active:scale-95 transition-all flex items-center justify-center font-black text-white text-base font-mono border border-slate-700 shadow-md"
-                        >
-                          {key}
-                        </button>
-                      ))}
-                      
-                      {/* Left: Back / Clear button */}
-                      <button
-                        type="button"
-                        onClick={handleBackspace}
-                        className="w-12 h-12 rounded-full bg-slate-900 hover:bg-rose-950/20 active:scale-95 transition-all text-xs font-black text-rose-500 uppercase font-sans border border-rose-950/40"
-                      >
-                        EFFACER
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => handleKeyClick('0')}
-                        className="w-12 h-12 rounded-full bg-slate-800 hover:bg-slate-700 active:scale-95 transition-all flex items-center justify-center font-black text-white text-base font-mono border border-slate-700"
-                      >
-                        0
-                      </button>
-
-                      {/* Right: Validation confirmation button */}
-                      <button
-                        type="button"
-                        onClick={handleStkSubmit}
-                        className="w-12 h-12 rounded-full bg-emerald-700 hover:bg-emerald-600 active:scale-95 transition-all text-[8px] font-black text-white uppercase leading-none font-sans shadow-lg shadow-emerald-950/40"
-                      >
-                        VALIDER
-                      </button>
-                    </div>
-
-                    <div className="text-center pt-2">
-                      <p className="text-[6px] font-black text-slate-500 uppercase tracking-[0.3em]">Simulation Physique AMR-TECH</p>
-                    </div>
-                  </div>
-
+                <div>
+                  <span className="text-[9px] font-black text-slate-400 uppercase block">Trajet & Navire</span>
+                  <p className="text-sm font-extrabold text-maritime">{currentRes.itinerary} ({currentRes.ship})</p>
+                </div>
+                <div>
+                  <span className="text-[9px] font-black text-slate-400 uppercase block">Classe & Places</span>
+                  <p className="text-sm font-extrabold">{currentRes.travelClass} ({currentRes.passengersCount} place(s))</p>
+                </div>
+                <div>
+                  <span className="text-[9px] font-black text-slate-400 uppercase block">Date de Voyage</span>
+                  <p className="text-sm font-extrabold">{currentRes.travelDate}</p>
+                </div>
+                <div>
+                  <span className="text-[9px] font-black text-slate-400 uppercase block">Téléphone Déclaré</span>
+                  <p className="text-sm font-mono text-slate-700">{currentRes.phone}</p>
+                </div>
+                <div>
+                  <span className="text-[9px] font-black text-slate-400 uppercase block">Montant à Verser</span>
+                  <p className="text-base font-black text-emerald-600 font-mono">{currentRes.amount}.00 $</p>
                 </div>
               </div>
+            </div>
+
+            {/* Navigation Buttons */}
+            <div className="flex flex-col sm:flex-row gap-4 pt-2">
+              <button
+                onClick={onComplete}
+                className="flex-1 py-4 bg-[#001233] hover:bg-slate-900 text-white font-black uppercase tracking-widest rounded-2xl transition-all text-xs flex items-center justify-center gap-2 shadow-lg"
+              >
+                <Ticket size={16} />
+                Accéder à mon Espace Billets
+              </button>
             </div>
           </motion.div>
         )}
 
-        {/* Step 3: STK validating spinner progress */}
-        {step === 'stk-validating' && (
+        {/* CASE 2: VALIDATED SCREEN */}
+        {isValidated && (
           <motion.div 
-            key="stk-validating"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="bg-slate-900 border border-slate-800 rounded-[50px] p-16 text-center text-white space-y-8 shadow-2xl"
+            key="validated"
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-white rounded-[32px] sm:rounded-[40px] border border-emerald-200 shadow-2xl p-8 sm:p-12 text-center space-y-8 relative overflow-hidden"
           >
-            <div className="max-w-md mx-auto space-y-6">
-              <div className="w-20 h-20 bg-slate-800 border border-slate-700 rounded-3xl flex items-center justify-center mx-auto shadow-xl">
-                <div className="w-10 h-10 border-4 border-gold border-t-transparent rounded-full animate-spin" />
-              </div>
-              <div className="space-y-3">
-                <span className="text-gold text-[10px] font-black tracking-[0.4em] uppercase">VÉRIFICATION</span>
-                <h3 className="text-2xl font-black uppercase tracking-tighter italic">TRAITEMENT EN COURS</h3>
-                <p className="text-xs text-slate-400 font-bold leading-relaxed uppercase">
-                  Contact de l'opérateur mobile pour le débit instantané des fonds. Votre billet est en cours d'écriture dans la base de données...
-                </p>
-              </div>
+            <div className="absolute top-0 left-0 w-full h-3 bg-emerald-500" />
+            
+            <div className="w-20 h-20 bg-emerald-50 text-emerald-500 rounded-3xl border border-emerald-200 flex items-center justify-center mx-auto shadow-inner">
+              <CheckCircle size={48} className="animate-bounce" />
+            </div>
+
+            <div className="space-y-2">
+              <span className="text-emerald-600 text-[10px] font-black tracking-[0.4em] uppercase block">
+                PAIEMENT CONFIRMÉ PAR L'ADMINISTRATION
+              </span>
+              <h2 className="text-2xl sm:text-4xl font-black text-maritime uppercase tracking-tight italic italic">
+                VOTRE BILLET ÉLECTRONIQUE EST PRÊT !
+              </h2>
+              <p className="text-xs sm:text-sm font-medium text-slate-600 max-w-lg mx-auto">
+                L'administration Mugote a validé votre virement. Votre billet officiel numéro <span className="font-mono font-bold text-black">{currentRes.ticketId}</span> est actif.
+              </p>
+            </div>
+
+            {/* Ticket download action */}
+            <div className="max-w-md mx-auto space-y-4 pt-4">
+              <button
+                onClick={async () => {
+                  await generateTicket(currentRes, siteSettings);
+                }}
+                className="w-full py-5 bg-gold hover:bg-[#e0b400] text-maritime hover:scale-[1.01] active:scale-95 font-black uppercase tracking-[0.2em] rounded-2xl shadow-xl transition-all text-xs flex items-center justify-center gap-3"
+              >
+                <Download size={18} />
+                Télécharger Mon Billet PDF Officiel
+              </button>
+
+              <button
+                onClick={onComplete}
+                className="w-full py-4 bg-[#001233] hover:bg-slate-900 text-white font-black uppercase tracking-widest rounded-2xl transition-all text-xs flex items-center justify-center gap-2"
+              >
+                <Ticket size={16} />
+                Voir dans Mes Billets
+              </button>
             </div>
           </motion.div>
         )}
 
-        {/* Step 4: SUCCESS Boarding Pass & Automatic Ticket PDF */}
-        {step === 'success' && (
+        {/* CASE 3: REJECTED SCREEN */}
+        {isRejected && (
           <motion.div 
-            key="success"
-            className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start text-left"
+            key="rejected"
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-white rounded-[32px] sm:rounded-[40px] border border-rose-200 shadow-2xl p-8 sm:p-12 text-center space-y-6 relative overflow-hidden"
           >
-            {/* Left column: Ticket validation board */}
-            <div className="lg:col-span-7 space-y-6">
-              <div className="bg-white rounded-[35px] border border-slate-200 shadow-xl p-8 sm:p-10 text-center space-y-6 relative overflow-hidden">
-                <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-emerald-500 via-gold to-maritime" />
-                
-                <div className="w-20 h-20 bg-emerald-50 text-emerald-500 rounded-3xl flex items-center justify-center mx-auto shadow-inner">
-                  <CheckCircle size={44} className="animate-bounce" />
-                </div>
-
-                <div className="space-y-2">
-                  <span className="text-emerald-600 text-[10px] font-black tracking-[0.4em] uppercase block">PAIEMENT REÇU & CONFIRMÉ</span>
-                  <h2 className="text-2xl sm:text-3xl font-black text-maritime uppercase tracking-tighter italic leading-none">
-                    TRANSACTION VALIDÉE AVEC SUCCÈS
-                  </h2>
-                </div>
-
-                <div className="p-4 bg-emerald-50/60 border border-emerald-100 rounded-2xl text-[10px] sm:text-xs font-medium text-emerald-900 leading-relaxed uppercase max-w-md mx-auto">
-                  Votre codesecret a été accepté et les fonds ont été confirmés. Votre billet valide avec QR code a été enregistré directement sur cet appareil !
-                </div>
-
-                <div className="space-y-4 pt-4">
-                  {/* Action 1: Real PDF download button */}
-                  <button
-                    onClick={async () => {
-                      const finalRes: Reservation = {
-                        ...reservation,
-                        status: 'VALIDATED',
-                        ticketId: generatedTicketId,
-                        transactionId: momoTransactionId,
-                        momoOperator: operatorName
-                      };
-                      await generateTicket(finalRes, siteSettings);
-                    }}
-                    className="w-full py-5 bg-gold hover:bg-[#e0b400] text-maritime hover:scale-[1.01] active:scale-95 font-black uppercase tracking-[0.25em] rounded-2xl shadow-lg transition-all text-xs flex items-center justify-center gap-3"
-                  >
-                    <Download size={16} />
-                    Télécharger le Billet (PDF)
-                  </button>
-
-                  {/* Action 2: Navigate dashboard */}
-                  <button
-                    onClick={onComplete}
-                    className="w-full py-4 bg-[#001233] hover:bg-slate-900 text-white font-black uppercase tracking-[0.2em] rounded-2xl transition-all text-[11px] flex items-center justify-center gap-2"
-                  >
-                    <Ticket size={14} />
-                    Accéder à mon espace Billets
-                  </button>
-                </div>
-              </div>
+            <div className="w-16 h-16 bg-rose-50 text-rose-500 rounded-3xl border border-rose-200 flex items-center justify-center mx-auto">
+              <XCircle size={40} />
             </div>
 
-            {/* Right column: High-fidelity interactive Boarding Pass Printable component view */}
-            <div className="lg:col-span-5 flex justify-center">
-              <div className="w-[340px] bg-[#001233] rounded-[30px] shadow-2xl relative overflow-hidden text-white border border-white/10 flex flex-col justify-between">
-                
-                {/* Visual Glass highlights */}
-                <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full blur-2xl pointer-events-none" />
-                <div className="absolute inset-0 bg-gradient-to-b from-white/[0.04] to-transparent pointer-events-none" />
-
-                {/* Top sector */}
-                <div className="p-6 space-y-6 relative z-10">
-                  <div className="flex justify-between items-center">
-                    <div>
-                      <p className="text-[7px] font-black text-gold uppercase tracking-widest leading-none">Billet Électronique</p>
-                      <h4 className="text-sm font-black uppercase tracking-tighter italic">AMR MUGOTE</h4>
-                    </div>
-                    <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center border border-white/20">
-                      <Anchor size={14} className="text-gold" />
-                    </div>
-                  </div>
-
-                  <div className="space-y-4">
-                    {/* Itinerary lines direction */}
-                    <div className="flex justify-between items-center bg-white/5 p-4 rounded-2xl border border-white/5">
-                      <div>
-                        <p className="text-[7px] font-black text-white/50 uppercase">DE / FROM</p>
-                        <p className="text-xl font-black uppercase tracking-tighter">{reservation.itinerary.split('-')[0]}</p>
-                      </div>
-                      <div className="text-center font-bold text-gold text-xs px-2 animate-pulse">⚓</div>
-                      <div className="text-right">
-                        <p className="text-[7px] font-black text-white/50 uppercase">À / TO</p>
-                        <p className="text-xl font-black uppercase tracking-tighter">{reservation.itinerary.split('-')[1] || 'Goma'}</p>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4 text-left">
-                      <div>
-                        <p className="text-[7px] font-black text-white/40 uppercase">PASSAGER / CLIENT</p>
-                        <p className="text-xs font-black uppercase truncate">{reservation.fullName}</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-[7px] font-black text-white/40 uppercase">CLASSE / CLASS</p>
-                        <p className="text-xs font-black text-gold uppercase leading-normal">{reservation.travelClass}</p>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4 text-left border-t border-white/5 pt-3">
-                      <div>
-                        <p className="text-[7px] font-black text-white/40 uppercase">SIÈGES / ADULT(S)</p>
-                        <p className="text-xs font-black font-mono">{reservation.passengersCount}x Billet(s)</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-[7px] font-black text-white/40 uppercase">STATUT BILLET</p>
-                        <span className="inline-block px-2 py-0.5 bg-emerald-500/20 border border-emerald-500/40 text-[9px] font-black text-emerald-400 uppercase rounded">VALIDÉ</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Separation cutouts mimicking real tickets */}
-                <div className="flex items-center justify-between px-0 relative my-2">
-                  <div className="w-5 h-10 bg-[#f8fafc] rounded-r-full -ml-[1px] border border-l-0 border-slate-200" />
-                  <div className="flex-1 border-t border-dashed border-white/10 mx-2" />
-                  <div className="w-5 h-10 bg-[#f8fafc] rounded-l-full -mr-[1px] border border-r-0 border-slate-200" />
-                </div>
-
-                {/* Bottom barcode sector */}
-                <div className="p-6 bg-slate-950/40 flex flex-col items-center gap-4 text-center rounded-b-[30px]">
-                  
-                  {/* Dynamic generated QR code */}
-                  <div className="p-3 bg-white rounded-2xl shadow-xl inline-block border-2 border-gold/40">
-                    <QRCodeSVG 
-                      value={JSON.stringify({
-                        id: reservation.id,
-                        ticketId: generatedTicketId,
-                        client: reservation.fullName,
-                        voyage: reservation.itinerary,
-                        class: reservation.travelClass,
-                        amount: reservation.amount,
-                        date: formatDate(Date.now())
-                      })} 
-                      size={120} 
-                    />
-                  </div>
-
-                  <div className="space-y-1">
-                    <p className="text-[9px] font-black text-slate-500 uppercase font-mono">CODE ID UNIQUE BILLET</p>
-                    <p className="text-sm font-black font-mono tracking-wider text-gold">{generatedTicketId}</p>
-                    <p className="text-[7px] font-black text-white/30 uppercase font-mono">REF: {momoTransactionId}</p>
-                  </div>
-                </div>
-
-              </div>
+            <div className="space-y-2">
+              <span className="text-rose-600 text-[10px] font-black tracking-[0.3em] uppercase block">
+                RÉSERVATION NON VALIDÉE
+              </span>
+              <h2 className="text-xl sm:text-3xl font-black text-rose-600 uppercase tracking-tight italic">
+                Paiement non confirmé
+              </h2>
+              <p className="text-xs text-slate-600 font-medium max-w-md mx-auto">
+                L'administration n'a pas pu associer un virement Mobile Money à cette réservation. Veuillez contacter notre assistance au +243 994 102 673 pour régulariser.
+              </p>
             </div>
+
+            <button
+              onClick={onComplete}
+              className="py-3 px-8 bg-slate-800 text-white font-black uppercase tracking-widest rounded-xl text-xs"
+            >
+              Retour à Mes Billets
+            </button>
           </motion.div>
         )}
 
