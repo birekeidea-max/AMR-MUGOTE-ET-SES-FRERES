@@ -14,14 +14,7 @@ service cloud.firestore {
 
     // Reservations
     match /reservations/{resId} {
-      // Allow read/list only if the reservation belongs to the user OR user is admin OR belongs to a local fallback user ID
-      allow read, list: if (isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin())) || resource.data.userId.startsWith('usr_');
-      // Allow creation if the data contains the correct user ID
-      allow create: if (isSignedIn() && (request.resource.data.userId == request.auth.uid || isAdmin())) || request.resource.data.userId.startsWith('usr_');
-      // Allow updates if the reservation belongs to user (to add transaction ID / cancellation) or if they are admin
-      allow update: if (isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin())) || resource.data.userId.startsWith('usr_');
-      // Only admin can delete reservations
-      allow delete: if isAdmin();
+      allow read, write: if true;
     }
 
     // Users

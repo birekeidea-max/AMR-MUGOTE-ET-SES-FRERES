@@ -23,6 +23,8 @@ export interface Reservation {
   transactionId: string;
   amount: number;
   createdAt: number;
+  bookingDateFormatted?: string;
+  bookingTimeFormatted?: string;
   validatedAt?: number;
   validatedBy?: string;
   ticketId?: string;

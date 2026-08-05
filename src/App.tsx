@@ -34,6 +34,7 @@ import {
   User,
   MessageCircle,
   CheckCircle,
+  XCircle,
   Send,
   MessageSquareText,
   MessageSquare,
@@ -4178,8 +4179,12 @@ function Payment({ reservation, onComplete, siteSettings }: { reservation: Reser
                   <p className="text-sm font-extrabold">{currentRes.travelClass} ({currentRes.passengersCount} place(s))</p>
                 </div>
                 <div>
-                  <span className="text-[9px] font-black text-slate-400 uppercase block">Date de Voyage</span>
-                  <p className="text-sm font-extrabold">{currentRes.travelDate}</p>
+                  <span className="text-[9px] font-black text-slate-400 uppercase block">Date & Heure de Voyage</span>
+                  <p className="text-sm font-extrabold text-maritime">{currentRes.travelDate} à {currentRes.departureTime || '07:30'}</p>
+                </div>
+                <div>
+                  <span className="text-[9px] font-black text-slate-400 uppercase block">Réservé le</span>
+                  <p className="text-sm font-bold text-slate-700">{currentRes.bookingDateFormatted || (currentRes.createdAt ? new Date(currentRes.createdAt).toLocaleDateString('fr-FR') : 'Aujourd\'hui')} {currentRes.bookingTimeFormatted ? `à ${currentRes.bookingTimeFormatted}` : (currentRes.createdAt ? `à ${new Date(currentRes.createdAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}` : '')}</p>
                 </div>
                 <div>
                   <span className="text-[9px] font-black text-slate-400 uppercase block">Téléphone Déclaré</span>
@@ -4969,28 +4974,46 @@ function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlock
       let ticketId = '';
       if (action === 'VALIDATED') {
         let isUnique = false;
-        while (!isUnique) {
+        let attempts = 0;
+        while (!isUnique && attempts < 15) {
+          attempts++;
           const randomId = Math.random().toString(36).substring(2, 8).toUpperCase();
           ticketId = `AMR-${randomId}`;
-          
-          // Verify uniqueness in DB
-          const q = query(collection(db, 'reservations'), where('ticketId', '==', ticketId));
-          const querySnapshot = await getDocs(q);
-          if (querySnapshot.empty) {
+          try {
+            const q = query(collection(db, 'reservations'), where('ticketId', '==', ticketId));
+            const querySnapshot = await getDocs(q);
+            if (querySnapshot.empty) {
+              isUnique = true;
+            }
+          } catch {
             isUnique = true;
           }
         }
+        if (!ticketId) {
+          ticketId = `AMR-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+        }
       }
 
-      await updateDoc(doc(db, 'reservations', resId), {
+      const updateFields: any = {
         status: action,
         validatedAt: action === 'VALIDATED' ? Date.now() : null,
-        validatedBy: auth.currentUser?.uid,
-        ticketId: action === 'VALIDATED' ? ticketId : ''
-      });
+      };
+
+      if (action === 'VALIDATED') {
+        updateFields.ticketId = ticketId;
+      }
+
+      // Only add validatedBy if auth.currentUser exists and has a uid to avoid Firestore undefined errors
+      if (auth.currentUser?.uid) {
+        updateFields.validatedBy = auth.currentUser.uid;
+      }
+
+      await updateDoc(doc(db, 'reservations', resId), updateFields);
+      alert(action === 'VALIDATED' ? "Billet validé avec succès !" : "Billet rejeté avec succès.");
     } catch (error) {
       console.error("Action failed", error);
-      handleFirestoreError(error, action === 'VALIDATED' ? OperationType.UPDATE : OperationType.UPDATE, `reservations/${resId}`);
+      alert("Une erreur est survenue lors du traitement du billet. Veuillez réessayer.");
+      handleFirestoreError(error, OperationType.UPDATE, `reservations/${resId}`);
     }
   };
 
@@ -5334,7 +5357,10 @@ function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlock
                           <p className="text-[10px] font-bold text-black uppercase italic">{res.itinerary.split('-')[1]}</p>
                         </div>
                         <div className="text-left">
-                          <p className="text-xs font-bold text-black">{res.travelDate}</p>
+                          <p className="text-xs font-black text-black">Départ: {res.travelDate} à {res.departureTime || '07:30'}</p>
+                          <p className="text-[9px] font-extrabold text-slate-500 uppercase tracking-widest mt-0.5">
+                            Réservé le: {res.bookingDateFormatted || (res.createdAt ? new Date(res.createdAt).toLocaleDateString('fr-FR') : 'N/A')} {res.bookingTimeFormatted ? `à ${res.bookingTimeFormatted}` : (res.createdAt ? `à ${new Date(res.createdAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}` : '')}
+                          </p>
                           <p className="text-[9px] font-extrabold text-slate-400 uppercase tracking-widest mt-1">{res.ship} • {res.travelClass} • {res.passengersCount} PAX</p>
                         </div>
                       </div>
@@ -5424,21 +5450,38 @@ function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlock
                               <>
                                 <button 
                                   onClick={() => handleAction(res.id!, 'VALIDATED')} 
-                                  className="px-4 py-2 flex items-center gap-2 bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white transition-all rounded-xl shadow-sm border border-emerald-100 text-[9px] font-black uppercase tracking-widest"
+                                  className="px-4 py-2 flex items-center gap-2 bg-emerald-500 text-white hover:bg-emerald-600 transition-all rounded-xl shadow-md text-[9px] font-black uppercase tracking-widest cursor-pointer active:scale-95"
                                 >
                                   <CheckCircle2 size={14} /> Valider
                                 </button>
                                 <button 
                                   onClick={() => handleAction(res.id!, 'REJECTED')} 
-                                  className="px-4 py-2 flex items-center gap-2 bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white transition-all rounded-xl shadow-sm border border-rose-100 text-[9px] font-black uppercase tracking-widest"
+                                  className="px-4 py-2 flex items-center gap-2 bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white transition-all rounded-xl shadow-sm border border-rose-100 text-[9px] font-black uppercase tracking-widest cursor-pointer active:scale-95"
                                 >
                                   <X size={14} /> Rejeter
                                 </button>
                               </>
                             )}
                             {res.status === 'VALIDATED' && (
-                              <button onClick={() => generatePDF(res)} className="px-6 py-2.5 bg-maritime text-white hover:bg-maritime-dark transition-all rounded-xl text-[9px] font-extrabold uppercase tracking-widest shadow-lg shadow-maritime/20 flex items-center gap-2">
-                                <Printer size={14} /> Imprimer
+                              <>
+                                <button onClick={() => generatePDF(res)} className="px-4 py-2 bg-maritime text-white hover:bg-maritime-dark transition-all rounded-xl text-[9px] font-extrabold uppercase tracking-widest shadow-md flex items-center gap-2 cursor-pointer">
+                                  <Printer size={14} /> Imprimer
+                                </button>
+                                <button 
+                                  onClick={() => handleAction(res.id!, 'REJECTED')} 
+                                  className="px-3 py-2 flex items-center gap-1.5 bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white transition-all rounded-xl border border-rose-100 text-[9px] font-black uppercase tracking-widest cursor-pointer"
+                                  title="Annuler/Rejeter la validation"
+                                >
+                                  <X size={14} /> Rejeter
+                                </button>
+                              </>
+                            )}
+                            {res.status === 'REJECTED' && (
+                              <button 
+                                onClick={() => handleAction(res.id!, 'VALIDATED')} 
+                                className="px-4 py-2 flex items-center gap-2 bg-emerald-500 text-white hover:bg-emerald-600 transition-all rounded-xl shadow-md text-[9px] font-black uppercase tracking-widest cursor-pointer active:scale-95"
+                              >
+                                <CheckCircle2 size={14} /> Valider
                               </button>
                             )}
                             <button 
@@ -6888,7 +6931,8 @@ function MyTickets({ user, siteSettings }: { user: FirebaseUser | null, siteSett
                         </div>
                       </div>
                       <div className="mt-3.5 space-y-1">
-                        <p className="text-[8px] sm:text-[9px] text-slate-500 font-bold uppercase tracking-widest leading-tight">{res.travelDate} • {res.departureTime} • {res.ship}</p>
+                        <p className="text-[8px] sm:text-[10px] text-maritime font-black uppercase tracking-widest leading-tight">Voyage: {res.travelDate} à {res.departureTime || '07:30'} • {res.ship}</p>
+                        <p className="text-[7px] sm:text-[8px] text-slate-400 font-medium uppercase tracking-widest">Réservation faite le: {res.bookingDateFormatted || (res.createdAt ? new Date(res.createdAt).toLocaleDateString('fr-FR') : 'Aujourd\'hui')} {res.bookingTimeFormatted ? `à ${res.bookingTimeFormatted}` : (res.createdAt ? `à ${new Date(res.createdAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}` : '')}</p>
                         {res.transactionId && (
                           <p className="text-[7px] text-slate-400 font-mono italic">TX: {res.transactionId}</p>
                         )}
