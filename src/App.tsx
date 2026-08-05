@@ -2543,7 +2543,7 @@ function AdminChatView({ conversation }: { conversation: any }) {
     try {
       await addDoc(collection(db, 'conversations', conversation.id, 'messages'), {
         text: reply,
-        senderId: auth.currentUser?.uid,
+        senderId: auth.currentUser?.uid || 'admin_system',
         senderRole: 'ADMIN',
         createdAt: serverTimestamp()
       });
@@ -4864,8 +4864,8 @@ function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlock
         processedUrl: finalUrl,
         processedType: finalType,
         processedDesc: finalDesc,
-        authorId: auth.currentUser?.uid,
-        authorEmail: auth.currentUser?.email,
+        authorId: auth.currentUser?.uid || 'admin_system',
+        authorEmail: auth.currentUser?.email || 'admin@amrmugote.com',
       };
 
       if (!editMediaId) {
