@@ -166,8 +166,8 @@ const getEmbedUrl = (url: string) => {
   return url;
 };
 
-const MERCHANT_PHONE = "+243 994 286 469";
-const CONTACT_NUMBERS = ["0991717549", "0853129170"];
+const MERCHANT_PHONE = "+243 994 102 673";
+const CONTACT_NUMBERS = ["+243 994 102 673", "+243 816 680 709"];
 const PRICES: Record<TravelClass, number> = {
   '1ère Classe': 27,
   '2ème Classe': 17,
@@ -1313,8 +1313,8 @@ export default function App() {
             <div className="space-y-6">
               <h6 className="text-[10px] font-black uppercase tracking-[0.4em] text-white italic underline underline-offset-8 decoration-gold/50">Contact & Support</h6>
               <ul className="space-y-4 text-white/60 text-[10px] font-bold uppercase tracking-[0.2em]">
-                <li className="flex items-center justify-center gap-3 hover:text-white transition-colors"> 
-                  <span className="w-1.5 h-1.5 bg-gold rounded-full" /> {MERCHANT_PHONE}
+                <li className="flex items-center justify-center gap-3 hover:text-white transition-colors font-mono font-bold"> 
+                  <span className="w-1.5 h-1.5 bg-gold rounded-full" /> {CONTACT_NUMBERS.join(' / ')}
                 </li>
                 <li className="flex items-center justify-center gap-3 hover:text-white transition-colors"> 
                   <span className="w-1.5 h-1.5 bg-gold rounded-full" /> contact@amrmugote.com
@@ -3649,9 +3649,61 @@ function Booking({ onReserved, user, onLoginRequest }: { onReserved: (res: Reser
                     </div>
                   </div>
                   <div className="p-2.5 lg:p-6 flex-1 space-y-4">
+                    {/* Official Payment Destination Numbers Box */}
+                    <div className="bg-[#001233] text-white p-3.5 lg:p-5 rounded-2xl border-2 border-gold/40 shadow-lg space-y-2.5">
+                      <div className="flex items-center justify-between border-b border-white/10 pb-2">
+                        <span className="text-[9px] lg:text-[11px] font-black uppercase text-gold tracking-widest flex items-center gap-1.5">
+                          <CheckCircle size={14} className="text-gold" /> Numéros Officiels de Paiement de la Compagnie
+                        </span>
+                        <span className="text-[8px] lg:text-[9px] font-black uppercase bg-gold/20 text-gold px-2 py-0.5 rounded-full">
+                          Obligatoire
+                        </span>
+                      </div>
+                      
+                      <p className="text-[9px] lg:text-[10px] text-slate-300 font-medium leading-tight">
+                        Veuillez verser ou transférer le montant de votre billet sur l'un de ces deux numéros officiels ci-dessous pour valider votre réservation :
+                      </p>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                        <div className={cn(
+                          "p-2.5 rounded-xl border transition-all flex flex-col justify-between gap-1",
+                          formData.momoOperator === 'Airtel Money' || formData.momoOperator === 'Orange Money'
+                            ? "bg-rose-950/80 border-rose-500 shadow-md ring-2 ring-rose-500/30"
+                            : "bg-white/5 border-white/10"
+                        )}>
+                          <div className="flex items-center justify-between">
+                            <span className="text-[9px] lg:text-[10px] font-black uppercase text-rose-400">
+                              Airtel Money & Orange Money
+                            </span>
+                            <span className="text-[8px] font-extrabold uppercase text-white/50">Compte 1</span>
+                          </div>
+                          <span className="text-sm lg:text-base font-black font-mono text-white tracking-wider">
+                            +243 994 102 673
+                          </span>
+                        </div>
+
+                        <div className={cn(
+                          "p-2.5 rounded-xl border transition-all flex flex-col justify-between gap-1",
+                          formData.momoOperator === 'M-Pesa'
+                            ? "bg-emerald-950/80 border-emerald-500 shadow-md ring-2 ring-emerald-500/30"
+                            : "bg-white/5 border-white/10"
+                        )}>
+                          <div className="flex items-center justify-between">
+                            <span className="text-[9px] lg:text-[10px] font-black uppercase text-emerald-400">
+                              Vodacom M-Pesa
+                            </span>
+                            <span className="text-[8px] font-extrabold uppercase text-white/50">Compte 2</span>
+                          </div>
+                          <span className="text-sm lg:text-base font-black font-mono text-white tracking-wider">
+                            +243 816 680 709
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
                     <div>
                       <label className="block text-[8px] lg:text-[10px] font-black uppercase tracking-[0.1em] text-slate-400 mb-2">
-                        Choisir l'Opérateur du Paiement Push
+                        Choisir votre Opérateur Mobile
                       </label>
                       <div className="grid grid-cols-3 gap-2">
                         {[
@@ -3679,7 +3731,7 @@ function Booking({ onReserved, user, onLoginRequest }: { onReserved: (res: Reser
 
                     <div>
                       <label className="block text-[8px] lg:text-[10px] font-black uppercase tracking-[0.1em] text-slate-400 mb-1">
-                        Numéro Mobile Money (pour confirmer le STK Push sur votre mobile)
+                        Votre Numéro de Téléphone (pour recevoir le STK Push et la confirmation)
                       </label>
                       <input 
                         required
@@ -3977,7 +4029,7 @@ function Booking({ onReserved, user, onLoginRequest }: { onReserved: (res: Reser
                   </div>
                   <div className="space-y-0.5 lg:space-y-1">
                     <p className="text-[6px] lg:text-[7px] font-black text-white/30 uppercase tracking-widest">Support</p>
-                    <p className="text-[8px] lg:text-[9px] font-black text-gold/80">{CONTACT_NUMBERS[0]}</p>
+                    <p className="text-[8px] lg:text-[9px] font-black text-gold/80 font-mono">{CONTACT_NUMBERS.join(' / ')}</p>
                   </div>
                   <div className="w-full h-8 lg:h-12 bg-white/5 rounded-lg lg:rounded-xl border border-white/5 overflow-hidden flex">
                     {[...Array(30)].map((_, i) => (
