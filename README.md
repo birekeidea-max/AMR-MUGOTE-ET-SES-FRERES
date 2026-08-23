@@ -1,237 +1,341 @@
 # 🚢 AMR MUGOTE ET SES FRÈRES
 
-> Plateforme numérique de réservation maritime sur le Lac Kivu entre **Bukavu** et **Goma**.
+> **Plateforme numérique de réservation maritime, suivi de flotte en temps réel et contrôle d'embarquement sur le Lac Kivu (Bukavu ⇄ Goma, République Démocratique du Congo).**
 
-![Version](https://img.shields.io/badge/version-1.0-blue)
-![React](https://img.shields.io/badge/React-19-61DAFB)
-![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6)
-![Firebase](https://img.shields.io/badge/Firebase-Backend-FFCA28)
-![Node.js](https://img.shields.io/badge/Node.js-Express-339933)
-![License](https://img.shields.io/badge/License-Academic-green)
+<p align="center">
+  <a href="https://amr-mugote-et-ses-freres.vercel.app">
+    <img src="https://img.shields.io/badge/Production%20Live-amr--mugote--et--ses--freres.vercel.app-0052cc?style=for-the-badge&logo=vercel&logoColor=white" alt="Vercel Deployment" />
+  </a>
+</p>
 
----
-
-# 📖 À propos
-
-**AMR MUGOTE ET SES FRÈRES** est une plateforme web moderne conçue pour digitaliser la réservation des billets de transport maritime sur le Lac Kivu.
-
-Elle permet aux voyageurs de réserver leurs billets en ligne, d'effectuer des paiements Mobile Money (M-Pesa, Airtel Money, Orange Money via l'API FlexPay), de recevoir un billet électronique sécurisé avec un identifiant unique / QR Code et de valider l'embarquement en temps réel.
-
-Le projet a été développé dans le cadre du **Programme d'Incubation et d'Innovation Technologique de GDG On Campus UCB**.
-
----
-
-# 🌐 Démonstration
-
-## Application
-
-https://amr-mugote-et-ses-freres.vercel.app
+<p align="center">
+  <img src="https://img.shields.io/badge/React-19.0-61DAFB?style=flat-square&logo=react&logoColor=black" alt="React 19" />
+  <img src="https://img.shields.io/badge/TypeScript-5.8-3178C6?style=flat-square&logo=typescript&logoColor=white" alt="TypeScript" />
+  <img src="https://img.shields.io/badge/Tailwind_CSS-v4.1-38B2AC?style=flat-square&logo=tailwind-css&logoColor=white" alt="Tailwind CSS v4" />
+  <img src="https://img.shields.io/badge/Firebase-Firestore%20%7C%20Auth%20%7C%20Storage-FFCA28?style=flat-square&logo=firebase&logoColor=black" alt="Firebase" />
+  <img src="https://img.shields.io/badge/Node.js-Express%20Backend-339933?style=flat-square&logo=node.js&logoColor=white" alt="Node Express" />
+  <img src="https://img.shields.io/badge/Google_Gemini-AI_Assistant-8E75B2?style=flat-square&logo=google&logoColor=white" alt="Gemini AI" />
+  <img src="https://img.shields.io/badge/Google_Maps-Flotte_GPS-4285F4?style=flat-square&logo=google-maps&logoColor=white" alt="Google Maps" />
+  <img src="https://img.shields.io/badge/PWA-Installable-5A0FC8?style=flat-square&logo=pwa&logoColor=white" alt="PWA" />
+  <img src="https://img.shields.io/badge/License-Academic%20%2F%20Innovation-success?style=flat-square" alt="License" />
+</p>
 
 ---
 
-# 🎯 Objectifs
+## 📑 Sommaire
 
-La plateforme vise à :
-
-- Digitaliser les réservations maritimes sur le Lac Kivu (Bukavu ⇄ Goma)
-- Réduire les longues files d'attente aux ports d'embarquement
-- Lutter contre la fraude de billets via des signatures uniques et un outil de scan QR Code
-- Sécuriser les transactions financières via des passerelles de paiement Mobile Money
-- Générer automatiquement des e-billets complets
-- Améliorer le suivi logistique de la flotte et des passagers
-- Simplifier l'embarquement grâce à un module de contrôle d'embarquement
-
----
-
-# ✨ Fonctionnalités
-
-## 👤 Voyageur
-
-- **Création de compte & Connexion** : Authentification sécurisée (Firebase Auth)
-- **Réservations en Ligne** : Sélection du trajet (Bukavu ⇄ Goma), de la date, du navire et de la classe (VIP, 1ère, 2ème, 3ème)
-- **Paiement Mobile Money** : Intégration transparente avec FlexPay pour valider les paiements (M-Pesa, Airtel Money, Orange Money)
-- **E-Billet Sécurisé** : Génération instantanée d'un reçu avec numéro de billet unique, QR Code et informations détaillées de voyage
-- **Localisation & Suivi** : Visualisation en temps réel de la flotte de navires sur la carte du Lac Kivu et calcul d'itinéraires/distances
-- **Messagerie & IA** : Assistant IA intégré (Gemini Pro) pour répondre instantanément aux interrogations des passagers
-
----
-
-## 👨‍💼 Administrateur
-
-- **Tableau de Bord Holistique** : Vue d'ensemble sur les flux financiers, statistiques de fréquentation et taux de remplissage
-- **Gestion de la Flotte** : Ajout, modification, localisation GPS en temps réel et statut de navigation (À quai, En navigation, En maintenance) de chaque navire
-- **Gestion des Horaires & Trajets** : Planification des départs réguliers
-- **Gestion des Utilisateurs & Rôles** : Liste unifiée des utilisateurs avec gestion des statuts de sécurité
-- **Gestion des Médias & Actualités** : Publication de communiqués et photos de la flotte pour les voyageurs
+1. [📖 Contexte & Présentation](#-contexte--présentation)
+2. [🎯 Problématique & Objectifs](#-problématique--objectifs)
+3. [✨ Fonctionnalités Principales](#-fonctionnalités-principales)
+   - [👤 Espace Passager / Voyageur](#-espace-passager--voyageur)
+   - [👨‍💼 Espace Administration & Gestion de Flotte](#-espace-administration--gestion-de-flotte)
+   - [🛂 Espace Contrôleur / Scanner d'Embarquement (QR Code)](#-espace-contrôleur--scanner-dembarquement-qr-code)
+   - [🤖 Assistant Virtuel IA (Gemini)](#-assistant-virtuel-ia-gemini)
+   - [📰 Journal de Bord & Communauté](#-journal-de-bord--communauté)
+   - [📱 Application Web Progressive (PWA)](#-application-web-progressive-pwa)
+4. [🏗 Architecture Système & Flux de Données](#-architecture-système--flux-de-données)
+5. [🛠 Technologies Utilisées](#-technologies-utilisées)
+6. [📂 Structure du Projet](#-structure-du-projet)
+7. [🗄 Modèle de Données Firestore](#-modèle-de-données-firestore)
+8. [💳 Passerelle de Paiement Mobile Money](#-passerelle-de-paiement-mobile-money)
+9. [🔐 Sécurité & Lutte Anti-Fraude](#-sécurité--lutte-anti-fraude)
+10. [🔌 Endpoints d'API Backend](#-endpoints-dapi-backend)
+11. [⚙️ Installation & Démarrage Local](#️-installation--démarrage-local)
+12. [🔧 Variables d'Environnement](#-variables-denvironnement)
+13. [🚀 Déploiement en Production](#-déploiement-en-production)
+14. [🔮 Feuille de Route & Évolutions](#-feuille-de-route--évolutions)
+15. [👨‍💻 Auteur & Crédits Académiques](#-auteur--crédits-académiques)
+16. [📄 Licence](#-licence)
 
 ---
 
-## 🛂 Contrôleur / Scanner d'Embarquement
+## 📖 Contexte & Présentation
 
-- **Vérification QR Code** : Scanner embarqué (caméra ou ID manuel) pour identifier instantanément les billets
-- **Contrôle d'Accréditation** : Validation de l'état de paiement et de l'authenticité du ticket
-- **Confirmation d'Embarquement** : Enregistrement en direct du passager (passage au statut *EMBARQUÉ*) avec heure précise d'embarquement pour éviter la réutilisation frauduleuse du même billet
+Le **Lac Kivu**, reliant les deux grands pôles économiques de l'Est de la République Démocratique du Congo (**Bukavu** au Sud-Kivu et **Goma** au Nord-Kivu), constitue l'axe de transport le plus stratégique et sécurisé de la région.
+
+**ETS AMR MUGOTE ET SES FRÈRES** est une compagnie maritime historique de premier plan exploitant des navires de ligne réguliers (notamment *Mugote 1*, *Mugote 2*, *Mugote 3*).
+
+Cette plateforme web full-stack a été conçue pour **digitaliser l'intégralité de l'expérience de voyage lacustre**, de la réservation en ligne au contrôle physique des passagers à l'embarquement via QR Code scanné par caméra.
+
+> 🎓 *Ce projet s'inscrit dans le cadre du **Programme d'Incubation et d'Innovation Technologique de GDG On Campus UCB** (Université Catholique de Bukavu).*
 
 ---
 
-# 🏗 Architecture
+## 🎯 Problématique & Objectifs
 
-Le projet suit une architecture robuste et hautement réactive.
+| Défi traditionnel | Solution apportée par la plateforme |
+|---|---|
+| **Files d'attente au port** | Réservation 24h/24 et émission instantanée de e-billet PDF |
+| **Fraude et duplication de billets** | Billets signés avec ID unique et QR Code scannable à usage unique |
+| **Paiement en espèces complexe** | Intégration Mobile Money (Airtel Money, M-Pesa, Orange Money via FlexPay) |
+| **Manque de visibilité sur les bateaux** | Carte interactive GPS Google Maps affichant la flotte en temps réel |
+| **Assistance voyageur saturée** | Assistant IA expert (Google Gemini) répondant instantanément |
+| **Contrôle d'embarquement manuel** | Scanner QR intégré avec horodatage et changement de statut *BOARDED* |
+
+---
+
+## ✨ Fonctionnalités Principales
+
+### 👤 Espace Passager / Voyageur
+- **Authentification Sécurisée** : Connexion par e-mail/mot de passe ou identifiant local persistant.
+- **Réservation de Traversée** :
+  - Choix du trajet : **Bukavu ➔ Goma** ou **Goma ➔ Bukavu**.
+  - Sélection de la date, du navire et de la classe (*VIP*, *1ère Classe*, *2ème Classe*, *3ème Classe*).
+  - Gestion multi-passagers avec calcul dynamique des montants.
+- **Paiement Mobile Money & Manuel** :
+  - Déclenchement automatique par push USSD (*FlexPay DRC*).
+  - Mode direct Airtel Money avec saisie de référence de transaction.
+- **E-Billet Sécurisé & Téléchargeable** :
+  - Fiche détaillée du billet avec QR Code haute densité.
+  - Exportation directe au format **PDF** via *jsPDF*.
+- **Localisation & Itinéraires** :
+  - Localisation du port de départ (ex: Port Mugote de Bukavu à Beach Muhanzi / Kadutu).
+  - Calcul d'itinéraire et estimation de la distance restante par géolocalisation GPS.
+
+### 👨‍💼 Espace Administration & Gestion de Flotte
+- **Dashboard Analytique** : Chiffre d'affaires en temps réel, nombre total de réservations, taux de fréquentation.
+- **Validation & Gestion des Réservations** :
+  - Validation manuelle ou automatisée des paiements.
+  - Annulation ou modification de billets.
+- **Gestion de la Flotte** :
+  - Ajout/édition de bateaux (*Mugote 1, 2, 3*).
+  - Mise à jour des coordonnées GPS et des statuts opérationnels (*À quai*, *En navigation*, *En maintenance*).
+- **Gestion des Horaires & Trajets** : Planification des départs quotidiens et des affectations de navires.
+- **Gestion des Utilisateurs** : Annuaire complet des comptes avec rôles et coordonnées.
+- **Centre de Médias & Actualités** : Publication d'annonces officielles, photos et vidéos.
+
+### 🛂 Espace Contrôleur / Scanner d'Embarquement (QR Code)
+- **Scanner Intégré par Caméra** : Utilisation de la caméra de l'appareil (*html5-qrcode*) sans matériel supplémentaire.
+- **Recherche par Identifiant Manuel** : Possibilité de taper manuellement le code unique du billet (ex: `AMR-A8F2K9`).
+- **Validation Idempotente** :
+  - ✅ **Billet Valide & Payé** ➔ Validation avec passage immédiat au statut **EMBARQUÉ** (*BOARDED*).
+  - ⚠️ **Billet Déjà Utilisé** ➔ Alerte immédiate avec date et heure du premier embarquement pour bloquer la fraude.
+  - ❌ **Billet Invalide ou Impayé** ➔ Refus catégorique de l'embarquement.
+
+### 🤖 Assistant Virtuel IA (Gemini)
+- Intégré directement dans l'interface pour guider les passagers.
+- Connaissance experte des horaires, tarifs, ports d'attache et consignes de sécurité d'AMR MUGOTE.
+- Traitement sécurisé côté serveur via le SDK `@google/genai`.
+
+### 📰 Journal de Bord & Communauté
+- Flux d'actualités et communiqués de la compagnie maritime.
+- Support des images et vidéos interactives.
+- Système de mentions "J'aime" et espace de commentaires pour les voyageurs.
+
+### 📱 Application Web Progressive (PWA)
+- **Installable** en un clic sur Android, iOS (Safari) et Desktop.
+- Service Worker pour la mise en cache des assets statiques.
+- Fonctionnement fluide même en connexion réseau instable.
+
+---
+
+## 🏗 Architecture Système & Flux de Données
 
 ```
-                    React 19 Frontend (Vite)
-                                │
-                      ┌─────────┴─────────┐
-                      │ HTTPS API         │ Temps Réel
-                      ▼                   ▼
-          Node.js + Express Server    Cloud Firestore (Firebase Client SDK)
-                      │                   │
-         ┌────────────┼────────────┐      ├─────────────────────────┐
-         │            │            │      ▼                         ▼
-         ▼            ▼            ▼   Firebase Authentication  Firebase Storage
-     FlexPay API  Gemini AI   Admin SDK
+                                  UTILISATEURS
+              ┌─────────────────────────┼─────────────────────────┐
+              ▼                         ▼                         ▼
+         Passagers                Administrateurs             Contrôleurs
+     (Mobile / Desktop)         (Gestion & Flotte)        (Scan QR Embarquement)
+              │                         │                         │
+              └─────────────────────────┼─────────────────────────┘
+                                        │
+                                        ▼
+                           ┌──────────────────────────┐
+                           │   React 19 + Vite + PWA  │
+                           │     (Tailwind CSS v4)    │
+                           └────────────┬─────────────┘
+                                        │
+                 ┌──────────────────────┴──────────────────────┐
+                 │ HTTPS (API Routes)                          │ WebSocket / Client SDK
+                 ▼                                             ▼
+  ┌─────────────────────────────┐               ┌─────────────────────────────┐
+  │      Node.js + Express      │               │   Firebase Cloud Services   │
+  │     (Backend server.ts)     │               ├─────────────────────────────┤
+  ├─────────────────────────────┤               │ • Cloud Firestore (DB)      │
+  │ • Proxy IA /api/chat        │               │ • Firebase Authentication   │
+  │ • Gateway FlexPay Mobile    │               │ • Firebase Storage (Médias) │
+  │ • Webhooks & Signatures     │               │ • Firestore Security Rules  │
+  │ • Générateur Ticket Unique  │               └─────────────────────────────┘
+  └──────────────┬──────────────┘                              ▲
+                 │                                             │
+      ┌──────────┴──────────┐                                  │
+      ▼                     ▼                                  │
+┌───────────┐         ┌───────────┐                            │
+│  Gemini   │         │  FlexPay  │────────────────────────────┘
+│  AI SDK   │         │ Mobile CD │ (Mise à jour statut paiement)
+└───────────┘         └───────────┘
 ```
 
 ---
 
-# 🛠 Technologies utilisées
+## 🛠 Technologies Utilisées
 
-## Frontend
+### Frontend
+- **React 19** & **Vite 6** — Interface utilisateur moderne, ultra-rapide et modulaire.
+- **TypeScript 5.8** — Typage statique strict pour une robustesse applicative totale.
+- **Tailwind CSS v4** — Framework utilitaire haute performance pour un design moderne et adaptatif.
+- **Framer Motion** — Animations et transitions visuelles fluides.
+- **Lucide React** — Bibliothèque d'icônes vectorielles cohérentes.
+- **Google Maps API** (`@vis.gl/react-google-maps`) — Cartographie interactive et géolocalisation de la flotte.
+- **html5-qrcode** — Décodage temps réel de codes QR via la caméra web/mobile.
+- **jsPDF** & **qrcode.react** — Génération dynamique de billets au format PDF et rendu QR Code.
 
-- **React 19** & **Vite 6** (Framework UI ultra-rapide)
-- **TypeScript** (Typage statique strict pour la fiabilité)
-- **Tailwind CSS v4** (Design moderne, réactif et fluide)
-- **Framer Motion** (Micro-animations fluides de transitions)
-- **Lucide React** (Ensemble d'icônes vectorielles cohérentes)
-- **Google Maps API (@vis.gl/react-google-maps)** (Localisation interactive de la flotte)
-- **jsPDF** & **QRCode.react** (Génération et rendu des e-billets)
+### Backend & API
+- **Node.js** & **Express 4** — Serveur d'application et passerelle d'API REST.
+- **@google/genai** — SDK officiel Google Gemini pour l'assistant conversationnel.
+- **Firebase Admin SDK** — Opérations privilégiées côté serveur (mise à jour sécurisée des tickets).
+- **esbuild** — Compilation et bundling optimisé du backend en un fichier standalone `dist/server.cjs`.
 
-## Backend (Serveur Hybride)
-
-- **Node.js** & **Express**
-- **Firebase Admin SDK** (Opérations privilégiées d'écriture et de validation de billets)
-- **Google Gen AI SDK (@google/genai)** (Intégration de l'assistant IA Gemini)
-- **esbuild** (Compilation et bundling optimisés en un fichier standalone `dist/server.cjs`)
-
-## Base de Données & Cloud Services
-
-- **Cloud Firestore** (Stockage et synchronisation en temps réel des documents)
-- **Firebase Storage** (Hébergement des documents et médias)
-- **Firebase Authentication** (Gestion sécurisée des profils utilisateurs)
-- **Google Analytics** (Suivi d'utilisation et diagnostic de pannes)
+### Base de Données & Cloud
+- **Cloud Firestore** — Base de données NoSQL temps réel pour les réservations, la flotte et les actualités.
+- **Firebase Authentication** — Gestion sécurisée des identités et des sessions.
+- **Firebase Storage** — Stockage des photos de bateaux, médias et pièces jointes.
 
 ---
 
-# 📂 Structure du projet
-
-L'arborescence réelle du projet s'organise ainsi :
+## 📂 Structure du Projet
 
 ```
 amr-mugote-et-ses-freres/
-├── public/                     # Fichiers statiques et médias
-├── src/                        # Code source Frontend (React)
-│   ├── components/             # Composants modulaires réutilisables
-│   │   ├── DocumentScannerWidget.tsx  # Module scanner de contrôle de billets (QR)
-│   │   ├── LocalisationView.tsx       # Carte interactive GPS et suivi de flotte (Google Maps)
-│   │   └── UsersListView.tsx          # Vue unifiée d'administration des utilisateurs
-│   ├── lib/                    # Initialisations de services tiers
-│   │   ├── firebase.ts                # Configuration client Firebase (Firestore, Auth, Storage)
-│   │   └── utils.ts                   # Utilitaires CSS (fusion de classes Tailwind cn)
-│   ├── App.tsx                 # Composant racine, routage de vues et interfaces globales
-│   ├── index.css               # Imports globaux de Tailwind CSS et polices
-│   ├── main.tsx                # Point d'entrée de montage React 19
-│   └── types.ts                # Déclarations globales d'interfaces TypeScript (Reservation, Ship, etc.)
-├── server.ts                   # Serveur Express principal (API routes + middleware Vite)
-├── .env.example                # Exemple de configuration des variables d'environnement
-├── firestore.rules             # Règles de sécurité Firestore appliquées en production
-├── firebase-blueprint.json     # Configuration de la structure de base Firestore
-├── firebase-applet-config.json # Fichier de métadonnées Firebase
-├── metadata.json               # Métadonnées et permissions de l'application
-├── package.json                # scripts de build et dependances NPM
-├── SDD.md                      # Document de conception logicielle détaillé (Software Design Document)
-└── tsconfig.json               # Configuration du compilateur TypeScript
+├── public/                       # Assets publics statiques
+│   ├── favicon.ico               # Icône du site
+│   ├── icon-192.png / 512.png    # Icônes de l'application PWA
+│   ├── manifest.json             # Manifeste PWA
+│   ├── robots.txt                # Directives d'indexation SEO
+│   ├── sitemap.xml               # Plan du site pour moteurs de recherche
+│   └── sw.js                     # Service Worker PWA
+├── scripts/                      # Scripts d'automatisation de build
+│   ├── generate-icons.js         # Génération dynamique des icônes PWA
+│   └── generate-sitemap.js       # Génération automatique du sitemap SEO
+├── src/                          # Code source Frontend React
+│   ├── components/               # Composants React modulaires
+│   │   ├── DocumentScannerWidget.tsx # Module de scan QR pour le contrôle d'embarquement
+│   │   ├── LocalisationView.tsx      # Carte GPS Google Maps et suivi de la flotte
+│   │   └── UsersListView.tsx         # Console d'administration des utilisateurs
+│   ├── lib/                      # Services et utilitaires
+│   │   ├── firebase.ts           # Configuration et initialisation Firebase Client
+│   │   └── utils.ts              # Utilitaires (fusion de classes Tailwind cn)
+│   ├── App.tsx                   # Composant racine, routage et logique centrale
+│   ├── index.css                 # Import global de Tailwind CSS v4
+│   ├── main.tsx                  # Montage de l'application React
+│   └── types.ts                  # Interfaces TypeScript globales (Reservation, Ship, etc.)
+├── .env.example                  # Modèle des variables d'environnement
+├── firestore.rules               # Règles de sécurité Firestore
+├── firebase-applet-config.json   # Configuration du projet Firebase
+├── firebase-blueprint.json       # Schéma blueprint de la base de données
+├── metadata.json                 # Métadonnées de l'application
+├── package.json                  # Scripts NPM et dépendances
+├── SDD.md                        # Software Design Document (Spécifications logicielles)
+├── server.ts                     # Serveur Express (API routes + middleware Vite)
+├── tsconfig.json                 # Configuration TypeScript
+├── vercel.json                   # Configuration de routage et déploiement Vercel
+└── vite.config.ts                # Configuration du bundler Vite
 ```
 
 ---
 
-# 🔐 Sécurité
+## 🗄 Modèle de Données Firestore
 
-- **Règles de sécurité Firestore** : Restriction granulaire des accès (seul l'administrateur ou le contrôleur peut modifier le statut d'embarquement d'un billet, lecture restreinte aux réservations propres de chaque utilisateur).
-- **Vérification d'Embarquement Idempotente** : Dès qu'un billet est scanné pour l'embarquement, il est marqué comme *BOARDED*. Tout scan ultérieur affiche une alerte rouge signalant que le billet a déjà été utilisé.
-- **Double-Canal** : Toutes les opérations de modification de statuts sensibles transitent par des scripts d'administration sécurisés.
-
----
-
-# 🗄 Collections Firestore
-
-- `users` : Profils d'authentification et informations de base.
-- `users_list` : Cache public synchronisé pour la recherche et l'administration des comptes.
-- `reservations` : Enregistrements détaillés des réservations et des passagers (nom, navire, itinéraire, classe, statut de paiement, boardingStatus).
-- `fleet` : Données sur les bateaux (nom, capacité, description, photo, coordonnées GPS de localisation en temps réel, statut de navigation).
-- `schedules` : Horaires officiels et navires assignés pour chaque trajet.
-- `news` : Publications d'avis de voyage et communiqués de presse.
-- `messages` : Historique des conversations avec l'agent d'assistance pour chaque utilisateur.
-- `media` : Galerie multimédia de la flotte.
-- `settings` : Collection de configuration globale de la plateforme (collection `settings/site` contenant l'arrière-plan de l'application, les photos par défaut et le code d'administration).
+| Collection | Description | Champs Principaux |
+|---|---|---|
+| `reservations` | Billets et réservations des passagers | `id`, `ticketId`, `userId`, `passengerName`, `phone`, `route`, `departureDate`, `departureTime`, `shipName`, `seatClass`, `amount`, `status` (*PENDING*, *VALIDATED*, *CANCELLED*), `boardingStatus` (*PENDING*, *BOARDED*), `boardedAt`, `transactionId` |
+| `fleet` | Bateaux de la compagnie | `id`, `name`, `capacity`, `speed`, `status` (*At Port*, *Sailing*, *Maintenance*), `latitude`, `longitude`, `imageUrl`, `description` |
+| `schedules` | Horaires et plannings des traversées | `id`, `route`, `departureTime`, `shipId`, `shipName`, `priceVIP`, `priceFirst`, `priceSecond`, `priceThird` |
+| `news` | Communiqués, avis et médias | `id`, `title`, `content`, `processedUrl`, `processedType` (*image*, *video*, *text*), `likes`, `createdAt`, `authorEmail` |
+| `news/{id}/comments` | Commentaires sur une actualité | `id`, `userId`, `userName`, `content`, `createdAt` |
+| `conversations` | Fils de discussion de support | `id`, `userId`, `userName`, `lastMessage`, `updatedAt` |
+| `conversations/{id}/messages` | Messages individuels de support | `id`, `text`, `senderId`, `senderRole` (*USER*, *ADMIN*, *AI*), `createdAt` |
+| `siteSettings` | Configuration globale du site | `adminCode`, `primaryColor`, `heroImageUrl` |
 
 ---
 
-# 🔄 Processus de réservation et paiement
+## 💳 Passerelle de Paiement Mobile Money
 
-1. **Recherche & Sélection** : Le client choisit le trajet, le navire, l'horaire et le nombre de passagers.
-2. **Facturation** : Calcul automatique du montant total.
-3. **Paiement Mobile Money via l'API FlexPay** :
-   - Requête USSD PUSH envoyée sur la carte SIM du client.
-   - Attente de la saisie sécurisée du code PIN par le client sur son téléphone.
-   - Callback serveur automatique mettant à jour instantanément la réservation au statut *VALIDATED*.
-4. **Billet Électronique** : Génération automatique du QR Code unique et possibilité d'exporter le billet de transport sous format PDF.
-5. **Embarquement** : Contrôle et scan du code par le contrôleur au port de départ.
+La plateforme prend en charge les opérateurs majeurs de RDC :
+- 🟢 **M-Pesa** (Vodacom RDC)
+- 🔴 **Airtel Money** (Airtel RDC)
+- 🟠 **Orange Money** (Orange RDC)
 
----
-
-# 💳 Paiements supportés
-
-- **M-Pesa** (Vodacom)
-- **Airtel Money** (Airtel)
-- **Orange Money** (Orange)
+### Flux de paiement automatisé (FlexPay API) :
+1. Le client saisit son numéro de téléphone congolais (`+243...`).
+2. Le serveur envoie une requête d'initialisation USSD Push à l'API FlexPay.
+3. Le client reçoit une invite sur son téléphone pour saisir son code PIN secret.
+4. FlexPay notifie le serveur via webhook (`/api/flexpay/callback`).
+5. Le billet passe instantanément à l'état `VALIDATED` et génère un `ticketId` unique (`AMR-XXXXXX`).
 
 ---
 
-# ⚙️ Installation et exécution
+## 🔐 Sécurité & Lutte Anti-Fraude
 
-## Cloner le projet
+1. **Génération d'Identifiant de Billet Unique** : Algorithme avec vérification d'unicité dans Firestore pour éviter toute collision.
+2. **QR Code Sécurisé** : Le QR code embarque les métadonnées cryptées et l'identifiant unique du passager.
+3. **Contrôle d'Embarquement à Usage Unique (Idempotence)** : Dès la première validation par le contrôleur au port, le statut devient `BOARDED` avec horodatage (`boardedAt`). Toute tentative de réutilisation affiche une alerte rouge immédiate.
+4. **Protection des Clés d'API** : Les clés sensibles (Gemini API, FlexPay API, Firebase Admin) sont confinées côté serveur et ne sont jamais exposées au client.
+
+---
+
+## 🔌 Endpoints d'API Backend
+
+| Méthode | Route | Description |
+|---|---|---|
+| `POST` | `/api/chat` | Proxy pour les échanges avec l'assistant IA Gemini |
+| `POST` | `/api/flexpay/initialize` | Déclenchement d'un paiement Mobile Money USSD Push |
+| `POST` | `/api/flexpay/callback` | Webhook de réception des confirmations de paiement FlexPay |
+| `GET` | `/api/flexpay/check-status/:ref` | Vérification de l'état d'une transaction par référence |
+| `POST` | `/api/flexpay/simulate` | Endpoint de test pour la validation en environnement bac à sable |
+| `GET` | `/api/config` | Configuration publique de contact et de paiement |
+| `GET` | `/api/sdd` | Visualisation du Software Design Document (SDD) |
+| `GET` | `/sitemap.xml` | Fichier Sitemap XML pour le référencement |
+| `GET` | `/robots.txt` | Directives d'indexation pour les robots |
+
+---
+
+## ⚙️ Installation & Démarrage Local
+
+### Prérequis
+- [Node.js](https://nodejs.org/) (version 18 ou supérieure recommandée)
+- [npm](https://www.npmjs.com/) ou [yarn](https://yarnpkg.com/)
+- Un compte Firebase avec un projet Firestore configuré
+
+### 1. Cloner le dépôt
 
 ```bash
 git clone https://github.com/birekeidea-max/amr-mugote-et-ses-freres.git
-```
-
-## Entrer dans le projet
-
-```bash
 cd amr-mugote-et-ses-freres
 ```
 
-## Installer les dépendances
+### 2. Installer les dépendances
 
 ```bash
 npm install
 ```
 
-## Lancer le serveur de développement (Express + Vite)
+### 3. Configurer l'environnement
+
+Copiez `.env.example` vers un nouveau fichier `.env` :
+
+```bash
+cp .env.example .env
+```
+
+Renseignez les variables nécessaires (voir section suivante).
+
+### 4. Lancer le serveur de développement
 
 ```bash
 npm run dev
 ```
-Le serveur démarrera sur le port **3000** (URL : http://localhost:3000).
 
-## Compiler pour la production
+L'application démarre automatiquement sur **`http://localhost:3000`**.
+
+### 5. Compiler pour la production
 
 ```bash
 npm run build
 ```
-Cette commande compile le frontend React avec Vite dans le dossier `dist/` et package le backend TypeScript `server.ts` sous forme de bundle CJS standalone `dist/server.cjs` via `esbuild`.
 
-## Lancer l'application compilée en production
+### 6. Lancer le serveur compilé
 
 ```bash
 npm run start
@@ -239,75 +343,74 @@ npm run start
 
 ---
 
-# 🔧 Variables d'environnement
+## 🔧 Variables d'Environnement
 
-Créez un fichier `.env` à la racine en vous inspirant de `.env.example` :
+Exemple de configuration dans le fichier `.env` :
 
 ```env
-# Clé d'API Google Gemini
-GEMINI_API_KEY="votre_cle_gemini"
+# Clé d'API Google Gemini (utilisée pour l'assistant IA)
+GEMINI_API_KEY="votre_cle_api_gemini"
 
-# URL publique de l'application (pour les callbacks de paiement)
-APP_URL="https://votre-app.com"
+# URL publique de l'application (requise pour les webhooks FlexPay)
+APP_URL="https://amr-mugote-et-ses-freres.vercel.app"
 
-# Clés d'API FlexPay DRC pour les paiements réels
-FLEXPAY_API_TOKEN="votre_bearer_token_flexpay"
-FLEXPAY_MERCHANT_KEY="votre_cle_marchand_flexpay"
+# Identifiants de l'API FlexPay DRC (Mobile Money)
+FLEXPAY_API_TOKEN="votre_token_bearer_flexpay"
+FLEXPAY_MERCHANT_KEY="votre_merchant_key_flexpay"
 
-# Numéro de réception Airtel par défaut pour collecter les fonds
+# Numéro Airtel officiel pour la réception des fonds
 RECIPIENT_AIRTEL_NUMBER="+243994102673"
 ```
 
-*Remarque : Les clés d'API Firebase et de Google Maps sont configurées de manière sécurisée et centralisée.*
+---
+
+## 🚀 Déploiement en Production
+
+### Déploiement sur Vercel
+Le projet inclut un fichier `vercel.json` préconfiguré :
+1. Connectez votre dépôt GitHub à [Vercel](https://vercel.com).
+2. Définissez les variables d'environnement dans le tableau de bord Vercel.
+3. Déployez la branche `main`.
+
+### Déploiement sur Cloud Run / Docker
+Le projet peut être exécuté dans un conteneur Docker standard avec Node.js :
+```bash
+npm run build
+npm run start
+```
+Le serveur écoute sur le port `3000` (`0.0.0.0:3000`).
 
 ---
 
-# 📊 Statistiques prévisionnelles de flux
+## 🔮 Feuille de Route & Évolutions
 
-- Capacité cible d'accueil : **Plus de 50 000 utilisateurs actifs**
-- Volume opérationnel : **Environ 1 500 voyageurs sécurisés par semaine**
-- Synchronisation : Temps réel complet (inférieur à **1 seconde** pour la mise à jour des états d'embarquement)
-- Fiabilité réseau : Gestion fluide des états déconnectés avec synchronisation au retour au réseau
-
----
-
-# 🔮 Améliorations futures
-
-- Applications mobiles natives Android / iOS
-- Notifications Push SMS pour informer des retards éventuels de départs
-- Paiement par carte bancaire locale
-- Géolocalisation par balises physiques autonomes (IoT) sur les navires (en remplacement du positionnement manuel par la console d'administration)
+- [ ] **Balises GPS IoT Matérielles** : Intégration de traceurs GPS physiques autonomes sur chaque navire pour une synchronisation automatique des coordonnées.
+- [ ] **Notifications SMS & WhatsApp** : Envoi automatique de rappels de départ et d'alertes météo par SMS.
+- [ ] **Passerelle de Paiement par Carte Bancaire** : Support des cartes Visa et Mastercard locales.
+- [ ] **Gestion du Fret et des Marchandises** : Module d'enregistrement et de pesage des bagages et marchandises lourdes.
 
 ---
 
-# 👨‍💻 Auteur
+## 👨‍💻 Auteur & Crédits Académiques
 
 **BIREKE IDEA**
-*Étudiant en Sciences Informatiques à l'Université Catholique de Bukavu (UCB)*
-*Développeur & Concepteur de Solutions*
+*Développeur Full-Stack & Concepteur de Solutions Numériques*
+*Étudiant en Sciences Informatiques à l'**Université Catholique de Bukavu (UCB)***
 
-- **GitHub** : [github.com/birekeidea-max](https://github.com/birekeidea-max)
-- **Email** : [birekeidea@gmail.com](mailto:birekeidea@gmail.com)
+- 🐙 **GitHub** : [@birekeidea-max](https://github.com/birekeidea-max)
+- 📧 **Email** : [birekeidea@gmail.com](mailto:birekeidea@gmail.com)
 
----
-
-# 🙏 Remerciements
-
-Nos remerciements les plus sincères s'adressent à :
-- **L'Université Catholique de Bukavu (UCB)**
+### Remerciements
+- **Université Catholique de Bukavu (UCB)**
 - **GDG On Campus UCB**
-- **Le Programme d'Incubation et d'Innovation Technologique**
-- Les mentors et relecteurs pour leurs conseils tout au long de la conception.
+- **Programme d'Incubation et d'Innovation Technologique**
+- L'équipe de direction de l'**ETS AMR MUGOTE ET SES FRÈRES**
 
 ---
 
-# 📄 Licence
+## 📄 Licence
 
-Ce projet est développé sous licence académique et d'innovation dans un cadre de recherche.
-© 2026 BIREKE IDEA — Tous droits réservés.
+Ce projet est développé à des fins académiques, de recherche et d'innovation technologique pour le développement socio-économique de la région du Kivu.
 
----
+© 2026 **BIREKE IDEA** — Tous droits réservés.
 
-## ⭐ Soutenir le projet
-
-Si ce projet vous a été utile, n'hésitez pas à lui attribuer une **⭐ sur GitHub** et à partager vos suggestions d'amélioration.
