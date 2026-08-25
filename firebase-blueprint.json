@@ -113,9 +113,33 @@
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["from", "to", "time"]
+    },
+    "SiteSettings": {
+      "title": "SiteSettings",
+      "description": "Global application configuration including official class tariffs and visuals.",
+      "type": "object",
+      "properties": {
+        "homeBg": { "type": "string" },
+        "homeDetail": { "type": "string" },
+        "adminCode": { "type": "string" },
+        "classPrices": {
+          "type": "object",
+          "description": "Unique official ticket price in USD for each passenger class.",
+          "properties": {
+            "VIP": { "type": "number" },
+            "1ère Classe": { "type": "number" },
+            "2ème Classe": { "type": "number" },
+            "3ème Classe": { "type": "number" }
+          }
+        }
+      }
     }
   },
   "firestore": {
+    "settings": {
+      "schema": { "$ref": "#/entities/SiteSettings" },
+      "description": "Global site configuration settings including official tariffs."
+    },
     "reservations": {
       "schema": { "$ref": "#/entities/Reservation" },
       "description": "Collection of all bookings."

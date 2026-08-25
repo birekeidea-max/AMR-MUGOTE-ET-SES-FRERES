@@ -47,3 +47,13 @@ export interface UserProfile {
   role: 'CLIENT' | 'ADMIN';
   isVerified: boolean;
 }
+
+export type ClassPrices = Record<TravelClass, number>;
+
+export interface SiteSettings {
+  homeBg?: string;
+  homeDetail?: string;
+  logo?: string;
+  adminCode?: string;
+  classPrices?: Partial<Record<TravelClass, number>>;
+}

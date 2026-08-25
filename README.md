@@ -94,6 +94,9 @@ Cette plateforme web full-stack a été conçue pour **digitaliser l'intégralit
 
 ### 👨‍💼 Espace Administration & Gestion de Flotte
 - **Dashboard Analytique** : Chiffre d'affaires en temps réel, nombre total de réservations, taux de fréquentation.
+- **Gestion Dynamique des Tarifs & Classes** :
+  - Configuration en temps réel du tarif officiel en dollars ($ USD) pour chaque classe (*VIP*, *1ère Classe*, *2ème Classe*, *3ème Classe*).
+  - Unicité stricte des tarifs synchronisés sur l'accueil, les réservations, les QR codes et les reçus.
 - **Validation & Gestion des Réservations** :
   - Validation manuelle ou automatisée des paiements.
   - Annulation ou modification de billets.

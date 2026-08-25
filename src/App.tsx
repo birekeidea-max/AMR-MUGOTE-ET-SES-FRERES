@@ -53,7 +53,12 @@ import {
   Download,
   Heart,
   Maximize2,
-  Minimize2
+  Minimize2,
+  DollarSign,
+  Banknote,
+  Save,
+  Sparkles,
+  Tag
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { auth, db, handleFirestoreError, OperationType, uploadToStorage } from './lib/firebase';
@@ -99,6 +104,7 @@ import DocumentScannerWidget from './components/DocumentScannerWidget';
 import JsonLdSchema from './components/JsonLdSchema';
 import FAQ from './components/FAQ';
 import SchedulesAndTariffs from './components/SchedulesAndTariffs';
+import AdminTarifsView from './components/AdminTarifsView';
 
 // --- Safe localStorage Polyfill for sandboxed iframe environments ---
 let safeLocalStorage: Storage;
@@ -169,12 +175,30 @@ const getEmbedUrl = (url: string) => {
 
 const MERCHANT_PHONE = "+243 994 102 673";
 const CONTACT_NUMBERS = ["+243 994 102 673", "+243 816 680 709"];
-const PRICES: Record<TravelClass, number> = {
+
+export const DEFAULT_PRICES: Record<TravelClass, number> = {
+  'VIP': 27,
   '1ère Classe': 27,
   '2ème Classe': 17,
-  '3ème Classe': 10,
-  'VIP': 27
+  '3ème Classe': 10
 };
+
+export const getClassPrices = (settings?: any): Record<TravelClass, number> => {
+  return {
+    'VIP': Number(settings?.classPrices?.['VIP'] ?? DEFAULT_PRICES['VIP']),
+    '1ère Classe': Number(settings?.classPrices?.['1ère Classe'] ?? DEFAULT_PRICES['1ère Classe']),
+    '2ème Classe': Number(settings?.classPrices?.['2ème Classe'] ?? DEFAULT_PRICES['2ème Classe']),
+    '3ème Classe': Number(settings?.classPrices?.['3ème Classe'] ?? DEFAULT_PRICES['3ème Classe']),
+  };
+};
+
+export const getClassPrice = (travelClass: TravelClass, settings?: any): number => {
+  const prices = getClassPrices(settings);
+  return prices[travelClass] ?? DEFAULT_PRICES[travelClass] ?? 20;
+};
+
+// Fallback constant for backwards compatibility
+const PRICES: Record<TravelClass, number> = DEFAULT_PRICES;
 
 const CLASS_COLORS: Record<TravelClass, { main: string, rgb: [number, number, number], light: string }> = {
   '1ère Classe': { main: '#EAB308', rgb: [234, 179, 8], light: 'rgba(234, 179, 8, 0.1)' }, // Gold
@@ -1271,6 +1295,7 @@ export default function App() {
                   onReserved={(res) => { setCurrentReservation(res); setCurrentPage('payment'); }} 
                   user={user} 
                   onLoginRequest={() => setAuthModal({ isOpen: true, mode: 'user' })}
+                  siteSettings={siteSettings}
                 />
               )}
               {currentPage === 'payment' && <Payment reservation={currentReservation} onComplete={() => setCurrentPage('tickets')} siteSettings={siteSettings} />}
@@ -2920,10 +2945,11 @@ function ChatWidget({ user }: { user: FirebaseUser | null }) {
 
 // --- Page Components ---
 
-function Home({ onBook, onNavigate, siteSettings, schedules }: { onBook: () => void, onNavigate: (page: string) => void, siteSettings?: { homeBg: string, homeDetail: string }, schedules: any[] }) {
+function Home({ onBook, onNavigate, siteSettings, schedules }: { onBook: () => void, onNavigate: (page: string) => void, siteSettings?: any, schedules: any[] }) {
   const [media, setMedia] = useState<any[]>([]);
   const [galleryImages, setGalleryImages] = useState<any[]>([]);
 
+  const prices = getClassPrices(siteSettings);
   const settings = siteSettings || { 
     homeBg: 'https://images.unsplash.com/photo-1559139225-8216b8e8303e?q=80&w=2070&auto=format&fit=crop',
     homeDetail: 'https://images.unsplash.com/photo-1544551763-46a013bb70d5?q=80&w=2070&auto=format&fit=crop',
@@ -3290,40 +3316,40 @@ function Home({ onBook, onNavigate, siteSettings, schedules }: { onBook: () => v
       <section id="prices" className="max-w-7xl mx-auto px-8 bg-slate-50 py-10 -mx-8">
         <div className="text-center max-w-2xl mx-auto mb-12 space-y-4">
           <h3 className="text-black text-[9px] font-bold uppercase tracking-[0.4em] opacity-40">Séléctionnez votre confort</h3>
-          <h4 className="text-2xl font-extrabold tracking-tighter text-black uppercase italic">Tarifications</h4>
+          <h4 className="text-2xl font-extrabold tracking-tighter text-black uppercase italic">Tarifications Officielles</h4>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-5 max-w-5xl mx-auto">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 max-w-6xl mx-auto">
           {[
             { 
+              name: "VIP", 
+              price: `${prices['VIP']}$`, 
+              features: ["Salon Climatisé", "Salon VIP", "Priorité"],
+              img: "https://images.unsplash.com/photo-1520264184863-ad1b4ae2399a?q=80&w=2070&auto=format&fit=crop"
+            },
+            { 
               name: "1ère Classe", 
-              price: `${PRICES['1ère Classe']}$`, 
+              price: `${prices['1ère Classe']}$`, 
               features: ["Service standard", "Sûr & Rapide"],
               img: "https://images.unsplash.com/photo-1599308662135-7d472288924b?q=80&w=2070&auto=format&fit=crop"
             },
             { 
               name: "2ème Classe", 
-              price: `${PRICES['2ème Classe']}$`, 
+              price: `${prices['2ème Classe']}$`, 
               features: ["Sièges confortables", "Espace ventilé"],
               img: "https://images.unsplash.com/photo-1569336415962-a4bd9f67c07a?q=80&w=2070&auto=format&fit=crop"
             },
             { 
               name: "3ème Classe", 
-              price: `${PRICES['3ème Classe']}$`, 
+              price: `${prices['3ème Classe']}$`, 
               features: ["Économique", "Sûr & Robuste"],
               img: "https://images.unsplash.com/photo-1559139225-8216b8e8303e?q=80&w=2070&auto=format&fit=crop"
-            },
-            { 
-              name: "VIP", 
-              price: `${PRICES['VIP']}$`, 
-              features: ["Salon Climatisé", "Salon VIP", "Priorité"],
-              img: "https://images.unsplash.com/photo-1520264184863-ad1b4ae2399a?q=80&w=2070&auto=format&fit=crop"
             },
           ].map((cls, i) => (
             <div key={i} className="bg-white p-2 rounded-[24px] border border-slate-100 shadow-lg shadow-slate-200/40 flex flex-col group h-full">
               <div className="h-40 rounded-[18px] overflow-hidden relative">
                 <img src={cls.img} alt={cls.name} className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-700" />
                 <div className="absolute inset-0 bg-black/10 group-hover:bg-transparent transition-colors" />
-                <div className="absolute bottom-3 left-1/2 -translate-x-1/2 px-3 py-1 bg-black text-white rounded-full text-[8px] font-bold tracking-widest">
+                <div className="absolute bottom-3 left-1/2 -translate-x-1/2 px-3 py-1 bg-black text-white rounded-full text-[8px] font-bold tracking-widest whitespace-nowrap shadow-md">
                   {cls.price} USD
                 </div>
               </div>
@@ -3338,7 +3364,7 @@ function Home({ onBook, onNavigate, siteSettings, schedules }: { onBook: () => v
                 </ul>
                 <button 
                   onClick={onBook}
-                  className="w-full py-2.5 bg-black text-white rounded-lg text-[8px] font-extrabold uppercase tracking-widest hover:bg-slate-800 transition-all shadow-md shadow-black/10"
+                  className="w-full py-2.5 bg-black text-white rounded-lg text-[8px] font-extrabold uppercase tracking-widest hover:bg-slate-800 transition-all shadow-md shadow-black/10 cursor-pointer"
                 >
                   Réserver
                 </button>
@@ -3349,7 +3375,7 @@ function Home({ onBook, onNavigate, siteSettings, schedules }: { onBook: () => v
       </section>
 
       {/* Horaires & Tarifs */}
-      <SchedulesAndTariffs />
+      <SchedulesAndTariffs siteSettings={siteSettings} />
 
       {/* Foire Aux Questions (FAQ) */}
       <FAQ />
@@ -3363,7 +3389,8 @@ const SHIP_CLASS_CAPACITIES: Record<ShipName, Record<TravelClass, number>> = {
   'Mugote 3': { 'VIP': 20, '1ère Classe': 45, '2ème Classe': 100, '3ème Classe': 180 }
 };
 
-function Booking({ onReserved, user, onLoginRequest }: { onReserved: (res: Reservation) => void, user: FirebaseUser | null, onLoginRequest: () => void }) {
+function Booking({ onReserved, user, onLoginRequest, siteSettings }: { onReserved: (res: Reservation) => void, user: FirebaseUser | null, onLoginRequest: () => void, siteSettings?: any }) {
+  const prices = getClassPrices(siteSettings);
   const [formData, setFormData] = useState({
     fullName: '',
     lastName: '',
@@ -3501,7 +3528,7 @@ function Booking({ onReserved, user, onLoginRequest }: { onReserved: (res: Reser
     }
     setSubmitting(true);
     
-    const amount = PRICES[formData.travelClass] * formData.passengersCount;
+    const amount = prices[formData.travelClass] * formData.passengersCount;
     
     // We auto-generate a temporary pending transactionId structure to satisfy the collection structure
     const tempTxnId = `TEMP-MUG-PAY-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
@@ -3865,7 +3892,7 @@ function Booking({ onReserved, user, onLoginRequest }: { onReserved: (res: Reser
                             }}
                           >
                             <p className={cn("text-[6px] lg:text-[8px] font-black uppercase tracking-tighter leading-none mb-0.5 lg:mb-1", isActive ? "text-white" : "text-slate-400")}>{c} ({labelName})</p>
-                            <p className={cn("text-[10px] lg:text-sm font-black font-mono leading-none", isActive ? "text-white" : "text-black")}>{PRICES[c]}$</p>
+                            <p className={cn("text-[10px] lg:text-sm font-black font-mono leading-none", isActive ? "text-white" : "text-black")}>{prices[c]}$</p>
                             
                             {formData.travelDate ? (
                               <p className={cn("text-[6px] lg:text-[7px] font-black uppercase mt-1 px-1.5 py-0.5 rounded-full tracking-widest", isActive ? "text-white bg-white/20" : remSeats <= 5 ? "text-rose-600 bg-rose-50 border border-rose-100" : "text-slate-500 bg-slate-200/50")}>
@@ -3910,11 +3937,11 @@ function Booking({ onReserved, user, onLoginRequest }: { onReserved: (res: Reser
                         <div className="absolute top-0 left-0 w-1 h-full bg-gold" />
                               <div className="text-left">
                                 <p className="text-[8px] lg:text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-0.5">Résumé</p>
-                                <p className="text-[10px] lg:text-sm font-black text-maritime font-mono">{formData.passengersCount}x {PRICES[formData.travelClass]}$</p>
+                                <p className="text-[10px] lg:text-sm font-black text-maritime font-mono">{formData.passengersCount}x {prices[formData.travelClass]}$</p>
                               </div>
                               <div className="text-right">
                                 <p className="text-[8px] lg:text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-0.5">TOTAL</p>
-                                <p className="text-xl lg:text-3xl font-black text-maritime font-mono tracking-tighter">{PRICES[formData.travelClass] * formData.passengersCount}$</p>
+                                <p className="text-xl lg:text-3xl font-black text-maritime font-mono tracking-tighter">{prices[formData.travelClass] * formData.passengersCount}$</p>
                               </div>
                             </div>
 
@@ -4015,7 +4042,7 @@ function Booking({ onReserved, user, onLoginRequest }: { onReserved: (res: Reser
                     <div className="text-right">
                       <p className="text-[7px] lg:text-[9px] font-black text-gold uppercase tracking-widest mb-0.5">Total</p>
                       <p className="text-2xl lg:text-4xl font-black font-mono tracking-tighter">
-                        {PRICES[formData.travelClass] * formData.passengersCount}<span className="text-[10px] opacity-50">$</span>
+                        {prices[formData.travelClass] * formData.passengersCount}<span className="text-[10px] opacity-50">$</span>
                       </p>
                     </div>
                   </div>
@@ -4298,7 +4325,7 @@ function Payment({ reservation, onComplete, siteSettings }: { reservation: Reser
 }
 
 function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlocked, setIsAdminUnlocked, setUser }: { siteSettings?: { homeBg: string, homeDetail: string }, onNavigate: (page: string) => void, schedules: any[], isAdmin: boolean, isAdminUnlocked: boolean, setIsAdminUnlocked: (val: boolean) => void, setUser?: (u: any) => void }) {
-  const [tab, setTab] = useState<'reservations' | 'users' | 'fleet' | 'media' | 'settings' | 'messages' | 'schedules' | 'scanner'>('reservations');
+  const [tab, setTab] = useState<'reservations' | 'tarifs' | 'users' | 'fleet' | 'media' | 'settings' | 'messages' | 'schedules' | 'scanner'>('reservations');
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [usersList, setUsersList] = useState<any[]>([]);
   const [fleetList, setFleetList] = useState<any[]>([]);
@@ -5201,6 +5228,7 @@ function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlock
             <div className="flex flex-wrap justify-center gap-2">
               {[
                 { id: 'reservations', label: 'Réservations', icon: Ticket },
+                { id: 'tarifs', label: 'Tarifs & Classes', icon: DollarSign },
                 { id: 'scanner', label: 'Scanner Port', icon: Camera },
                 { id: 'users', label: 'Utilisateurs', icon: Users },
                 { id: 'fleet', label: 'Flotte', icon: Anchor },
@@ -5500,6 +5528,8 @@ function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlock
             </table>
             {reservations.length === 0 && <div className="p-20 text-center text-slate-400 font-bold uppercase tracking-widest text-[10px]">Aucun passager enregistré.</div>}
           </div>
+        ) : tab === 'tarifs' ? (
+          <AdminTarifsView siteSettings={siteSettings} />
         ) : tab === 'users' ? (
           <div className="p-12 space-y-8">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -6370,15 +6400,17 @@ function GalleryView({ siteSettings }: { siteSettings: any }) {
         const url = data.processedUrl || data.url || data.videoUrl || data.imageUrl || data.image || data.video || data.contentUrl || '';
         const isVideo = type === 'video' || !!(data.videoUrl || data.video) || (url && (url.toLowerCase().match(/\.(mp4|webm|ogg|mov|mkv|3gp|m4v|avi)(\?.*)?$/i) || url.toLowerCase().includes('youtube.com') || url.toLowerCase().includes('youtu.be') || url.toLowerCase().includes('vimeo.com') || (url.toLowerCase().includes('firebasestorage.googleapis.com') && (url.toLowerCase().includes('.mov') || url.toLowerCase().includes('.mp4') || url.toLowerCase().includes('video') || url.toLowerCase().includes('.webm') || url.toLowerCase().includes('.avi')))));
 
+        const resolvedTitle = (data.title || '').trim() || (data.desc || data.content || data.description || '').slice(0, 45) || 'Publication AMR Mugote';
         return {
           ...data,
           id: doc.id,
+          title: resolvedTitle,
           processedUrl: url,
           processedType: isVideo ? 'video' : (type === 'text' && !url ? 'text' : 'image'),
           processedDesc: data.desc || data.content || data.description || data.text || '',
           sortDate: data.publishedAt || data.updatedAt || data.createdAt || { seconds: 0 }
         };
-      }).filter((item: any) => item.title && item.title.trim() !== "");
+      });
 
       setMedia(items.sort((a, b) => {
         const ta = a.sortDate?.seconds || 0;
@@ -6708,15 +6740,17 @@ function NewsView() {
         const url = data.processedUrl || data.url || data.videoUrl || data.imageUrl || data.image || data.video || data.contentUrl || '';
         const isVideo = type === 'video' || !!(data.videoUrl || data.video) || (url && (url.toLowerCase().match(/\.(mp4|webm|ogg|mov|mkv|3gp|m4v|avi)(\?.*)?$/i) || url.toLowerCase().includes('youtube.com') || url.toLowerCase().includes('youtu.be') || url.toLowerCase().includes('vimeo.com') || (url.toLowerCase().includes('firebasestorage.googleapis.com') && (url.toLowerCase().includes('.mov') || url.toLowerCase().includes('.mp4') || url.toLowerCase().includes('video') || url.toLowerCase().includes('.webm') || url.toLowerCase().includes('.avi')))));
 
+        const resolvedTitle = (data.title || '').trim() || (data.desc || data.content || data.description || '').slice(0, 45) || 'Publication AMR Mugote';
         return {
           ...data,
           id: doc.id,
+          title: resolvedTitle,
           processedUrl: url,
           processedType: isVideo ? 'video' : (type === 'text' && !url ? 'text' : 'image'),
           processedDesc: data.desc || data.content || data.description || data.text || '',
           sortDate: data.publishedAt || data.updatedAt || data.createdAt || { seconds: 0 }
         };
-      }).filter((item: any) => item.title && item.title.trim() !== "");
+      });
 
       setNews(items.sort((a, b) => {
         const ta = a.sortDate?.seconds || 0;
