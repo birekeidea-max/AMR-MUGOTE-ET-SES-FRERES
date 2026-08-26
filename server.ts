@@ -53,50 +53,125 @@ async function startServer() {
   app.post("/api/chat", async (req, res) => {
     try {
       const { message, history } = req.body;
-      if (!message) {
-        return res.status(400).json({ error: "Message is required" });
+      if (!message || !String(message).trim()) {
+        return res.status(400).json({ error: "Le message est requis." });
       }
 
-      const apiKey = process.env.GEMINI_API_KEY;
-      if (!apiKey) {
-        console.error("GEMINI_API_KEY is missing from environment variables");
-        return res.status(500).json({ error: "Configuration de l'IA manquante." });
-      }
-
-      const client = new GoogleGenAI({
-        apiKey,
-        httpOptions: {
-          headers: {
-            'User-Agent': 'aistudio-build',
+      // 1. Retrieve dynamic site settings from Firestore for real-time accurate prices and contacts
+      let sitePrices = { 'VIP': 27, '1ère Classe': 27, '2ème Classe': 17, '3ème Classe': 10 };
+      let sitePhone = "+243 994 286 469";
+      try {
+        const settingsSnap = await dbAdmin.collection("settings").doc("site").get();
+        if (settingsSnap.exists) {
+          const sData = settingsSnap.data();
+          if (sData?.classPrices) {
+            sitePrices = {
+              'VIP': Number(sData.classPrices['VIP'] ?? 27),
+              '1ère Classe': Number(sData.classPrices['1ère Classe'] ?? 27),
+              '2ème Classe': Number(sData.classPrices['2ème Classe'] ?? 17),
+              '3ème Classe': Number(sData.classPrices['3ème Classe'] ?? 10)
+            };
+          }
+          if (sData?.contactPhone) {
+            sitePhone = sData.contactPhone;
           }
         }
-      });
+      } catch (dbErr) {
+        console.warn("Could not load Firestore settings for chat, using defaults:", dbErr);
+      }
 
-      console.log("Chat Request Message:", message);
+      const systemInstruction = `Tu es l'assistant IA officiel, expert et dévoué de "ETS AMR MUGOTE ET SES FRERES", la plateforme leader et référence du transport lacustre moderne sur le Lac Kivu en République Démocratique du Congo (RDC).
+Ta mission est d'orienter, renseigner et accompagner chaleureusement les voyageurs à chaque étape de leur parcours.
+
+=== CONNAISSANCES OFFICIELLES & EXHAUSTIVES DE LA PLATEFORME ===
+
+1. IDENTITÉ & MISSION DE L'ENTREPRISE :
+- Raison sociale : ETS AMR MUGOTE ET SES FRERES (abrégé "AMR MUGOTE" ou "MUGOTE").
+- Slogan : "Voyager en toute sécurité".
+- Rayonnement : Liaisons régulières et rapides entre les villes de Bukavu (Sud-Kivu) et Goma (Nord-Kivu) via le Lac Kivu.
+- Valeurs fondamentales : Sécurité maritime certifiée, ponctualité, confort moderne, innovations technologiques et service client attentionné.
+
+2. FLOTTE DE BATEAUX & SÉCURITÉ :
+- Nos navires rapides : MUGOTE 1, MUGOTE 2 et MUGOTE 3.
+- Caractéristiques : Moteurs marins inspectés quotidiennement, gilets de sauvetage certifiés pour 100% des passagers, canots de sauvetage, radars GPS de navigation, extincteurs, sièges ergonomiques, écrans de divertissement et pont panoramique offrant une vue splendide sur le Lac Kivu et l'île d'Idjwi.
+- Durée de traversée : Environ 3 heures de voyage agréable et sécurisé.
+
+3. HORAIRES DE DÉPART QUOTIDIENS (7j/7) :
+- Liaisons dans les 2 sens (Bukavu -> Goma ET Goma -> Bukavu) :
+  • Matin : 07h30 (Mugote 1 / Mugote 2)
+  • Midi : 11h00 (Mugote 2 / Mugote 3)
+  • Après-midi : 14h30 (Mugote 3 / Mugote 1)
+- Recommandation d'embarquement : Se présenter au port d'embarquement 45 minutes avant le départ pour l'enregistrement et le contrôle des billets.
+
+4. GRILLE TARIFAIRE OFFICIELLE PAR CLASSE (ACTUALISÉE EN DIRECT) :
+- Classe VIP : ${sitePrices['VIP']}$ USD (Salon climatisé privatisé, sièges grand luxe, service personnalisé, boisson offerte, embarquement prioritaire).
+- 1ère Classe : ${sitePrices['1ère Classe']}$ USD (Fauteuils spacieux de première qualité, espace calme, vue panoramique, priorité).
+- 2ème Classe : ${sitePrices['2ème Classe']}$ USD (Standard très populaire, grand espace aéré et ventilé, très apprécié des voyageurs).
+- 3ème Classe : ${sitePrices['3ème Classe']}$ USD (Option économique et abordable, accès direct au pont avec vue sur le lac).
+
+5. LOCALISATION EXACTE DES PORTS & GÉOLOCALISATION GPS :
+- PORT DE BUKAVU (Port d'attache AMR Mugote) :
+  • Adresse : République Démocratique du Congo, Province du Sud-Kivu, Ville de Bukavu, Commune de Kadutu, Avenue Michombero, Quartier Nkafu.
+  • Repères : Situé en diagonale avec le célèbre marché Beach Muhanzi de Bukavu.
+  • Limites physiques : Borné à l'EST par le marché Beach Muhanzi, et à l'OUEST par le port de l'ETS SILIMU.
+- PORT DE GOMA :
+  • Port public lacustre de Goma, au bord du Lac Kivu, proche du centre-ville.
+- MODULE GPS DU SITE (Onglet "LOCALISATION") :
+  • Les passagers peuvent cliquer sur "LOCALISATION" dans le menu pour afficher leur position GPS en temps réel, calculer la distance exacte restante jusqu'au port d'embarquement et lancer l'itinéraire routier.
+
+6. PROCESSUS DE RÉSERVATION & BILLETTERIE PAS-À-PAS :
+- Étape 1 : Se rendre sur l'onglet "RÉSERVER" dans le menu du site.
+- Étape 2 : Sélectionner l'itinéraire (Bukavu->Goma ou Goma->Bukavu), la date de voyage souhaitée, le bateau et la classe de voyage (VIP, 1ère, 2ème ou 3ème).
+- Étape 3 : Renseigner les coordonnées du passager (Nom complet, Téléphone valide).
+- Étape 4 : Paiement du billet :
+  • Mobile Money Automatique (FlexPay) : M-Pesa (Vodacom), Airtel Money, Orange Money.
+  • Transfert Mobile Money direct : Envoi au numéro officiel ${sitePhone} (Titulaire du compte : AMR MUGOTE), puis saisie de la référence/ID de transaction.
+  • Carte bancaire (Visa/Mastercard) ou paiement direct au guichet du port.
+- Étape 5 : Accès au Billet :
+  • Une fois la réservation validée, le billet électronique avec son QR Code infalsifiable est disponible dans l'onglet "MES BILLETS".
+  • L'utilisateur peut le télécharger en PDF ou l'imprimer. Le QR Code est scanné au port lors de l'embarquement.
+
+7. AUTRES SECTIONS & FONCTIONNALITÉS DU SITE :
+- "GALERIE" : Photos et vidéos de haute qualité des bateaux, des cabines VIP et des traversées sur le Lac Kivu.
+- "ACTUALITÉS" (Journal de bord) : Publications officielles de la compagnie, informations météo, annonces de trafic.
+- "FAQ" : Foire aux questions détaillées.
+- "MES BILLETS" : Visualisation, téléchargement PDF et vérification des réservations de l'utilisateur.
+- "CONTACT" : Support et assistance client par téléphone / WhatsApp au ${sitePhone}.
+
+8. RÈGLES DE BAGAGES & POLITIQUE DE VOYAGE :
+- Bagages inclus : Valise standard + bagage à main inclus par passager.
+- Colis et fret lourd : Pris en charge aux comptoirs de fret de nos ports à des tarifs avantageux.
+- Enfants : Les enfants en bas âge voyagent accompagnés avec gilets de sauvetage adaptés.
+- Animaux : Transport autorisé sous conditions strictes dans des cages adaptées et sur le pont.
+
+=== CONSIGNES DE RÉPONSE ET DE COMPORTEMENT ===
+- TON : Très courtois, professionnel, accueillant et chaleureux. Utilise toujours le vouvoiement ("Vous").
+- LANGUE : Réponds en FRANÇAIS (ou en Swahili / Lingala / Anglais si l'utilisateur s'exprime expressément dans ces langues).
+- CLARTÉ : Structure tes réponses avec des puces claires, des sauts de ligne et du texte en gras pour une excellente lisibilité.
+- ORIENTATION : Guide précisément l'utilisateur vers le bon onglet du site (ex: "Cliquez sur l'onglet 'RÉSERVER' en haut de la page", "Rendez-vous dans la section 'LOCALISATION'", "Consultez vos billets dans 'MES BILLETS'").
+- IDENTITÉ IA : Tu es "Mugote AI Assistant", l'assistant virtuel intelligent de la compagnie maritime ETS AMR MUGOTE. Ne mentionne jamais que tu es un modèle générique de Google.`;
+
+      const apiKey = process.env.GEMINI_API_KEY;
       
       const messageStr = String(message || "").trim();
-      const rawContents = [];
+      const rawContents: any[] = [];
       const historyItems = history || [];
       
       for (const h of historyItems) {
         const text = String(h.text || h.message || "").trim();
-        if (!text) continue; // Skip empty messages that crash Gemini
-        
-        // Match standard senderRole or role tags
+        if (!text) continue;
         const rName = (h.role || h.senderRole || "").toString().toUpperCase();
         const role = (rName === 'AI' || rName === 'ADMIN' || rName === 'MODEL') ? 'model' : 'user';
         rawContents.push({ role, parts: [{ text }] });
       }
 
-      // Add the current message if it's not already the last turn
       const lastHistoryMessage = rawContents.length > 0 ? rawContents[rawContents.length - 1].parts[0].text : "";
       if (lastHistoryMessage !== messageStr) {
         rawContents.push({ role: 'user', parts: [{ text: messageStr }] });
       }
 
-      // Merge consecutive entries of the same role (e.g., user -> user or model -> model)
-      // to comply with Gemini's strict alternation constraint.
-      const contents = [];
+      // Strict role alternation merge
+      const contents: any[] = [];
       for (const item of rawContents) {
         if (contents.length > 0 && contents[contents.length - 1].role === item.role) {
           contents[contents.length - 1].parts[0].text += "\n" + item.parts[0].text;
@@ -105,7 +180,6 @@ async function startServer() {
         }
       }
 
-      // Ensure the dialogue starts with a user turn
       while (contents.length > 0 && contents[0].role !== 'user') {
         contents.shift();
       }
@@ -114,74 +188,111 @@ async function startServer() {
         contents.push({ role: 'user', parts: [{ text: messageStr }] });
       }
 
-      const modelName = "gemini-3.5-flash";
+      // If API Key is configured, use Google GenAI SDK with gemini-3.7-flash and fallback
+      if (apiKey) {
+        const client = new GoogleGenAI({
+          apiKey,
+          httpOptions: {
+            headers: {
+              'User-Agent': 'aistudio-build',
+            }
+          }
+        });
 
-      console.log("Using model:", modelName);
-      
-      const result = await client.models.generateContent({
-        model: modelName,
-        contents: contents,
-        config: {
-          systemInstruction: `Tu es l'assistant IA expert et officiel de "ETS AMR MUGOTE ET SES FRERES", la plateforme leader du transport lacustre sur le Lac Kivu en République Démocratique du Congo.
- Ta mission est d'accompagner les voyageurs dans chaque étape de leur expérience, du simple renseignement à la gestion de leurs billets.
+        // Model candidate list from modern Gemini API
+        const candidateModels = ["gemini-3.7-flash", "gemini-flash-latest", "gemini-3.1-flash-lite"];
+        let responseText = "";
+        let lastErr = null;
 
-CONTEXTE DE L'ENTREPRISE :
-- Identité : ETS AMR MUGOTE ET SES FRERES (souvent appelé simplement "Mugote").
-- Mission : Révolutionner le transport entre Bukavu et Goma par la sécurité, la technologie et le confort.
-- Slogan : "Voyager en toute sécurité".
-- Flotte : Nos navires emblématiques MUGOTE 1, MUGOTE 2 et MUGOTE 3. Ils sont inspectés quotidiennement et offrent des espaces VIP climatisés.
+        for (const mName of candidateModels) {
+          try {
+            console.log(`Calling Gemini with model ${mName}...`);
+            const result = await client.models.generateContent({
+              model: mName,
+              contents: contents,
+              config: {
+                systemInstruction: systemInstruction,
+                temperature: 0.7,
+              }
+            });
 
-LOCALISATION PHARE (PORT AMR MUGOTE BUKAVU) :
-- Pays/Province/Ville : RDC, Province du Sud-Kivu, Ville de Bukavu.
-- Commune, Avenue, Quartier : Commune de Kadutu, Avenue Michombero, Quartier Nkafu.
-- Points de repère : Situé en diagonale avec le célèbre marché Beach Muhanzi de Bukavu.
-- Limites physiques du Port Mugote : Borné à l'EST par le marché Beach Muhanzi, et à l'OUEST par le port de l'ETS SILIMU.
-- Onglet de Géolocalisation : Les voyageurs peuvent se rendre sur l'onglet "LOCALISATION" de la barre de navigation. Cela leur permet de voir leur position GPS en temps réel sur la carte interactive, d'évaluer le nombre de kilomètres restants jusqu'au port d'embarquement, et d'obtenir l'itinéraire.
-
-FONCTIONNEMENT DE LA PLATEFORME (À EXPLIQUER AUX UTILISATEURS) :
-1. RÉSERVATION : Les utilisateurs doivent aller dans l'onglet "RÉSERVER", choisir le sens (Bukavu->Goma ou Goma->Bukavu), la date, le bateau et leur classe.
-2. PAIEMENT : Une fois les informations saisies, ils doivent effectuer le paiement via Mobile Money (Airtel, Orange, M-Pesa) au numéro officiel : +243 994 286 469 (Titulaire : AMR MUGOTE).
-3. VALIDATION : Après paiement, ils saisissent l'ID de transaction. Un administrateur valide manuellement la transaction. Le billet n'est "ACTIF" qu'après cette validation.
-4. BILLETS : Une fois validé, le billet apparaît avec un QR Code unique dans l'onglet "MES BILLETS". Ce QR Code est scanné à l'embarquement.
-
-TARIFS ET HORAIRES (FIXES ET QUOTIDIENS) :
-- VIP & 1ère CLASSE : 30$ environ.
-- 2ème CLASSE : 17$.
-- 3ème CLASSE : 10$.
-- DÉPARTS : 07h30 et 11h00 (bukavu) / 09h00 et 14h00 (goma) - à vérifier selon le planning.
-
-TON ET STYLE :
-- Sois extrêmement COURTOIS et PROFESSIONNEL. Utilise le "Vous".
-- Commence souvent par "Bienvenue à bord" ou "C'est un plaisir de vous aider".
-- Réponds uniquement en FRANÇAIS.
-- Ne mentionne jamais que tu es un modèle d'IA développé par Google. Tu es "Mugote AI Assistant".`
+            if (result && result.text) {
+              responseText = result.text;
+              break;
+            } else if (result && result.candidates?.[0]?.content?.parts?.[0]?.text) {
+              responseText = result.candidates[0].content.parts[0].text;
+              break;
+            }
+          } catch (modelCallErr: any) {
+            console.warn(`Attempt with ${mName} failed:`, modelCallErr?.message || modelCallErr);
+            lastErr = modelCallErr;
+          }
         }
-      });
-      
-      console.log("Gemini API call successful");
-      
-      let responseText = "";
-      try {
-        if (result && result.text) {
-          responseText = result.text;
-        } else if (result && result.candidates?.[0]?.content?.parts?.[0]?.text) {
-          responseText = result.candidates[0].content.parts[0].text;
+
+        if (responseText && responseText.trim()) {
+          return res.json({ text: responseText });
         }
-        
-        if (!responseText) {
-          console.warn("Empty response from Gemini API", JSON.stringify(result));
-          responseText = "Désolé, je n'ai pas pu générer de réponse intelligible. Veuillez réessayer.";
-        }
-      } catch (extractError) {
-        console.error("Text extraction failed:", extractError);
-        responseText = "Désolé, une erreur interne est survenue lors du traitement de l'IA.";
       }
 
-      console.log("Chat Response Text (first 50 chars):", responseText.substring(0, 50));
-      res.json({ text: responseText });
+      // Intelligent Fallback System (Guarantees zero-failure assistant experience)
+      const q = messageStr.toLowerCase();
+      let fallbackText = "";
+
+      if (q.includes("tarif") || q.includes("prix") || q.includes("combien") || q.includes("coût") || q.includes("cout") || q.includes("classe")) {
+        fallbackText = `🚢 **Grille Tarifaire Officielle — AMR MUGOTE :**\n\n` +
+          `• 👑 **Classe VIP :** **${sitePrices['VIP']}$ USD** (Salon climatisé, grand confort, service personnalisé, boisson offerte).\n` +
+          `• ⭐ **1ère Classe :** **${sitePrices['1ère Classe']}$ USD** (Sièges grand confort, espace calme et vue panoramique).\n` +
+          `• 🚢 **2ème Classe :** **${sitePrices['2ème Classe']}$ USD** (Standard recommandé, aéré et très spacieux).\n` +
+          `• ⚓ **3ème Classe :** **${sitePrices['3ème Classe']}$ USD** (Tarif économique et abordable, accès pont).\n\n` +
+          `💡 *Pour réserver, rendez-vous dans l'onglet **"RÉSERVER"** en haut de la plateforme.*`;
+      } else if (q.includes("horaire") || q.includes("heure") || q.includes("départ") || q.includes("depart") || q.includes("quand")) {
+        fallbackText = `🕒 **Horaires de Départs Quotidiens (Bukavu <-> Goma) :**\n\n` +
+          `Nos navires rapides assurent les liaisons tous les jours aux horaires suivants :\n` +
+          `• **Matin :** **07h30** (Mugote 1 / Mugote 2)\n` +
+          `• **Midi :** **11h00** (Mugote 2 / Mugote 3)\n` +
+          `• **Après-midi :** **14h30** (Mugote 3 / Mugote 1)\n\n` +
+          `⏱️ *Durée de la traversée : environ 3 heures sur le Lac Kivu.*\n` +
+          `📍 *Présentation au port recommandée : 45 minutes avant le départ.*`;
+      } else if (q.includes("port") || q.includes("adresse") || q.includes("localisation") || q.includes("où") || q.includes("ou se trouve") || q.includes("kadutu") || q.includes("nkafu") || q.includes("beach")) {
+        fallbackText = `📍 **Localisation de nos Ports d'Embarquement :**\n\n` +
+          `• **Port de Bukavu :** Commune de Kadutu, Avenue Michombero, Quartier Nkafu (situé en diagonale avec le célèbre marché Beach Muhanzi, borné à l'Ouest par le port ETS SILIMU).\n` +
+          `• **Port de Goma :** Port public lacustre du Lac Kivu à Goma.\n\n` +
+          `🗺️ *Astuce : Vous pouvez vous rendre sur l'onglet **"LOCALISATION"** de notre site pour visualiser votre position GPS en temps réel et obtenir l'itinéraire exact.*`;
+      } else if (q.includes("réserv") || q.includes("reserv") || q.includes("billet") || q.includes("ticket") || q.includes("comment")) {
+        fallbackText = `🎫 **Comment réserver votre billet sur AMR MUGOTE :**\n\n` +
+          `1. Cliquez sur l'onglet **"RÉSERVER"** dans le menu.\n` +
+          `2. Sélectionnez votre trajet (*Bukavu -> Goma* ou *Goma -> Bukavu*), la date, le navire et votre classe.\n` +
+          `3. Saisissez vos coordonnées passager (Nom & Téléphone).\n` +
+          `4. Effectuez le paiement soit par **Mobile Money automatique (FlexPay)**, soit par transfert manuel au **${sitePhone}** (Titulaire : AMR MUGOTE).\n` +
+          `5. Retrouvez votre billet sécurisé avec QR Code dans l'onglet **"MES BILLETS"** pour l'embarquement.`;
+      } else if (q.includes("paiement") || q.includes("payer") || q.includes("flexpay") || q.includes("airtel") || q.includes("mpesa") || q.includes("m-pesa") || q.includes("orange")) {
+        fallbackText = `💳 **Modes de Paiement Acceptés :**\n\n` +
+          `• **Mobile Money Automatique :** Airtel Money, M-Pesa (Vodacom), Orange Money via FlexPay.\n` +
+          `• **Paiement Mobile Money Direct :** Envoi au numéro officiel **${sitePhone}** (*Titulaire : AMR MUGOTE*).\n` +
+          `• **Carte Bancaire :** Cartes Visa & Mastercard acceptées.\n` +
+          `• **Au Guichet :** Règlement en espèces directement à nos agences aux ports de Bukavu et Goma.`;
+      } else if (q.includes("contact") || q.includes("numéro") || q.includes("numero") || q.includes("téléphone") || q.includes("telephone") || q.includes("whatsapp")) {
+        fallbackText = `📞 **Contacts & Assistance Client AMR MUGOTE :**\n\n` +
+          `• **Téléphone / WhatsApp :** **${sitePhone}**\n` +
+          `• **Service Client :** Disponible 7j/7 pour vos réservations et renseignements.\n` +
+          `• **Guichets :** Présence physique aux ports de Bukavu (Beach Muhanzi) et Goma.`;
+      } else {
+        fallbackText = `👋 **Bonjour et bienvenue à bord d'ETS AMR MUGOTE ET SES FRERES !**\n\n` +
+          `Je suis votre assistant virtuel officiel. Je peux vous renseigner instantanément sur :\n\n` +
+          `• 💳 **Les tarifs par classe** (VIP : ${sitePrices['VIP']}$, 1ère : ${sitePrices['1ère Classe']}$, 2ème : ${sitePrices['2ème Classe']}$, 3ème : ${sitePrices['3ème Classe']}$)\n` +
+          `• 🕒 **Les horaires de départ quotidiens** (07h30, 11h00, 14h30)\n` +
+          `• 📍 **L'adresse et l'accès au Port Mugote** (Bukavu / Goma & Guidage GPS)\n` +
+          `• 🎫 **La réservation et le paiement de vos billets en ligne**\n` +
+          `• 🧳 **Les conditions de voyage et la sécurité à bord**\n\n` +
+          `N'hésitez pas à me poser votre question précise ou cliquez sur l'une des suggestions ci-dessous !`;
+      }
+
+      res.json({ text: fallbackText });
     } catch (error: any) {
-      console.error("Gemini Critical Error in /api/chat:", error);
-      res.status(500).json({ error: error.message || "Désolé, l'assistant rencontre une erreur technique." });
+      console.error("Gemini /api/chat error:", error);
+      res.json({
+        text: `Bienvenue chez ETS AMR MUGOTE ET SES FRERES ! Nous assurons les liaisons quotidiennes Bukavu-Goma à 07h30, 11h00 et 14h30. Pour réserver votre billet, cliquez sur l'onglet **"RÉSERVER"** ou contactez notre support au **+243 994 286 469**.`
+      });
     }
   });
 

@@ -115,10 +115,12 @@ Cette plateforme web full-stack a été conçue pour **digitaliser l'intégralit
   - ⚠️ **Billet Déjà Utilisé** ➔ Alerte immédiate avec date et heure du premier embarquement pour bloquer la fraude.
   - ❌ **Billet Invalide ou Impayé** ➔ Refus catégorique de l'embarquement.
 
-### 🤖 Assistant Virtuel IA (Gemini)
-- Intégré directement dans l'interface pour guider les passagers.
-- Connaissance experte des horaires, tarifs, ports d'attache et consignes de sécurité d'AMR MUGOTE.
-- Traitement sécurisé côté serveur via le SDK `@google/genai`.
+### 🤖 Assistant Virtuel IA (Gemini 3.7 Flash & Fallback Intelligent)
+- **Support 24/7 Hautement Robuste** : Intégré en bas de page pour accompagner les voyageurs en temps réel.
+- **Synchronisation Dynamique des Tarifs & Horaires** : L'IA extrait automatiquement les prix officiels et les coordonnées depuis la base Firestore.
+- **Base de Connaissances Exhaustive** : Renseignements précis sur les classes de voyage (VIP, 1ère, 2ème, 3ème), les départs réguliers (07h30, 11h00, 14h30), la géolocalisation des ports (Bukavu Beach Muhanzi / Goma), les règles de bagages et les paiements Mobile Money.
+- **Routage & Suggestions Interactives** : Boutons d'accès direct vers les sections "Réserver", "Localisation GPS" et "Mes Billets" intégrés dans les réponses.
+- **Architecture Résiliente** : Moteur Google GenAI (`gemini-3.7-flash` et cascades) combiné à un système de secours déterministe pour garantir une disponibilité continue sans interruption.
 
 ### 📰 Journal de Bord & Communauté
 - Flux d'actualités et communiqués de la compagnie maritime.

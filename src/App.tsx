@@ -46,6 +46,8 @@ import {
   PhoneCall,
   Smartphone,
   RotateCw,
+  RotateCcw,
+  Compass,
   Rocket,
   Camera,
   Check,
@@ -154,6 +156,54 @@ const getAdminPassword = () => atob(ADMIN_PASS_B64);
 const isEmbedVideo = (url: string) => {
   const l = (url || '').toLowerCase();
   return l.includes('youtube.com') || l.includes('youtu.be') || l.includes('vimeo.com');
+};
+
+const isVid = (u: string) => {
+  const l = (u || '').toLowerCase();
+  return l.includes('.mp4') || l.includes('.mov') || l.includes('.avi') || l.includes('.webm') || 
+         l.includes('.mkv') || l.includes('.3gp') || l.includes('.m4v') || l.includes('.quicktime') ||
+         l.includes('video') || l.includes('youtube.com') || l.includes('youtu.be') || l.includes('vimeo.com');
+};
+
+const compressImage = (file: File, maxWidth: number = 2048, quality: number = 0.90): Promise<Blob> => {
+  return new Promise((resolve) => {
+    // Keep original file if small (<1MB) or GIF to avoid unnecessary processing
+    if (file.type === 'image/gif' || file.size < 1000000) {
+      resolve(file);
+      return;
+    }
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = (event) => {
+      const img = new Image();
+      img.src = event.target?.result as string;
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+
+        if (width > maxWidth) {
+          height = Math.round((maxWidth / width) * height);
+          width = maxWidth;
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.imageSmoothingEnabled = true;
+          ctx.imageSmoothingQuality = 'high';
+          ctx.drawImage(img, 0, 0, width, height);
+        }
+        canvas.toBlob((blob) => {
+          if (blob) resolve(blob);
+          else resolve(file);
+        }, file.type === 'image/png' ? 'image/png' : 'image/jpeg', quality);
+      };
+      img.onerror = () => resolve(file);
+    };
+    reader.onerror = () => resolve(file);
+  });
 };
 
 const getEmbedUrl = (url: string) => {
@@ -1305,7 +1355,7 @@ export default function App() {
               {currentPage === 'gallery' && <GalleryView siteSettings={siteSettings} />}
               {currentPage === 'users' && <UsersListView />}
               {currentPage === 'map' && <LocalisationView />}
-              <ChatWidget user={user} />
+              <ChatWidget user={user} onNavigate={setCurrentPage} siteSettings={siteSettings} />
             </>
           )}
         </AnimatePresence>
@@ -2626,7 +2676,83 @@ function AdminChatView({ conversation }: { conversation: any }) {
 
 // --- Chat Widget ---
 
-function ChatWidget({ user }: { user: FirebaseUser | null }) {
+function FormattedChatText({ text, onNavigate }: { text: string, onNavigate?: (page: string) => void }) {
+  // Check if text suggests specific pages
+  const lower = text.toLowerCase();
+  const showBookBtn = onNavigate && (lower.includes("onglet **\"réserver\"**") || lower.includes("onglet \"réserver\"") || lower.includes("cliquez sur l'onglet **\"réserver\"**") || lower.includes("onglet **réserver**"));
+  const showMapBtn = onNavigate && (lower.includes("onglet **\"localisation\"**") || lower.includes("onglet \"localisation\"") || lower.includes("section 'localisation'") || lower.includes("position gps"));
+  const showTicketsBtn = onNavigate && (lower.includes("onglet **\"mes billets\"**") || lower.includes("onglet \"mes billets\"") || lower.includes("section 'mes billets'"));
+
+  // Helper to parse bold **text**
+  const parseInlineBold = (line: string) => {
+    const parts = line.split(/(\*\*.*?\*\*)/g);
+    return parts.map((part, idx) => {
+      if (part.startsWith('**') && part.endsWith('**')) {
+        return <strong key={idx} className="font-extrabold text-slate-900">{part.slice(2, -2)}</strong>;
+      }
+      return part;
+    });
+  };
+
+  const lines = text.split('\n');
+
+  return (
+    <div className="space-y-1.5 text-xs md:text-[13px] leading-relaxed">
+      {lines.map((line, idx) => {
+        const trimmed = line.trim();
+        if (!trimmed) {
+          return <div key={idx} className="h-1" />;
+        }
+        if (trimmed.startsWith('•') || trimmed.startsWith('-')) {
+          return (
+            <div key={idx} className="flex items-start gap-1.5 pl-1">
+              <span className="text-gold font-black">•</span>
+              <span className="flex-1">{parseInlineBold(trimmed.substring(1).trim())}</span>
+            </div>
+          );
+        }
+        return <p key={idx}>{parseInlineBold(line)}</p>;
+      })}
+
+      {(showBookBtn || showMapBtn || showTicketsBtn) && (
+        <div className="pt-2 flex flex-wrap gap-2 border-t border-slate-100 mt-2">
+          {showBookBtn && (
+            <button 
+              type="button"
+              onClick={() => onNavigate?.('booking')}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-black hover:bg-gold hover:text-black text-white text-[10px] font-black uppercase tracking-wider rounded-xl transition-all shadow-xs cursor-pointer active:scale-95"
+            >
+              <Ticket size={12} />
+              <span>Aller à la Réservation</span>
+            </button>
+          )}
+          {showMapBtn && (
+            <button 
+              type="button"
+              onClick={() => onNavigate?.('map')}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-black hover:text-white text-slate-800 text-[10px] font-black uppercase tracking-wider rounded-xl transition-all shadow-xs cursor-pointer active:scale-95"
+            >
+              <Compass size={12} />
+              <span>Voir la Carte GPS</span>
+            </button>
+          )}
+          {showTicketsBtn && (
+            <button 
+              type="button"
+              onClick={() => onNavigate?.('tickets')}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-black hover:text-white text-slate-800 text-[10px] font-black uppercase tracking-wider rounded-xl transition-all shadow-xs cursor-pointer active:scale-95"
+            >
+              <QrCode size={12} />
+              <span>Consulter Mes Billets</span>
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ChatWidget({ user, onNavigate, siteSettings }: { user: FirebaseUser | null, onNavigate?: (page: string) => void, siteSettings?: any }) {
   const [isOpen, setIsOpen] = useState(false);
   const [isMaximized, setIsMaximized] = useState(false);
   const [messages, setMessages] = useState<any[]>([]);
@@ -2638,7 +2764,10 @@ function ChatWidget({ user }: { user: FirebaseUser | null }) {
 
   // Guest chat state
   const [guestMessages, setGuestMessages] = useState<any[]>([
-    { text: "Bienvenue chez Mugote ! Comment puis-je vous aider aujourd'hui ?", senderRole: 'AI' }
+    { 
+      text: "👋 **Bienvenue à bord d'ETS AMR MUGOTE ET SES FRERES !**\nJe suis votre assistant officiel. Posez-moi toutes vos questions sur les horaires, les tarifs des classes, nos ports d'embarquement ou la réservation de vos billets.", 
+      senderRole: 'AI' 
+    }
   ]);
 
   useEffect(() => {
@@ -2693,7 +2822,6 @@ function ChatWidget({ user }: { user: FirebaseUser | null }) {
     if (scrollContainerRef.current) {
       scrollContainerRef.current.scrollTop = scrollContainerRef.current.scrollHeight;
     }
-    // Also use scrollIntoView as fallback
     scrollEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
   }, [messages, guestMessages, sending, isOpen]);
 
@@ -2702,18 +2830,24 @@ function ChatWidget({ user }: { user: FirebaseUser | null }) {
     setSending(true);
 
     if (!user) {
-      // Guest Mode: Only IA response, no FireStore
+      // Guest Mode: Instant local state + Server Gemini API
       setGuestMessages(prev => [...prev, { text, senderRole: 'USER' }]);
       try {
         const response = await fetch('/api/chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ message: text, history: guestMessages.slice(-5).map(m => ({ role: m.senderRole, text: m.text })) })
+          body: JSON.stringify({ 
+            message: text, 
+            history: guestMessages.slice(-6).map(m => ({ role: m.senderRole, text: m.text })) 
+          })
         });
         const data = await response.json();
         setGuestMessages(prev => [...prev, { text: data.text || "Erreur de connexion", senderRole: 'AI' }]);
       } catch (err) {
-        setGuestMessages(prev => [...prev, { text: "Désolé, l'IA est indisponible.", senderRole: 'AI' }]);
+        setGuestMessages(prev => [...prev, { 
+          text: "Bienvenue chez AMR MUGOTE ! Nous assurons les liaisons Bukavu-Goma à 07h30, 11h00 et 14h30. Rendez-vous dans l'onglet **\"RÉSERVER\"** pour réserver votre place.", 
+          senderRole: 'AI' 
+        }]);
       } finally {
         setSending(false);
       }
@@ -2726,7 +2860,7 @@ function ChatWidget({ user }: { user: FirebaseUser | null }) {
     }
 
     try {
-      // 1. Add user message
+      // 1. Add user message to Firestore
       await addDoc(collection(db, 'conversations', convId, 'messages'), {
         text,
         senderId: user.uid,
@@ -2734,7 +2868,7 @@ function ChatWidget({ user }: { user: FirebaseUser | null }) {
         createdAt: serverTimestamp()
       });
 
-      // 2. Update conversation
+      // 2. Update conversation meta
       await updateDoc(doc(db, 'conversations', convId), {
         lastMessage: text,
         updatedAt: serverTimestamp(),
@@ -2742,7 +2876,7 @@ function ChatWidget({ user }: { user: FirebaseUser | null }) {
       });
 
       // 3. Trigger AI response via server proxy
-      const conversationHistory = messages.slice(-5).map(m => ({
+      const conversationHistory = messages.slice(-6).map(m => ({
         role: m.senderRole,
         text: m.text
       }));
@@ -2757,7 +2891,7 @@ function ChatWidget({ user }: { user: FirebaseUser | null }) {
       });
       
       const data = await response.json();
-      const responseText = data.text || data.error || "Désolé, je rencontre un problème de connexion. Un administrateur va vous répondre bientôt.";
+      const responseText = data.text || data.error || "Bienvenue à bord d'AMR MUGOTE ! Comment puis-je vous renseigner ?";
 
       await addDoc(collection(db, 'conversations', convId, 'messages'), {
         text: responseText,
@@ -2768,9 +2902,8 @@ function ChatWidget({ user }: { user: FirebaseUser | null }) {
 
     } catch (error) {
       console.error("Chat error", error);
-      // Show error in chat if it fails
       await addDoc(collection(db, 'conversations', convId, 'messages'), {
-        text: "Désolé, je rencontre un problème technique. Veuillez réessayer dans quelques instants.",
+        text: "Désolé, je rencontre une brève coupure technique. Nos départs ont lieu à 07h30, 11h00 et 14h30. Vous pouvez réserver directement dans l'onglet **\"RÉSERVER\"**.",
         senderId: 'ai',
         senderRole: 'AI',
         createdAt: serverTimestamp()
@@ -2792,13 +2925,27 @@ function ChatWidget({ user }: { user: FirebaseUser | null }) {
     await sendDirectMessage(text);
   };
 
+  const handleResetChat = () => {
+    if (!user) {
+      setGuestMessages([
+        { 
+          text: "👋 **Nouvelle conversation démarrée !**\nComment puis-je vous aider aujourd'hui à bord d'ETS AMR MUGOTE ?", 
+          senderRole: 'AI' 
+        }
+      ]);
+    }
+  };
+
   const displayMessages = user ? messages : guestMessages;
 
   const suggestions = [
-    { label: "💳 Tarifs", text: "Quels sont les tarifs des billets (VIP, 1ère classe et 2ème classe) ?" },
-    { label: "🕒 Horaires", text: "Quels sont les horaires de départ quotidiens de Goma et Bukavu ?" },
-    { label: "📍 Navigation", text: "Où se trouve précisément le Port Mugote de Bukavu ? Donnez-moi son adresse exacte." },
-    { label: "⛵ Comment réserver ?", text: "Comment puis-je réserver et payer mon billet sur la plateforme ?" }
+    { label: "👑 Tarifs par Classe", text: "Quels sont les tarifs officiels des billets (VIP, 1ère classe, 2ème classe et 3ème classe) ?" },
+    { label: "🕒 Horaires Départs", text: "Quels sont les horaires de départ quotidiens entre Bukavu et Goma et combien de temps dure la traversée ?" },
+    { label: "📍 Localisation Port", text: "Où se trouve précisément le Port Mugote de Bukavu ? Donnez-moi l'adresse exacte et les repères." },
+    { label: "🎫 Comment Réserver ?", text: "Comment puis-je réserver mon billet en ligne et l'obtenir avec son QR Code ?" },
+    { label: "💳 Modes de Paiement", text: "Quels sont les modes de paiement acceptés (Mobile Money, FlexPay, Airtel, M-Pesa, Orange) ?" },
+    { label: "🧳 Bagages & Sécurité", text: "Quelles sont les règles pour les bagages à bord et les mesures de sécurité maritime ?" },
+    { label: "📞 Contacter Support", text: "Quel est le numéro de téléphone officiel et WhatsApp du service client AMR Mugote ?" }
   ];
 
   return (
@@ -2812,26 +2959,39 @@ function ChatWidget({ user }: { user: FirebaseUser | null }) {
              className={cn(
                "bg-white shadow-2xl rounded-[32px] border border-slate-200/80 flex flex-col mb-4 overflow-hidden transition-all duration-300 ease-out",
                isMaximized 
-                 ? "w-[360px] md:w-[780px] h-[600px] md:h-[820px] max-h-[85vh]" 
-                 : "w-[360px] md:w-[480px] h-[540px] md:h-[680px] max-h-[80vh]"
+                 ? "w-[360px] md:w-[780px] h-[600px] md:h-[820px] max-h-[88vh]" 
+                 : "w-[360px] md:w-[480px] h-[540px] md:h-[680px] max-h-[82vh]"
              )}
            >
              {/* Chat Header */}
-             <div className="p-6 bg-black text-white flex justify-between items-center select-none shadow-md">
+             <div className="p-5 md:p-6 bg-black text-white flex justify-between items-center select-none shadow-md">
                <div className="flex items-center gap-3">
-                 <div className="w-9 h-9 bg-gold rounded-full flex items-center justify-center text-black shadow-inner">
-                   <Ship size={18} />
+                 <div className="w-10 h-10 bg-gold rounded-2xl flex items-center justify-center text-black shadow-inner">
+                   <Ship size={20} />
                  </div>
                  <div>
-                   <h4 className="text-[11px] font-black uppercase tracking-widest leading-none mb-1">Mugote Assistant AI</h4>
-                   <p className="text-[9px] opacity-75 font-bold uppercase tracking-wider flex items-center gap-1.5">
-                     <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-ping"></span>
-                     <span>Navire en ligne • Support H24</span>
+                   <div className="flex items-center gap-2">
+                     <h4 className="text-[11px] font-black uppercase tracking-widest leading-none text-white">Mugote AI Assistant</h4>
+                     <span className="px-1.5 py-0.5 bg-gold/20 text-gold rounded text-[8px] font-black uppercase tracking-wider">Gemini 3.7</span>
+                   </div>
+                   <p className="text-[9px] opacity-80 font-bold uppercase tracking-wider flex items-center gap-1.5 mt-1">
+                     <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-ping"></span>
+                     <span>Assistance Maritime H24 • En Ligne</span>
                    </p>
                  </div>
                </div>
                
                <div className="flex items-center gap-1.5">
+                 {/* Reset chat button */}
+                 {!user && (
+                   <button 
+                     onClick={handleResetChat}
+                     title="Recommencer la conversation"
+                     className="p-2 hover:bg-white/10 rounded-xl transition-all duration-150 text-slate-300 hover:text-white active:scale-95 cursor-pointer text-[10px] font-bold"
+                   >
+                     <RotateCcw size={16} />
+                   </button>
+                 )}
                  {/* Expand / Collapse Button */}
                  <button 
                    onClick={() => setIsMaximized(!isMaximized)} 
@@ -2851,7 +3011,7 @@ function ChatWidget({ user }: { user: FirebaseUser | null }) {
              </div>
 
              {/* Message Flow Area */}
-             <div ref={scrollContainerRef} className="flex-1 overflow-y-auto p-6 space-y-4 bg-slate-50/50">
+             <div ref={scrollContainerRef} className="flex-1 overflow-y-auto p-5 md:p-6 space-y-4 bg-slate-50/50">
                {displayMessages.length === 0 ? (
                  <div className="text-center py-24 space-y-4 opacity-30">
                    <MessageSquareText size={52} className="mx-auto text-slate-400" />
@@ -2865,13 +3025,17 @@ function ChatWidget({ user }: { user: FirebaseUser | null }) {
                      transition={{ duration: 0.2 }}
                      key={i} 
                      className={cn(
-                       "max-w-[85%] p-4 text-xs md:text-[13px] leading-relaxed shadow-xs whitespace-pre-wrap break-words border",
+                       "max-w-[88%] p-4 text-xs md:text-[13px] leading-relaxed shadow-xs break-words border",
                        m.senderRole === 'USER' 
                          ? "bg-black text-white border-black ml-auto rounded-[22px] rounded-tr-none font-medium selection:bg-gold/30" 
-                         : "bg-white text-slate-900 border-slate-200/75 rounded-[22px] rounded-tl-none font-semibold selection:bg-slate-200"
+                         : "bg-white text-slate-900 border-slate-200/80 rounded-[22px] rounded-tl-none font-normal selection:bg-slate-200 shadow-sm"
                      )}
                    >
-                     {m.text}
+                     {m.senderRole === 'USER' ? (
+                       <p className="whitespace-pre-wrap">{m.text}</p>
+                     ) : (
+                       <FormattedChatText text={m.text} onNavigate={onNavigate} />
+                     )}
                    </motion.div>
                  ))
                )}
@@ -2880,13 +3044,13 @@ function ChatWidget({ user }: { user: FirebaseUser | null }) {
                  <motion.div
                    initial={{ opacity: 0, y: 5 }}
                    animate={{ opacity: 1, y: 0 }}
-                   className="max-w-[85%] p-3.5 text-xs bg-white text-slate-600 border border-slate-200 rounded-[22px] rounded-tl-none font-bold mr-auto flex items-center gap-2 shadow-xs"
+                   className="max-w-[85%] p-3.5 text-xs bg-white text-slate-700 border border-slate-200 rounded-[22px] rounded-tl-none font-bold mr-auto flex items-center gap-2 shadow-xs"
                  >
-                   <span>L'assistant est en train d'écrire</span>
+                   <span>Mugote AI est en train d'écrire</span>
                    <span className="flex gap-1 items-center ml-1">
-                     <span className="w-1.5 h-1.5 bg-black rounded-full animate-bounce [animation-delay:-0.3s]"></span>
-                     <span className="w-1.5 h-1.5 bg-black rounded-full animate-bounce [animation-delay:-0.15s]"></span>
-                     <span className="w-1.5 h-1.5 bg-black rounded-full animate-bounce"></span>
+                     <span className="w-1.5 h-1.5 bg-gold rounded-full animate-bounce [animation-delay:-0.3s]"></span>
+                     <span className="w-1.5 h-1.5 bg-gold rounded-full animate-bounce [animation-delay:-0.15s]"></span>
+                     <span className="w-1.5 h-1.5 bg-gold rounded-full animate-bounce"></span>
                    </span>
                  </motion.div>
                )}
@@ -2895,14 +3059,17 @@ function ChatWidget({ user }: { user: FirebaseUser | null }) {
 
              {/* Auto suggestive quick actions */}
              {!sending && (
-               <div className="flex gap-2 overflow-x-auto px-4 py-2 bg-white border-t border-b border-slate-100 scrollbar-none items-center">
-                 <span className="text-[9px] text-slate-400 uppercase font-black tracking-wider whitespace-nowrap px-1">Questions fréquentes :</span>
+               <div className="flex gap-2 overflow-x-auto px-4 py-2.5 bg-slate-100/70 border-t border-b border-slate-200/60 scrollbar-none items-center">
+                 <span className="text-[9px] text-slate-500 uppercase font-black tracking-wider whitespace-nowrap px-1 flex items-center gap-1">
+                   <Sparkles size={11} className="text-gold" />
+                   Questions rapides :
+                 </span>
                  {suggestions.map((s, index) => (
                    <button
                      key={index}
                      type="button"
                      onClick={() => handleSuggestionClick(s.text)}
-                     className="px-3 py-1.5 bg-slate-50 hover:bg-black hover:text-white rounded-full text-[9px] font-black uppercase tracking-wider text-slate-600 transition-all border border-slate-200 whitespace-nowrap cursor-pointer shadow-xs active:scale-95"
+                     className="px-3 py-1.5 bg-white hover:bg-black hover:text-white rounded-full text-[9px] font-black uppercase tracking-wider text-slate-700 transition-all border border-slate-200 whitespace-nowrap cursor-pointer shadow-xs active:scale-95 shrink-0"
                    >
                      {s.label}
                    </button>
@@ -2911,17 +3078,18 @@ function ChatWidget({ user }: { user: FirebaseUser | null }) {
              )}
 
              {/* Input Form Footer */}
-             <form onSubmit={handleSend} className="p-4 bg-white border-t border-slate-100 flex gap-2">
+             <form onSubmit={handleSend} className="p-4 bg-white border-t border-slate-100 flex gap-2 items-center">
                <input 
                  value={inputText}
                  onChange={(e) => setInputText(e.target.value)}
                  disabled={sending}
-                 placeholder="Tapez votre message ici..."
-                 className="flex-1 bg-slate-50 hover:bg-slate-100/60 focus:bg-white rounded-2xl px-5 py-3.5 text-xs md:text-[13px] border border-transparent focus:border-slate-200 focus:outline-none focus:ring-4 focus:ring-black/5 disabled:opacity-50 transition-all duration-150"
+                 placeholder="Posez votre question (tarifs, horaires, réservation...)"
+                 className="flex-1 bg-slate-50 hover:bg-slate-100/60 focus:bg-white rounded-2xl px-5 py-3.5 text-xs md:text-[13px] border border-transparent focus:border-slate-200 focus:outline-none focus:ring-4 focus:ring-black/5 disabled:opacity-50 transition-all duration-150 font-medium"
                />
                <button 
+                 type="submit"
                  disabled={sending || !inputText.trim()}
-                 className="w-12 h-12 bg-black hover:bg-slate-900 text-white flex items-center justify-center rounded-2xl shadow-xl shadow-black/10 hover:scale-105 active:scale-95 transition-all disabled:opacity-30 disabled:hover:scale-100 cursor-pointer"
+                 className="w-12 h-12 bg-black hover:bg-gold hover:text-black text-white flex items-center justify-center rounded-2xl shadow-xl shadow-black/10 hover:scale-105 active:scale-95 transition-all disabled:opacity-30 disabled:hover:scale-100 disabled:hover:bg-black disabled:hover:text-white cursor-pointer shrink-0"
                >
                  <Send size={18} />
                </button>
@@ -2933,11 +3101,20 @@ function ChatWidget({ user }: { user: FirebaseUser | null }) {
       <button 
         onClick={() => setIsOpen(!isOpen)}
         className={cn(
-          "w-16 h-16 flex items-center justify-center rounded-full shadow-2xl transition-all hover:scale-110 active:scale-90",
+          "w-16 h-16 flex items-center justify-center rounded-full shadow-2xl transition-all hover:scale-110 active:scale-90 group relative",
           isOpen ? "bg-white text-black border border-slate-100" : "bg-black text-white shadow-black/40"
         )}
       >
-        {isOpen ? <X size={28} /> : <MessageCircle size={28} />}
+        {isOpen ? (
+          <X size={28} />
+        ) : (
+          <>
+            <MessageCircle size={28} className="transition-transform group-hover:scale-110" />
+            <span className="absolute -top-1 -right-1 w-4 h-4 bg-gold rounded-full border-2 border-white flex items-center justify-center">
+              <span className="w-1.5 h-1.5 bg-black rounded-full animate-ping"></span>
+            </span>
+          </>
+        )}
       </button>
     </div>
   );
@@ -2963,18 +3140,25 @@ function Home({ onBook, onNavigate, siteSettings, schedules }: { onBook: () => v
       const newsItems = snapshot.docs.map(doc => {
         const data = doc.data();
         const type = (data.type || '').toLowerCase();
-        const url = data.processedUrl || data.url || data.videoUrl || data.imageUrl || data.image || data.video || data.contentUrl || '';
-        const isVideo = type === 'video' || !!(data.videoUrl || data.video) || (url && (url.toLowerCase().match(/\.(mp4|webm|ogg|mov|mkv|3gp|m4v|avi)(\?.*)?$/i) || url.toLowerCase().includes('youtube.com') || url.toLowerCase().includes('youtu.be') || url.toLowerCase().includes('vimeo.com') || (url.toLowerCase().includes('firebasestorage.googleapis.com') && (url.toLowerCase().includes('.mov') || url.toLowerCase().includes('.mp4') || url.toLowerCase().includes('video') || url.toLowerCase().includes('.webm') || url.toLowerCase().includes('.avi')))));
+        const mediaList = Array.isArray(data.media) && data.media.length > 0 ? data.media : [];
+        const url = data.processedUrl || data.url || data.videoUrl || data.imageUrl || mediaList[0] || data.image || data.video || data.contentUrl || '';
+        const isVideo = type === 'video' || !!(data.videoUrl || data.video) || isVid(url) || mediaList.some(m => isVid(m));
         
+        const rawTitle = (data.title || '').trim();
+        const rawDesc = (data.desc || data.content || data.description || data.text || '').trim();
+        const resolvedTitle = rawTitle || rawDesc.slice(0, 45) || (isVideo ? 'Vidéo Mugote' : url ? 'Photo Mugote' : 'Information Mugote');
+
         return {
           ...data,
           id: doc.id,
+          title: resolvedTitle,
           processedUrl: url,
+          media: mediaList.length > 0 ? mediaList : (url ? [url] : []),
           processedType: isVideo ? 'video' : (type === 'text' && !url ? 'text' : 'image'),
-          processedDesc: data.desc || data.content || data.description || data.text || '',
+          processedDesc: rawDesc,
           sortDate: data.publishedAt || data.updatedAt || data.createdAt || { seconds: 0 }
         };
-      }).filter((item: any) => item.title && item.title.trim() !== "");
+      }).filter((item: any) => item.processedUrl || item.processedDesc || item.title);
 
       const sortedNews = newsItems.sort((a, b) => {
         const ta = a.sortDate?.seconds || 0;
@@ -2983,11 +3167,10 @@ function Home({ onBook, onNavigate, siteSettings, schedules }: { onBook: () => v
       });
 
       setMedia(sortedNews.slice(0, 100)); // Show more on home
-      // Filter for gallery specifically from the same dataset to avoid index issues
-      setGalleryImages(sortedNews.filter(item => item.processedType === 'image').slice(0, 24));
+      // Filter for gallery specifically from the same dataset to include images and videos
+      setGalleryImages(sortedNews.filter(item => item.processedType === 'image' || item.processedType === 'video').slice(0, 24));
     }, (error) => {
        console.error("Home query error:", error);
-       // Silent fail to keep UI clean during network instability
     });
 
     return () => {
@@ -4361,98 +4544,16 @@ function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlock
   const detailInputRef = useRef<HTMLInputElement>(null);
   const mediaInputRef = useRef<HTMLInputElement>(null);
 
-  const isVid = (u: string) => {
-    const l = (u || '').toLowerCase();
-    return l.includes('.mp4') || l.includes('.mov') || l.includes('.avi') || l.includes('.webm') || 
-           l.includes('.mkv') || l.includes('.3gp') || l.includes('.m4v') || l.includes('.quicktime') ||
-           l.includes('video') || l.includes('youtube.com') || l.includes('youtu.be') || l.includes('vimeo.com');
-  };
-
-  const compressImage = (file: File, maxWidth: number = 2048, quality: number = 0.90): Promise<Blob> => {
-    return new Promise((resolve) => {
-      // Keep original file if small (<1MB) or GIF to avoid unnecessary processing
-      if (file.type === 'image/gif' || file.size < 1000000) {
-        resolve(file);
-        return;
-      }
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onload = (event) => {
-        const img = new Image();
-        img.src = event.target?.result as string;
-        img.onload = () => {
-          const canvas = document.createElement('canvas');
-          let width = img.width;
-          let height = img.height;
-
-          if (width > maxWidth) {
-            height = Math.round((maxWidth / width) * height);
-            width = maxWidth;
-          }
-
-          canvas.width = width;
-          canvas.height = height;
-          const ctx = canvas.getContext('2d');
-          if (ctx) {
-            ctx.imageSmoothingEnabled = true;
-            ctx.imageSmoothingQuality = 'high';
-            ctx.drawImage(img, 0, 0, width, height);
-          }
-          canvas.toBlob((blob) => {
-            if (blob) resolve(blob);
-            else resolve(file);
-          }, file.type === 'image/png' ? 'image/png' : 'image/jpeg', quality);
-        };
-        img.onerror = () => resolve(file);
-      };
-      reader.onerror = () => resolve(file);
-    });
-  };
-
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
     const incoming = Array.from(files) as File[];
     
-    // 1. Add to pending and show previews immediately
+    // Add to pending files and generate object previews immediately
     setNewMedia(prev => ({ ...prev, pendingFiles: [...prev.pendingFiles, ...incoming] }));
     const newPreviews = incoming.map((file: File) => URL.createObjectURL(file));
     setPreviewUrls(prev => [...prev, ...newPreviews]);
-
-    // 2. START UPLOADING IMMEDIATELY IN THE BACKGROUND
-    // Crisp HD quality preservation for images
-    incoming.forEach(async (file, idx) => {
-      try {
-        const path = `news/${Date.now()}_${idx}_${file.name.replace(/\s+/g, '_')}`;
-        let blob: File | Blob = file;
-        
-        // High quality preservation for photos (max width 2048, quality 0.90)
-        if (file.type.startsWith('image/') && file.type !== 'image/gif') {
-          try {
-            blob = await compressImage(file, 2048, 0.90);
-          } catch (e) {
-            console.warn("HD compression fallback to original file", e);
-          }
-        }
-        
-        const url = await uploadToStorage(blob, path);
-        
-        // Move from pending to confirmed media immediately when done
-        setNewMedia(prev => ({
-          ...prev,
-          media: [...prev.media, url],
-          pendingFiles: prev.pendingFiles.filter(f => f !== file)
-        }));
-      } catch (err) {
-        console.error("Silent background upload failed:", err);
-        // Silently remove from pending on error
-        setNewMedia(prev => ({
-          ...prev,
-          pendingFiles: prev.pendingFiles.filter(f => f !== file)
-        }));
-      }
-    });
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, target: 'homeBg' | 'homeDetail') => {
@@ -4559,21 +4660,26 @@ function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlock
       const items = snapshot.docs.map(doc => {
         const data = doc.data();
         const type = (data.type || '').toLowerCase();
-        const url = data.processedUrl || data.url || data.videoUrl || data.imageUrl || data.image || data.video || data.contentUrl || '';
-        const isVideo = type === 'video' || !!(data.videoUrl || data.video) || (url && (url.toLowerCase().match(/\.(mp4|webm|ogg|mov|mkv|3gp|m4v|avi)(\?.*)?$/i) || url.toLowerCase().includes('youtube.com') || url.toLowerCase().includes('youtu.be') || url.toLowerCase().includes('vimeo.com') || (url.toLowerCase().includes('firebasestorage.googleapis.com') && (url.toLowerCase().includes('.mov') || url.toLowerCase().includes('.mp4') || url.toLowerCase().includes('video') || url.toLowerCase().includes('.webm') || url.toLowerCase().includes('.avi')))));
+        const mediaList = Array.isArray(data.media) && data.media.length > 0 ? data.media : [];
+        const url = data.processedUrl || data.url || data.videoUrl || data.imageUrl || mediaList[0] || data.image || data.video || data.contentUrl || '';
+        const isVideo = type === 'video' || !!(data.videoUrl || data.video) || isVid(url) || mediaList.some(m => isVid(m));
         
-        // Use a very robust date fallback
+        const rawTitle = (data.title || '').trim();
+        const rawDesc = (data.desc || data.content || data.description || data.text || '').trim();
+        const resolvedTitle = rawTitle || rawDesc.slice(0, 45) || (isVideo ? 'Vidéo Mugote' : url ? 'Photo Mugote' : 'Information Mugote');
         const sortDate = data.publishedAt || data.createdAt || data.updatedAt || { seconds: 0 };
 
         return {
           ...data,
           id: doc.id,
+          title: resolvedTitle,
           processedUrl: url,
+          media: mediaList.length > 0 ? mediaList : (url ? [url] : []),
           processedType: isVideo ? 'video' : (type === 'text' && !url ? 'text' : 'image'),
-          processedDesc: data.desc || data.content || data.description || data.text || '',
+          processedDesc: rawDesc,
           sortDate
         };
-      }).filter((item: any) => item.title && item.title.trim() !== "");
+      }).filter((item: any) => item.processedUrl || item.processedDesc || item.title);
 
       setNewsList(items.sort((a, b) => {
         const ta = a.sortDate?.seconds || 0;
@@ -4836,61 +4942,93 @@ function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlock
   const handleAddMedia = async (e: React.FormEvent) => {
     e.preventDefault();
     setUploading('media_publish');
-    
-    // Fast simulated progress: reach ~98% in ~4 seconds
-    const progressInterval = setInterval(() => {
-      setUploadProgress(prev => {
-        if (prev >= 98) {
-          clearInterval(progressInterval);
-          return 98;
-        }
-        return prev + 2; 
-      });
-    }, 80);
+    setUploadProgress(0);
 
     try {
-      if (newMedia.pendingFiles.length > 0) {
-        let waitAttempts = 0;
-        while (newMedia.pendingFiles.length > 0 && waitAttempts < 10) {
-          await new Promise(r => setTimeout(r, 400));
-          waitAttempts++;
+      const pending = newMedia.pendingFiles || [];
+      const existingMedia = [...newMedia.media];
+
+      if (pending.length === 0 && existingMedia.length === 0 && !newMedia.url && !newMedia.title && !newMedia.desc) {
+        alert("Veuillez sélectionner au moins une photo, une vidéo, un lien ou saisir un texte.");
+        setUploading(null);
+        return;
+      }
+
+      // Upload all pending files to Firebase Storage with real-time aggregated progress
+      const newlyUploadedUrls: string[] = [];
+      if (pending.length > 0) {
+        const fileProgresses = new Array(pending.length).fill(0);
+
+        for (let i = 0; i < pending.length; i++) {
+          const file = pending[i];
+          const isVideoFile = file.type.startsWith('video/') || 
+                              ['.mp4', '.mov', '.avi', '.webm', '.mkv', '.3gp'].some(ext => file.name.toLowerCase().endsWith(ext));
+          
+          let blobToUpload: File | Blob = file;
+          if (!isVideoFile && file.type.startsWith('image/') && file.type !== 'image/gif') {
+            try {
+              blobToUpload = await compressImage(file, 2048, 0.90);
+            } catch (err) {
+              console.warn("Image compression skipped:", err);
+            }
+          }
+
+          const sanitizedName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+          const path = `news/${Date.now()}_${i}_${sanitizedName}`;
+
+          const downloadUrl = await uploadToStorage(blobToUpload, path, (progress) => {
+            fileProgresses[i] = progress;
+            const totalProgress = fileProgresses.reduce((a, b) => a + b, 0) / pending.length;
+            setUploadProgress(Math.round(totalProgress));
+          });
+
+          newlyUploadedUrls.push(downloadUrl);
         }
       }
 
-      if (!newMedia.title && newMedia.media.length === 0 && !newMedia.url && newMedia.pendingFiles.length === 0 && !newMedia.desc) {
-          clearInterval(progressInterval);
-          alert("Veuillez sélectionner une photo, une vidéo ou entrer un texte.");
-          setUploading(null);
-          return;
-      }
+      const allMedia = [...existingMedia, ...newlyUploadedUrls];
+      let finalUrl = allMedia[0] || newMedia.url || '';
       
-      const uploadedUrls = [...newMedia.media];
-      let finalType = newMedia.type;
-      const finalUrl = uploadedUrls[0] || newMedia.url || '';
-
-      if (uploadedUrls.length > 0) {
-        finalType = isVid(uploadedUrls[0]) ? 'video' : 'image';
-      } else if (newMedia.url) {
-        finalType = isVid(newMedia.url) ? 'video' : 'image';
+      // Determine media type
+      let finalType: 'image' | 'video' | 'text' = 'text';
+      if (allMedia.length > 0 || finalUrl) {
+        const hasVideo = allMedia.some(u => isVid(u)) || isVid(finalUrl) || (pending.some(f => f.type.startsWith('video/')));
+        finalType = hasVideo ? 'video' : 'image';
       }
-      const finalTitle = newMedia.title ? newMedia.title.trim() : '';
-      const finalDesc = newMedia.desc ? newMedia.desc.trim() : '';
+
+      const rawTitle = newMedia.title.trim();
+      const rawDesc = newMedia.desc.trim();
+
+      // Ensure title is NEVER empty so it is never filtered out by legacy systems
+      let finalTitle = rawTitle;
+      if (!finalTitle) {
+        if (finalType === 'video') {
+          finalTitle = rawDesc.slice(0, 45).trim() || `Vidéo — Traversée Lac Kivu (${new Date().toLocaleDateString('fr-FR')})`;
+        } else if (finalType === 'image') {
+          finalTitle = rawDesc.slice(0, 45).trim() || `Photo — Navires AMR Mugote (${new Date().toLocaleDateString('fr-FR')})`;
+        } else {
+          finalTitle = rawDesc.slice(0, 45).trim() || `Communiqué Officiel (${new Date().toLocaleDateString('fr-FR')})`;
+        }
+      }
 
       const mediaData: any = {
         title: finalTitle,
-        desc: finalDesc,
-        content: finalDesc,
+        desc: rawDesc,
+        content: rawDesc,
         url: finalUrl,
         imageUrl: finalType === 'image' ? finalUrl : '',
         videoUrl: finalType === 'video' ? finalUrl : '',
         type: finalType,
-        media: uploadedUrls,
-        updatedAt: serverTimestamp(),
+        media: allMedia,
+        views: 0,
+        likes: 0,
+        commentsCount: 0,
         publishedAt: serverTimestamp(),
         createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
         processedUrl: finalUrl,
         processedType: finalType,
-        processedDesc: finalDesc,
+        processedDesc: rawDesc,
         authorId: auth.currentUser?.uid || 'admin_system',
         authorEmail: auth.currentUser?.email || 'admin@amrmugote.com',
       };
@@ -4907,9 +5045,7 @@ function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlock
       }
       
       setUploadProgress(100);
-      clearInterval(progressInterval);
-      
-      alert("FÉLICITATIONS ! Votre contenu a été publié avec succès. 🎉");
+      alert("FÉLICITATIONS ! Votre publication (vidéo/photo) est maintenant en ligne sur toute la plateforme ! 🎉");
       
       previewUrls.forEach(url => {
         if (url.startsWith('blob:')) URL.revokeObjectURL(url);
@@ -5064,9 +5200,10 @@ function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlock
           const data = document.data();
           const title = data.title || '';
           const desc = data.desc || data.content || data.description || data.text || '';
-          const url = data.processedUrl || data.url || data.videoUrl || data.imageUrl || data.image || data.video || data.contentUrl || '';
+          const mediaList = Array.isArray(data.media) ? data.media : [];
+          const url = data.processedUrl || data.url || data.videoUrl || data.imageUrl || mediaList[0] || data.image || data.video || data.contentUrl || '';
           
-          const isCorrupt = !url.trim() && !desc.trim() && !title.trim();
+          const isCorrupt = !url.trim() && !desc.trim() && !title.trim() && mediaList.length === 0;
           if (isCorrupt) {
             await deleteDoc(doc(db, 'news', document.id));
             deletedCount++;
@@ -6397,20 +6534,25 @@ function GalleryView({ siteSettings }: { siteSettings: any }) {
       const items = snapshot.docs.map(doc => {
         const data = doc.data();
         const type = (data.type || '').toLowerCase();
-        const url = data.processedUrl || data.url || data.videoUrl || data.imageUrl || data.image || data.video || data.contentUrl || '';
-        const isVideo = type === 'video' || !!(data.videoUrl || data.video) || (url && (url.toLowerCase().match(/\.(mp4|webm|ogg|mov|mkv|3gp|m4v|avi)(\?.*)?$/i) || url.toLowerCase().includes('youtube.com') || url.toLowerCase().includes('youtu.be') || url.toLowerCase().includes('vimeo.com') || (url.toLowerCase().includes('firebasestorage.googleapis.com') && (url.toLowerCase().includes('.mov') || url.toLowerCase().includes('.mp4') || url.toLowerCase().includes('video') || url.toLowerCase().includes('.webm') || url.toLowerCase().includes('.avi')))));
+        const mediaList = Array.isArray(data.media) && data.media.length > 0 ? data.media : [];
+        const url = data.processedUrl || data.url || data.videoUrl || data.imageUrl || mediaList[0] || data.image || data.video || data.contentUrl || '';
+        const isVideo = type === 'video' || !!(data.videoUrl || data.video) || isVid(url) || mediaList.some(m => isVid(m));
 
-        const resolvedTitle = (data.title || '').trim() || (data.desc || data.content || data.description || '').slice(0, 45) || 'Publication AMR Mugote';
+        const rawTitle = (data.title || '').trim();
+        const rawDesc = (data.desc || data.content || data.description || data.text || '').trim();
+        const resolvedTitle = rawTitle || rawDesc.slice(0, 45) || (isVideo ? 'Vidéo Mugote' : url ? 'Photo Mugote' : 'Publication AMR Mugote');
+        
         return {
           ...data,
           id: doc.id,
           title: resolvedTitle,
           processedUrl: url,
+          media: mediaList.length > 0 ? mediaList : (url ? [url] : []),
           processedType: isVideo ? 'video' : (type === 'text' && !url ? 'text' : 'image'),
-          processedDesc: data.desc || data.content || data.description || data.text || '',
+          processedDesc: rawDesc,
           sortDate: data.publishedAt || data.updatedAt || data.createdAt || { seconds: 0 }
         };
-      });
+      }).filter((item: any) => item.processedUrl || item.processedDesc || item.title);
 
       setMedia(items.sort((a, b) => {
         const ta = a.sortDate?.seconds || 0;
@@ -6737,20 +6879,25 @@ function NewsView() {
       const items = snapshot.docs.map(doc => {
         const data = doc.data();
         const type = (data.type || '').toLowerCase();
-        const url = data.processedUrl || data.url || data.videoUrl || data.imageUrl || data.image || data.video || data.contentUrl || '';
-        const isVideo = type === 'video' || !!(data.videoUrl || data.video) || (url && (url.toLowerCase().match(/\.(mp4|webm|ogg|mov|mkv|3gp|m4v|avi)(\?.*)?$/i) || url.toLowerCase().includes('youtube.com') || url.toLowerCase().includes('youtu.be') || url.toLowerCase().includes('vimeo.com') || (url.toLowerCase().includes('firebasestorage.googleapis.com') && (url.toLowerCase().includes('.mov') || url.toLowerCase().includes('.mp4') || url.toLowerCase().includes('video') || url.toLowerCase().includes('.webm') || url.toLowerCase().includes('.avi')))));
+        const mediaList = Array.isArray(data.media) && data.media.length > 0 ? data.media : [];
+        const url = data.processedUrl || data.url || data.videoUrl || data.imageUrl || mediaList[0] || data.image || data.video || data.contentUrl || '';
+        const isVideo = type === 'video' || !!(data.videoUrl || data.video) || isVid(url) || mediaList.some(m => isVid(m));
 
-        const resolvedTitle = (data.title || '').trim() || (data.desc || data.content || data.description || '').slice(0, 45) || 'Publication AMR Mugote';
+        const rawTitle = (data.title || '').trim();
+        const rawDesc = (data.desc || data.content || data.description || data.text || '').trim();
+        const resolvedTitle = rawTitle || rawDesc.slice(0, 45) || (isVideo ? 'Vidéo Mugote' : url ? 'Photo Mugote' : 'Publication AMR Mugote');
+        
         return {
           ...data,
           id: doc.id,
           title: resolvedTitle,
           processedUrl: url,
+          media: mediaList.length > 0 ? mediaList : (url ? [url] : []),
           processedType: isVideo ? 'video' : (type === 'text' && !url ? 'text' : 'image'),
-          processedDesc: data.desc || data.content || data.description || data.text || '',
+          processedDesc: rawDesc,
           sortDate: data.publishedAt || data.updatedAt || data.createdAt || { seconds: 0 }
         };
-      });
+      }).filter((item: any) => item.processedUrl || item.processedDesc || item.title);
 
       setNews(items.sort((a, b) => {
         const ta = a.sortDate?.seconds || 0;
