@@ -84,16 +84,17 @@ export default function DocumentScannerWidget() {
   const [cameraActive, setCameraActive] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
 
-  // Clean camera stream on unmount
-  useEffect(() => {
-    return () => {
-      stopCamera();
-    };
-  }, []);
-
   const stopCamera = () => {
     if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => track.stop());
+      try {
+        streamRef.current.getTracks().forEach(track => {
+          if (track.readyState === 'live') {
+            track.stop();
+          }
+        });
+      } catch (e) {
+        console.warn("Track stop error:", e);
+      }
       streamRef.current = null;
     }
     setCameraActive(false);
@@ -101,6 +102,13 @@ export default function DocumentScannerWidget() {
       videoRef.current.srcObject = null;
     }
   };
+
+  // Clean camera stream on unmount
+  useEffect(() => {
+    return () => {
+      stopCamera();
+    };
+  }, []);
 
   const startCamera = async () => {
     setCameraError(null);

@@ -15,8 +15,7 @@ import {
 } from 'lucide-react';
 import { doc, setDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
-import { TravelClass } from '../types';
-import { DEFAULT_PRICES, getClassPrices } from '../App';
+import { TravelClass, DEFAULT_PRICES, getClassPrices } from '../types';
 
 interface AdminTarifsViewProps {
   siteSettings?: any;

@@ -50,6 +50,27 @@ export interface UserProfile {
 
 export type ClassPrices = Record<TravelClass, number>;
 
+export const DEFAULT_PRICES: Record<TravelClass, number> = {
+  'VIP': 27,
+  '1ère Classe': 27,
+  '2ème Classe': 17,
+  '3ème Classe': 10
+};
+
+export const getClassPrices = (settings?: SiteSettings | null): Record<TravelClass, number> => {
+  return {
+    'VIP': Number(settings?.classPrices?.['VIP'] ?? DEFAULT_PRICES['VIP']),
+    '1ère Classe': Number(settings?.classPrices?.['1ère Classe'] ?? DEFAULT_PRICES['1ère Classe']),
+    '2ème Classe': Number(settings?.classPrices?.['2ème Classe'] ?? DEFAULT_PRICES['2ème Classe']),
+    '3ème Classe': Number(settings?.classPrices?.['3ème Classe'] ?? DEFAULT_PRICES['3ème Classe']),
+  };
+};
+
+export const getPriceForClass = (travelClass: TravelClass, settings?: SiteSettings | null): number => {
+  const prices = getClassPrices(settings);
+  return prices[travelClass] ?? DEFAULT_PRICES[travelClass] ?? 20;
+};
+
 export interface SiteSettings {
   homeBg?: string;
   homeDetail?: string;

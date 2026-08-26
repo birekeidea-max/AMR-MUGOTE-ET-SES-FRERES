@@ -107,6 +107,7 @@ import JsonLdSchema from './components/JsonLdSchema';
 import FAQ from './components/FAQ';
 import SchedulesAndTariffs from './components/SchedulesAndTariffs';
 import AdminTarifsView from './components/AdminTarifsView';
+import { ErrorBoundary } from './components/ErrorBoundary';
 
 // --- Safe localStorage Polyfill for sandboxed iframe environments ---
 let safeLocalStorage: Storage;
@@ -1339,7 +1340,7 @@ export default function App() {
             />
           ) : (
             <>
-              {currentPage === 'home' && <Home onBook={() => setCurrentPage('booking')} onNavigate={setCurrentPage} siteSettings={siteSettings} schedules={schedules} />}
+              {currentPage === 'home' && <Home onBook={() => setCurrentPage('booking')} onNavigate={(p) => setCurrentPage(p as Page)} siteSettings={siteSettings} schedules={schedules} />}
               {currentPage === 'booking' && (
                 <Booking 
                   onReserved={(res) => { setCurrentReservation(res); setCurrentPage('payment'); }} 
@@ -1349,13 +1350,13 @@ export default function App() {
                 />
               )}
               {currentPage === 'payment' && <Payment reservation={currentReservation} onComplete={() => setCurrentPage('tickets')} siteSettings={siteSettings} />}
-              {currentPage === 'dashboard' && <Dashboard siteSettings={siteSettings} onNavigate={setCurrentPage} schedules={schedules} isAdmin={isAdmin} isAdminUnlocked={isAdminUnlocked} setIsAdminUnlocked={setIsAdminUnlocked} setUser={setUser} />}
+              {currentPage === 'dashboard' && <Dashboard siteSettings={siteSettings} onNavigate={(p) => setCurrentPage(p as Page)} schedules={schedules} isAdmin={isAdmin} isAdminUnlocked={isAdminUnlocked} setIsAdminUnlocked={setIsAdminUnlocked} setUser={setUser} />}
               {currentPage === 'tickets' && <MyTickets user={user} siteSettings={siteSettings} />}
               {currentPage === 'news' && <NewsView />}
               {currentPage === 'gallery' && <GalleryView siteSettings={siteSettings} />}
               {currentPage === 'users' && <UsersListView />}
               {currentPage === 'map' && <LocalisationView />}
-              <ChatWidget user={user} onNavigate={setCurrentPage} siteSettings={siteSettings} />
+              <ChatWidget user={user} onNavigate={(p) => setCurrentPage(p as Page)} siteSettings={siteSettings} />
             </>
           )}
         </AnimatePresence>
@@ -3273,7 +3274,9 @@ function Home({ onBook, onNavigate, siteSettings, schedules }: { onBook: () => v
 
       {/* Document Scanner Section */}
       <section className="max-w-7xl mx-auto px-8 py-4">
-        <DocumentScannerWidget />
+        <ErrorBoundary fallbackTitle="Scanner d'embarquement">
+          <DocumentScannerWidget />
+        </ErrorBoundary>
       </section>
 
       {/* Services Section */}
@@ -5079,11 +5082,11 @@ function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlock
       return;
     }
     try {
-      const data = { ...scheduleForm, updatedAt: serverTimestamp() };
+      const data: Record<string, any> = { ...scheduleForm, updatedAt: serverTimestamp() };
       if (scheduleForm.id) {
         await updateDoc(doc(db, 'schedules', scheduleForm.id), data);
       } else {
-        delete (data as any).id;
+        delete data.id;
         data.createdAt = serverTimestamp();
         await addDoc(collection(db, 'schedules'), data);
       }
@@ -7329,7 +7332,7 @@ function AdminScannerView({ reservations }: AdminScannerViewProps) {
   const [scannedList, setScannedList] = useState<Reservation[]>([]);
   
   // Advanced Scan State Management
-  const [scanStatus, setScanStatus] = useState<'idle' | 'success' | 'alert_reused' | 'alert_unpaid' | 'error_not_found'>('idle');
+  const [scanStatus, setScanStatus] = useState<'idle' | 'loading' | 'success' | 'alert_reused' | 'alert_unpaid' | 'error_not_found'>('idle');
   const [statusMessage, setStatusMessage] = useState('');
 
   useEffect(() => {
