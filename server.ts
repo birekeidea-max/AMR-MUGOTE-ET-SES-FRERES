@@ -5,6 +5,9 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { GoogleGenAI } from "@google/genai";
 import fs from "fs";
+import { connectMongoDB } from "./server/db";
+import apiRoutes from "./server/routes/api";
+import { Reservation as MongoReservation, SiteSettings as MongoSiteSettings } from "./server/models";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -31,6 +34,18 @@ async function generateUniqueTicketId(): Promise<string> {
   while (!isUnique && attempts < 15) {
     const randomHex = Math.random().toString(36).substring(2, 8).toUpperCase();
     uniqueTicketId = `AMR-${randomHex}`;
+    
+    // Check MongoDB first if available
+    try {
+      const mongoExists = await MongoReservation.findOne({ ticketId: uniqueTicketId });
+      if (mongoExists) {
+        attempts++;
+        continue;
+      }
+    } catch (mErr) {
+      // MongoDB check optional during startup
+    }
+
     const qSnap = await reservationsCol.where("ticketId", "==", uniqueTicketId).get();
     if (qSnap.empty) {
       isUnique = true;
@@ -48,6 +63,14 @@ async function startServer() {
   const PORT = 3000;
 
   app.use(express.json());
+
+  // Connect to MongoDB Atlas in background without blocking server boot
+  connectMongoDB().catch(err => {
+    console.warn("MongoDB initial connection error:", err);
+  });
+
+  // Mount Comprehensive MongoDB REST API Routes
+  app.use('/api', apiRoutes);
 
   // Gemini AI Chat Proxy
   app.post("/api/chat", async (req, res) => {
@@ -425,7 +448,27 @@ Ta mission est d'orienter, renseigner et accompagner chaleureusement les voyageu
       if (isSuccess) {
         console.log(`FlexPay Callback confirms successful transaction reference: ${referenceToUse}`);
 
-        // Update the reservation document to VALIDATED with a unique, cryptographically friendly ticket ID
+        // Update MongoDB Reservation
+        let uniqueTicketId = "";
+        try {
+          const mongoRes = await MongoReservation.findOne({
+            $or: [{ transactionId: referenceToUse }, { trackingRef: referenceToUse }]
+          });
+          if (mongoRes && mongoRes.status !== 'VALIDATED') {
+            uniqueTicketId = await generateUniqueTicketId();
+            mongoRes.status = 'VALIDATED';
+            mongoRes.ticketId = uniqueTicketId;
+            mongoRes.validatedAt = new Date();
+            await mongoRes.save();
+            console.log(`[MongoDB] FlexPay validated ticket ${uniqueTicketId} for Mongo reservation ${mongoRes._id}`);
+          } else if (mongoRes) {
+            uniqueTicketId = mongoRes.ticketId || "";
+          }
+        } catch (mErr) {
+          console.warn("MongoDB FlexPay update error:", mErr);
+        }
+
+        // Update the Firestore reservation document (dual compatibility)
         const reservationsCol = dbAdmin.collection("reservations");
         const querySnapshot = await reservationsCol.where("transactionId", "==", referenceToUse).get();
 
@@ -433,13 +476,13 @@ Ta mission est d'orienter, renseigner et accompagner chaleureusement les voyageu
           for (const doc of querySnapshot.docs) {
             const reservationData = doc.data();
             if (reservationData.status !== "VALIDATED") {
-              const uniqueTicketId = await generateUniqueTicketId();
+              if (!uniqueTicketId) uniqueTicketId = await generateUniqueTicketId();
               await doc.ref.update({
                 status: "VALIDATED",
                 ticketId: uniqueTicketId,
                 validatedAt: Date.now()
               });
-              console.log(`Successfully completed reservation callback for ${doc.id} giving active Ticket ${uniqueTicketId}`);
+              console.log(`[Firestore] Successfully completed reservation callback for ${doc.id} giving active Ticket ${uniqueTicketId}`);
             }
           }
         } else {

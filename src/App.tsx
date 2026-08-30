@@ -60,9 +60,11 @@ import {
   Banknote,
   Save,
   Sparkles,
-  Tag
+  Tag,
+  Database
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { MongoMigrationView } from './components/MongoMigrationView';
 import { auth, db, handleFirestoreError, OperationType, uploadToStorage } from './lib/firebase';
 import { 
   signInWithPopup, 
@@ -4511,7 +4513,7 @@ function Payment({ reservation, onComplete, siteSettings }: { reservation: Reser
 }
 
 function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlocked, setIsAdminUnlocked, setUser }: { siteSettings?: { homeBg: string, homeDetail: string }, onNavigate: (page: string) => void, schedules: any[], isAdmin: boolean, isAdminUnlocked: boolean, setIsAdminUnlocked: (val: boolean) => void, setUser?: (u: any) => void }) {
-  const [tab, setTab] = useState<'reservations' | 'tarifs' | 'users' | 'fleet' | 'media' | 'settings' | 'messages' | 'schedules' | 'scanner'>('reservations');
+  const [tab, setTab] = useState<'reservations' | 'tarifs' | 'users' | 'fleet' | 'media' | 'settings' | 'messages' | 'schedules' | 'scanner' | 'mongodb'>('reservations');
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [usersList, setUsersList] = useState<any[]>([]);
   const [fleetList, setFleetList] = useState<any[]>([]);
@@ -5375,7 +5377,8 @@ function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlock
                 { id: 'schedules', label: 'Horaires', icon: Clock },
                 { id: 'messages', label: 'Discussions', icon: MessageSquare },
                 { id: 'media', label: 'Médias', icon: ImagePlus },
-                { id: 'settings', label: 'Paramètres', icon: Settings }
+                { id: 'settings', label: 'Paramètres', icon: Settings },
+                { id: 'mongodb', label: 'MongoDB Atlas', icon: Database }
               ].map(t => (
                 <button 
                   key={t.id}
@@ -6516,6 +6519,12 @@ function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlock
                 </div>
               </div>
             </div>
+          </div>
+        )}
+
+        {tab === 'mongodb' && (
+          <div className="w-full max-w-5xl mx-auto px-4">
+            <MongoMigrationView />
           </div>
         )}
       </div>

@@ -5,6 +5,7 @@ export type ShipName = 'Mugote 1' | 'Mugote 2' | 'Mugote 3';
 
 export interface Reservation {
   id?: string;
+  _id?: string;
   userId: string;
   fullName: string;
   lastName: string;
@@ -25,11 +26,24 @@ export interface Reservation {
   createdAt: number;
   bookingDateFormatted?: string;
   bookingTimeFormatted?: string;
-  validatedAt?: number;
+  validatedAt?: any;
   validatedBy?: string;
   ticketId?: string;
   boardingStatus?: 'PENDING' | 'BOARDED';
   boardedAt?: number;
+  notes?: string;
+  isUsed?: boolean;
+  usedAt?: any;
+}
+
+export interface Schedule {
+  id?: string;
+  _id?: string;
+  from: string;
+  to: string;
+  time: string;
+  ship?: string;
+  days?: string;
 }
 
 export interface News {
