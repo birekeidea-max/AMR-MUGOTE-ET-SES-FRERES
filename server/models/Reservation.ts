@@ -36,7 +36,7 @@ const ReservationSchema = new Schema<IReservation>({
   lastName: { type: String, default: '' },
   phone: { type: String, required: true, index: true },
   email: { type: String, index: true, default: '' },
-  itinerary: { type: String, required: true, enum: ['Bukavu-Goma', 'Goma-Bukavu'] },
+  itinerary: { type: String, required: true, default: 'Bukavu-Goma' },
   ship: { type: String, required: true, default: 'Mugote 1' },
   travelDate: { type: String, required: true, index: true },
   departureTime: { type: String, default: '07h30' },
@@ -50,7 +50,6 @@ const ReservationSchema = new Schema<IReservation>({
   status: { 
     type: String, 
     required: true, 
-    enum: ['PENDING', 'VALIDATED', 'REJECTED', 'CANCELLED'], 
     default: 'PENDING',
     index: true 
   },

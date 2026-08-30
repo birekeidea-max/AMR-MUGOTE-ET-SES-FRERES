@@ -13,6 +13,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 import admin from "firebase-admin";
+import { getFirestore } from "firebase-admin/firestore";
 
 const firebaseConfig = {
   projectId: "mugote2",
@@ -23,7 +24,7 @@ const adminApp = admin.apps.length ? admin.apps[0] : admin.initializeApp({
   projectId: firebaseConfig.projectId
 });
 
-const dbAdmin = adminApp.firestore();
+const dbAdmin = getFirestore(adminApp, firebaseConfig.databaseId);
 
 async function generateUniqueTicketId(): Promise<string> {
   let uniqueTicketId = "";

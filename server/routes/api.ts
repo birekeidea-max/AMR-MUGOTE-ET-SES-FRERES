@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import admin from 'firebase-admin';
+import { getFirestore } from 'firebase-admin/firestore';
 import { getDatabaseStatus, connectMongoDB } from '../db';
 import {
   SiteSettings,
@@ -730,7 +731,8 @@ router.post('/conversations/:id/messages', async (req: Request, res: Response) =
 // -------------------------------------------------------------
 router.post('/migrate/firestore-to-mongodb', async (req: Request, res: Response) => {
   try {
-    const dbAdmin = admin.firestore();
+    const adminApp = admin.apps.length ? admin.apps[0] : admin.initializeApp({ projectId: "mugote2" });
+    const dbAdmin = getFirestore(adminApp, "ai-studio-020b031e-1447-4f1b-8ef0-ab4a23c0b6ab");
     const stats: Record<string, { migrated: number; errors: number }> = {
       settings: { migrated: 0, errors: 0 },
       schedules: { migrated: 0, errors: 0 },
@@ -987,23 +989,33 @@ router.post('/migrate/batch', async (req: Request, res: Response) => {
     if (Array.isArray(schedules)) {
       for (const item of schedules) {
         try {
+          const depTime = item.departureTime || item.time || '07h30';
+          const itin = item.itinerary || (item.from && item.to ? `${item.from}-${item.to}` : 'Bukavu-Goma');
+          const shipName = item.ship || 'Mugote 1';
+
+          const query: any = item.id ? { firestoreId: item.id } : { departureTime: depTime, itinerary: itin, ship: shipName };
+
           await Schedule.findOneAndUpdate(
-            { $or: [{ firestoreId: item.id }, { departureTime: item.departureTime, itinerary: item.itinerary, ship: item.ship }] },
+            query,
             {
               $set: {
-                firestoreId: item.id,
-                ship: item.ship || 'Mugote 1',
-                departureTime: item.departureTime || '07h30',
-                itinerary: item.itinerary || 'Bukavu-Goma',
+                firestoreId: item.id || undefined,
+                ship: shipName,
+                departureTime: depTime,
+                time: depTime,
+                itinerary: itin,
+                from: item.from || itin.split('-')[0] || 'Bukavu',
+                to: item.to || itin.split('-')[1] || 'Goma',
                 frequency: item.frequency || 'Quotidien',
                 days: item.days || ['Tous les jours'],
                 isActive: item.isActive !== false
               }
             },
-            { upsert: true }
+            { upsert: true, new: true }
           );
           stats.schedules.migrated++;
         } catch (e) {
+          console.warn("Schedule migration item error:", e);
           stats.schedules.errors++;
         }
       }

@@ -141,9 +141,11 @@ export function MongoMigrationView() {
       const usersList = usersSnap ? usersSnap.docs.map(d => sanitizeFirestoreDoc({ id: d.id, ...d.data() })) : [];
       const resList = resSnap ? resSnap.docs.map(d => sanitizeFirestoreDoc({ id: d.id, ...d.data() })) : [];
 
-      addLog('info', `Firestore lu : ${resList.length} réservations, ${schedListCount(schedulesList)} horaires, ${fleetList.length} navires.`);
+      addLog('info', `Firestore lu : ${resList.length} réservations, ${schedListCount(schedulesList)} horaires, ${fleetList.length} navires, ${newsList.length} actualités.`);
 
       // 2. Send batch to backend MongoDB endpoint
+      addLog('info', "Envoi des données vers MongoDB Atlas...");
+      
       const batchRes = await mongoApi.batchMigration({
         settings: settingsData ? sanitizeFirestoreDoc(settingsData) : null,
         schedules: schedulesList,
@@ -157,12 +159,16 @@ export function MongoMigrationView() {
       const resMigrated = batchRes.stats?.reservations?.migrated || 0;
       const schedMigrated = batchRes.stats?.schedules?.migrated || 0;
       const fleetMigrated = batchRes.stats?.fleet?.migrated || 0;
-      addLog('success', `Migration terminée avec succès ! (${resMigrated} réservations, ${schedMigrated} horaires, ${fleetMigrated} navires sauvegardés dans MongoDB Atlas)`);
-      fetchHealth();
+      const newsMigrated = batchRes.stats?.news?.migrated || 0;
+      const usersMigrated = batchRes.stats?.users?.migrated || 0;
+      
+      addLog('success', `🎉 Migration réussie ! ${resMigrated} réservations, ${schedMigrated} horaires, ${fleetMigrated} navires, ${newsMigrated} actualités, ${usersMigrated} utilisateurs indexés dans MongoDB Atlas.`);
+      await fetchHealth();
     } catch (err: any) {
       console.error("Batch migration error:", err);
-      setMigrationError(err?.message || "Échec de la synchronisation vers MongoDB Atlas");
-      addLog('error', `Erreur de migration : ${err?.message || 'Erreur inconnue'}`);
+      const errorMsg = err?.message || "Échec de la synchronisation vers MongoDB Atlas";
+      setMigrationError(errorMsg);
+      addLog('error', `Erreur de migration : ${errorMsg}`);
     } finally {
       setMigrating(false);
     }
