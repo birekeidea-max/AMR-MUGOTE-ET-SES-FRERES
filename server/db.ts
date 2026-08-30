@@ -1,37 +1,74 @@
 import mongoose from 'mongoose';
 
-let isConnected = false;
+// Global cache interface for Serverless environments (Vercel, AWS Lambda)
+interface MongooseCache {
+  conn: typeof mongoose | null;
+  promise: Promise<typeof mongoose> | null;
+}
+
+declare global {
+  // eslint-disable-next-line no-var
+  var mongooseCache: MongooseCache | undefined;
+}
+
+const cached: MongooseCache = global.mongooseCache || { conn: null, promise: null };
+if (!global.mongooseCache) {
+  global.mongooseCache = cached;
+}
+
 let connectionStatus: 'disconnected' | 'connecting' | 'connected' | 'error' = 'disconnected';
 let lastError: string | null = null;
 
 export async function connectMongoDB(): Promise<boolean> {
+  // 1. If already connected in current runtime or readyState is 1 (connected), reuse immediately
+  if (mongoose.connection.readyState === 1) {
+    connectionStatus = 'connected';
+    return true;
+  }
+
   const uri = process.env.MONGODB_URI;
 
   if (!uri || !uri.trim()) {
-    console.warn("⚠️ [MongoDB] MONGODB_URI is not defined in environment. Ready for connection when configured in .env");
+    console.warn("⚠️ [MongoDB] MONGODB_URI is not defined in environment.");
     connectionStatus = 'disconnected';
     return false;
   }
 
-  try {
+  // 2. If a connection is already cached and active
+  if (cached.conn && cached.conn.connection.readyState === 1) {
+    connectionStatus = 'connected';
+    return true;
+  }
+
+  // 3. If a connection promise is in-flight, await it to prevent duplicate connection attempts
+  if (!cached.promise) {
     connectionStatus = 'connecting';
-    console.log("🔄 [MongoDB] Connecting to MongoDB Atlas...");
+    console.log("🔄 [MongoDB] Establishing connection to MongoDB Atlas (Serverless pool)...");
     
     // Set Mongoose configurations
     mongoose.set('strictQuery', false);
 
-    await mongoose.connect(uri, {
+    const opts = {
+      bufferCommands: false,
       serverSelectionTimeoutMS: 8000,
       socketTimeoutMS: 45000,
-    });
+      maxPoolSize: 10,
+    };
 
-    isConnected = true;
+    cached.promise = mongoose.connect(uri, opts).then((m) => {
+      console.log("✅ MongoDB connected successfully to database:", m.connection.name || 'default');
+      return m;
+    });
+  }
+
+  try {
+    cached.conn = await cached.promise;
     connectionStatus = 'connected';
     lastError = null;
-    console.log("✅ MongoDB connected successfully to database:", mongoose.connection.name || 'default');
     return true;
   } catch (error: any) {
-    isConnected = false;
+    cached.promise = null;
+    cached.conn = null;
     connectionStatus = 'error';
     lastError = error?.message || String(error);
     console.error("❌ MongoDB connection failed:", lastError);
@@ -40,13 +77,15 @@ export async function connectMongoDB(): Promise<boolean> {
 }
 
 mongoose.connection.on('disconnected', () => {
-  isConnected = false;
   connectionStatus = 'disconnected';
+  if (cached) {
+    cached.conn = null;
+    cached.promise = null;
+  }
   console.log("⚠️ [MongoDB] Disconnected from MongoDB Atlas");
 });
 
 mongoose.connection.on('reconnected', () => {
-  isConnected = true;
   connectionStatus = 'connected';
   console.log("🔄 [MongoDB] Reconnected to MongoDB Atlas");
 });
