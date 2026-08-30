@@ -65,6 +65,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { MongoMigrationView } from './components/MongoMigrationView';
+import { mongoApi } from './services/api';
 import { auth, db, handleFirestoreError, OperationType, uploadToStorage } from './lib/firebase';
 import { 
   signInWithPopup, 
@@ -3732,11 +3733,25 @@ function Booking({ onReserved, user, onLoginRequest, siteSettings }: { onReserve
     };
 
     try {
-      const docRef = await addDoc(collection(db, 'reservations'), resData);
+      // 1. Enregistrement direct dans MongoDB Atlas via l'API REST backend
+      let mongoResultId: string | undefined;
+      try {
+        const mongoRes = await mongoApi.createReservation(resData);
+        mongoResultId = mongoRes?._id || (mongoRes as any)?.id;
+        console.log("✅ Réservation enregistrée avec succès dans MongoDB Atlas :", mongoResultId);
+      } catch (mongoErr) {
+        console.warn("⚠️ Avertissement : écriture MongoDB Atlas échouée, conservation Firestore :", mongoErr);
+      }
+
+      // 2. Enregistrement miroir dans Firestore (temps réel & synchronisation instantanée)
+      const docRef = await addDoc(collection(db, 'reservations'), {
+        ...resData,
+        mongoId: mongoResultId || null
+      });
       
       // Assurer la création de l'utilisateur dans 'users' et 'users_list' pour qu'il soit immédiatement répertorié
       try {
-        await setDoc(doc(db, 'users', user.uid), {
+        const passengerProfile = {
           uid: user.uid,
           email: formData.email.trim() || 'Anonyme',
           displayName: `${formData.fullName.trim()} ${formData.lastName.trim()}`.trim() || 'Passager',
@@ -3744,24 +3759,23 @@ function Booking({ onReserved, user, onLoginRequest, siteSettings }: { onReserve
           isAnonymous: false,
           lastLogin: serverTimestamp(),
           isLocalSyncOnly: (user as any).isLocalSyncOnly ?? false
-        }, { merge: true });
+        };
+
+        await setDoc(doc(db, 'users', user.uid), passengerProfile, { merge: true });
 
         await setDoc(doc(db, 'users_list', user.uid), {
-          uid: user.uid,
-          email: formData.email.trim() || 'Anonyme',
-          displayName: `${formData.fullName.trim()} ${formData.lastName.trim()}`.trim() || 'Passager',
-          phone: formData.phone.trim() || '',
-          isAnonymous: false,
-          lastLogin: serverTimestamp(),
-          isLocalSyncOnly: (user as any).isLocalSyncOnly ?? false,
+          ...passengerProfile,
           usageCount: increment(1)
         }, { merge: true });
+
+        // Synchroniser également l'utilisateur dans MongoDB
+        mongoApi.syncUser(passengerProfile).catch(e => console.warn("Mongo user sync:", e));
         console.log("Passenger synchronized to users and users_list collections successfully on booking creation.");
       } catch (userErr) {
         console.warn("Non-blocking passenger sync to users_list failed:", userErr);
       }
 
-      onReserved({ ...resData, id: docRef.id });
+      onReserved({ ...resData, id: docRef.id, _id: mongoResultId });
     } catch (error: any) {
       console.error("Firestore reservation error:", error);
       setErrorLocal(error.message || "Échec de l'enregistrement de votre réservation. Veuillez réessayer.");
@@ -5125,11 +5139,23 @@ function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlock
 
   const handleCancellationAction = async (reservationId: string, action: 'approved' | 'rejected') => {
     try {
+      const newStatus = action === 'approved' ? 'ANNULÉ' : 'VALIDATED';
       await updateDoc(doc(db, 'reservations', reservationId), {
         cancellationStatus: action,
-        status: action === 'approved' ? 'ANNULÉ' : 'VALIDATED',
+        status: newStatus,
         cancellationProcessedAt: serverTimestamp()
       });
+
+      // Synchronisation vers MongoDB Atlas
+      try {
+        await mongoApi.updateReservationStatus(reservationId, {
+          status: newStatus as any,
+          cancellationStatus: action,
+        });
+      } catch (mErr) {
+        console.warn("Mongo cancellation sync:", mErr);
+      }
+
       alert(action === 'approved' ? "Annulation approuvée. Le billet est marqué comme ANNULÉ." : "Demande de remboursement rejetée.");
     } catch (err) {
       console.error(err);
@@ -5177,6 +5203,18 @@ function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlock
       }
 
       await updateDoc(doc(db, 'reservations', resId), updateFields);
+
+      // Synchronisation vers MongoDB Atlas
+      try {
+        await mongoApi.updateReservationStatus(resId, {
+          status: action,
+          ticketId: action === 'VALIDATED' ? ticketId : '',
+          validatedBy: auth.currentUser?.uid || 'Administration AMR MUGOTE'
+        });
+      } catch (mErr) {
+        console.warn("Mongo status sync:", mErr);
+      }
+
       alert(action === 'VALIDATED' ? "Billet validé avec succès !" : "Billet rejeté avec succès.");
     } catch (error) {
       console.error("Action failed", error);

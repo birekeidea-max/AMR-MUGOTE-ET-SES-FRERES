@@ -119,6 +119,10 @@ export const mongoApi = {
     method: 'PUT',
     body: JSON.stringify(data),
   }),
+  updateReservationStatus: (id: string, data: Partial<Reservation>) => apiRequest<Reservation>(`/reservations/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  }),
   deleteReservation: (id: string) => apiRequest<{ success: boolean }>(`/reservations/${id}`, {
     method: 'DELETE',
   }),
