@@ -948,9 +948,193 @@ function parseToDate(val: any): Date | undefined {
   return undefined;
 }
 
+// Universal Single-Item Sync Endpoint for Client-Side Progressive Migration
+router.post('/sync/item', async (req: Request, res: Response) => {
+  try {
+    const isConnected = await connectMongoDB();
+    if (!isConnected) {
+      return res.status(503).json({
+        error: "Connexion MongoDB Atlas impossible",
+        details: "Vérifiez la variable MONGODB_URI et les autorisations réseau (0.0.0.0/0) dans MongoDB Atlas."
+      });
+    }
+
+    const { type, data } = req.body || {};
+    if (!type || !data) {
+      return res.status(400).json({ error: "Type et données de l'élément obligatoires." });
+    }
+
+    let resultId = data.id || data._id || '';
+
+    switch (type) {
+      case 'settings': {
+        const updated = await SiteSettings.findOneAndUpdate(
+          { key: 'site' },
+          {
+            $set: {
+              homeBg: data.homeBg || '',
+              homeDetail: data.homeDetail || '',
+              adminCode: data.adminCode || 'MUGOTE2025',
+              contactPhone: data.contactPhone || '+243 994 286 469',
+              classPrices: data.classPrices || { VIP: 27, '1ère Classe': 27, '2ème Classe': 17, '3ème Classe': 10 },
+              updatedAt: new Date()
+            }
+          },
+          { upsert: true, new: true }
+        );
+        resultId = updated?._id?.toString() || 'site';
+        break;
+      }
+
+      case 'schedule': {
+        const depTime = data.departureTime || data.time || '07h30';
+        const itin = data.itinerary || (data.from && data.to ? `${data.from}-${data.to}` : 'Bukavu-Goma');
+        const shipName = data.ship || 'Mugote 1';
+        const query: any = data.id ? { firestoreId: data.id } : { departureTime: depTime, itinerary: itin, ship: shipName };
+
+        const updated = await Schedule.findOneAndUpdate(
+          query,
+          {
+            $set: {
+              firestoreId: data.id || undefined,
+              ship: shipName,
+              departureTime: depTime,
+              time: depTime,
+              itinerary: itin,
+              from: data.from || itin.split('-')[0] || 'Bukavu',
+              to: data.to || itin.split('-')[1] || 'Goma',
+              frequency: data.frequency || 'Quotidien',
+              days: data.days || ['Tous les jours'],
+              isActive: data.isActive !== false
+            }
+          },
+          { upsert: true, new: true }
+        );
+        resultId = updated?._id?.toString() || data.id;
+        break;
+      }
+
+      case 'boat':
+      case 'fleet': {
+        const updated = await Boat.findOneAndUpdate(
+          { $or: [{ firestoreId: data.id }, { name: data.name }] },
+          {
+            $set: {
+              firestoreId: data.id,
+              name: data.name || 'Mugote',
+              capacity: Number(data.capacity || 150),
+              description: data.description || '',
+              imageUrl: data.imageUrl || '',
+              gallery: data.gallery || [],
+              status: data.status || 'ACTIF'
+            }
+          },
+          { upsert: true, new: true }
+        );
+        resultId = updated?._id?.toString() || data.id;
+        break;
+      }
+
+      case 'news': {
+        const updated = await News.findOneAndUpdate(
+          { firestoreId: data.id },
+          {
+            $set: {
+              firestoreId: data.id,
+              title: data.title || 'Actualité AMR Mugote',
+              content: data.content || '',
+              imageUrl: data.imageUrl || '',
+              videoUrl: data.videoUrl || '',
+              media: data.media || [],
+              author: data.author || 'Direction AMR Mugote',
+              views: Number(data.views || 0),
+              publishedAt: parseToDate(data.publishedAt) || new Date()
+            }
+          },
+          { upsert: true, new: true }
+        );
+        resultId = updated?._id?.toString() || data.id;
+        break;
+      }
+
+      case 'user': {
+        const updated = await User.findOneAndUpdate(
+          { uid: data.uid || data.id },
+          {
+            $set: {
+              firestoreId: data.id,
+              uid: data.uid || data.id,
+              email: data.email || '',
+              displayName: data.displayName || data.name || '',
+              phone: data.phone || '',
+              role: data.role || 'CLIENT',
+              isVerified: !!data.isVerified
+            }
+          },
+          { upsert: true, new: true }
+        );
+        resultId = updated?._id?.toString() || data.uid || data.id;
+        break;
+      }
+
+      case 'reservation': {
+        const ticketId = data.ticketId || `AMR-${(data.id || '').substring(0, 6).toUpperCase()}`;
+        const updated = await Reservation.findOneAndUpdate(
+          { $or: [{ firestoreId: data.id }, { ticketId }] },
+          {
+            $set: {
+              firestoreId: data.id,
+              ticketId,
+              fullName: data.fullName || 'Passager',
+              lastName: data.lastName || '',
+              phone: data.phone || '',
+              email: data.email || '',
+              itinerary: data.itinerary || 'Bukavu-Goma',
+              ship: data.ship || 'Mugote 1',
+              travelDate: data.travelDate || new Date().toISOString().split('T')[0],
+              departureTime: data.departureTime || '07h30',
+              travelClass: data.travelClass || '2ème Classe',
+              passengersCount: Number(data.passengersCount || 1),
+              status: data.status || 'PENDING',
+              paymentMethod: data.paymentMethod || 'Mobile Money',
+              transactionId: data.transactionId || '',
+              amount: Number(data.amount || 20),
+              userId: data.userId || '',
+              isUsed: !!data.isUsed,
+              validatedAt: parseToDate(data.validatedAt),
+              cancellationStatus: data.cancellationStatus || undefined,
+              cancellationProcessedAt: parseToDate(data.cancellationProcessedAt),
+              createdAt: parseToDate(data.createdAt) || new Date()
+            }
+          },
+          { upsert: true, new: true }
+        );
+        resultId = updated?._id?.toString() || ticketId;
+        break;
+      }
+
+      default:
+        return res.status(400).json({ error: `Type non supporté : ${type}` });
+    }
+
+    res.json({ success: true, type, id: resultId, message: "Élément synchronisé dans MongoDB Atlas." });
+  } catch (error: any) {
+    console.error("Single item sync error in MongoDB:", error);
+    res.status(500).json({ error: "Erreur lors de la synchronisation de l'élément.", details: error?.message });
+  }
+});
+
 // Batch migration endpoint: accepts arrays of documents read by the frontend client (which has authenticated access to Firestore)
 router.post('/migrate/batch', async (req: Request, res: Response) => {
   try {
+    const isConnected = await connectMongoDB();
+    if (!isConnected) {
+      return res.status(503).json({
+        error: "Connexion MongoDB Atlas impossible",
+        details: "Assurez-vous que la variable MONGODB_URI est configurée dans Vercel (Settings > Environment Variables) et que l'IP 0.0.0.0/0 est autorisée dans MongoDB Atlas (Network Access)."
+      });
+    }
+
     const { settings, schedules, fleet, news, users, reservations } = req.body || {};
     const stats: Record<string, { migrated: number; errors: number }> = {
       settings: { migrated: 0, errors: 0 },

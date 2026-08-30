@@ -47,7 +47,14 @@ async function apiRequest<T>(
     let errorMsg = `HTTP Error ${response.status}${response.statusText ? ` (${response.statusText})` : ''}`;
     try {
       const errData = await response.json();
-      errorMsg = errData.error || errData.message || errorMsg;
+      if (errData.error) {
+        errorMsg = errData.error;
+        if (errData.details) {
+          errorMsg += ` : ${errData.details}`;
+        }
+      } else if (errData.message) {
+        errorMsg = errData.message;
+      }
     } catch {
       // Ignore JSON parse error
     }
@@ -188,7 +195,17 @@ export const mongoApi = {
     body: JSON.stringify(data),
   }),
 
-  // 9. Non-Destructive Data Migration
+  // 9. Non-Destructive Data Migration & Item-level Sync
+  syncItem: (type: 'settings' | 'schedule' | 'boat' | 'fleet' | 'news' | 'user' | 'reservation', data: any) => apiRequest<{
+    success: boolean;
+    type: string;
+    id: string;
+    message: string;
+  }>('/sync/item', {
+    method: 'POST',
+    body: JSON.stringify({ type, data }),
+  }),
+
   triggerMigration: () => apiRequest<{
     success: boolean;
     message: string;
