@@ -194,6 +194,22 @@ export const mongoApi = {
     method: 'POST',
   }),
 
+  batchMigration: (data: {
+    settings?: any;
+    schedules?: any[];
+    fleet?: any[];
+    news?: any[];
+    users?: any[];
+    reservations?: any[];
+  }) => apiRequest<{
+    success: boolean;
+    message: string;
+    stats: Record<string, { migrated: number; errors: number }>;
+  }>('/migrate/batch', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }),
+
   // 10. Connection Management
   reconnect: () => apiRequest<{
     success: boolean;

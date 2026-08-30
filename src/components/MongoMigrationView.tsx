@@ -17,6 +17,8 @@ import {
   Edit3 
 } from 'lucide-react';
 import { mongoApi } from '../services/api';
+import { db } from '../lib/firebase';
+import { collection, getDocs, doc, getDoc } from 'firebase/firestore';
 
 export function MongoMigrationView() {
   const [healthData, setHealthData] = useState<{
@@ -89,17 +91,65 @@ export function MongoMigrationView() {
     addLog('info', "Démarrage de la migration non-destructive Firestore -> MongoDB Atlas...");
 
     try {
-      const res = await mongoApi.triggerMigration();
-      setMigrationResult(res);
-      addLog('success', `Migration terminée avec succès ! (${res.stats?.reservations?.migrated || 0} réservations migrées)`);
+      // 1. First, attempt client-side collection read from authenticated Firestore
+      addLog('info', "Lecture des collections Firestore (Paramètres, Horaires, Navires, Actualités, Utilisateurs, Réservations)...");
+
+      let settingsData: any = null;
+      try {
+        const sSnap = await getDoc(doc(db, 'settings', 'site'));
+        if (sSnap.exists()) settingsData = sSnap.data();
+      } catch (e) {
+        console.warn("Could not read site settings from client Firestore:", e);
+      }
+
+      const [schedSnap, fleetSnap, newsSnap, usersSnap, resSnap] = await Promise.all([
+        getDocs(collection(db, 'schedules')).catch(() => null),
+        getDocs(collection(db, 'fleet')).catch(() => null),
+        getDocs(collection(db, 'news')).catch(() => null),
+        getDocs(collection(db, 'users')).catch(() => null),
+        getDocs(collection(db, 'reservations')).catch(() => null),
+      ]);
+
+      const schedulesList = schedSnap ? schedSnap.docs.map(d => ({ id: d.id, ...d.data() })) : [];
+      const fleetList = fleetSnap ? fleetSnap.docs.map(d => ({ id: d.id, ...d.data() })) : [];
+      const newsList = newsSnap ? newsSnap.docs.map(d => ({ id: d.id, ...d.data() })) : [];
+      const usersList = usersSnap ? usersSnap.docs.map(d => ({ id: d.id, ...d.data() })) : [];
+      const resList = resSnap ? resSnap.docs.map(d => ({ id: d.id, ...d.data() })) : [];
+
+      addLog('info', `Firestore lu : ${resList.length} réservations, ${schedListCount(schedulesList)} horaires, ${fleetList.length} navires.`);
+
+      // 2. Send batch to backend MongoDB endpoint
+      const batchRes = await mongoApi.batchMigration({
+        settings: settingsData,
+        schedules: schedulesList,
+        fleet: fleetList,
+        news: newsList,
+        users: usersList,
+        reservations: resList
+      });
+
+      setMigrationResult(batchRes);
+      const totalMigrated = (batchRes.stats?.reservations?.migrated || 0) + (batchRes.stats?.schedules?.migrated || 0);
+      addLog('success', `Migration terminée avec succès ! (${batchRes.stats?.reservations?.migrated || 0} réservations, ${batchRes.stats?.schedules?.migrated || 0} horaires, ${batchRes.stats?.fleet?.migrated || 0} navires sauvegardés dans MongoDB Atlas)`);
       fetchHealth();
     } catch (err: any) {
-      setMigrationError(err?.message || "Échec de la migration");
-      addLog('error', `Erreur de migration : ${err?.message || 'Erreur inconnue'}`);
+      console.warn("Direct batch migration failed, trying server fallback:", err);
+      // Fallback to server-side trigger
+      try {
+        const fallbackRes = await mongoApi.triggerMigration();
+        setMigrationResult(fallbackRes);
+        addLog('success', `Migration serveur terminée ! (${fallbackRes.stats?.reservations?.migrated || 0} réservations migrées)`);
+        fetchHealth();
+      } catch (fallbackErr: any) {
+        setMigrationError(fallbackErr?.message || err?.message || "Échec de la migration");
+        addLog('error', `Erreur de migration : ${fallbackErr?.message || err?.message || 'Erreur inconnue'}`);
+      }
     } finally {
       setMigrating(false);
     }
   };
+
+  const schedListCount = (list: any[]) => list?.length || 0;
 
   // 1. CREATE TEST
   const handleTestCreate = async () => {

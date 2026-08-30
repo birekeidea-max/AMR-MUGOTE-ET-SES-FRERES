@@ -928,4 +928,197 @@ router.post('/migrate/firestore-to-mongodb', async (req: Request, res: Response)
   }
 });
 
+// Batch migration endpoint: accepts arrays of documents read by the frontend client (which has authenticated access to Firestore)
+router.post('/migrate/batch', async (req: Request, res: Response) => {
+  try {
+    const { settings, schedules, fleet, news, users, reservations } = req.body || {};
+    const stats: Record<string, { migrated: number; errors: number }> = {
+      settings: { migrated: 0, errors: 0 },
+      schedules: { migrated: 0, errors: 0 },
+      fleet: { migrated: 0, errors: 0 },
+      news: { migrated: 0, errors: 0 },
+      users: { migrated: 0, errors: 0 },
+      reservations: { migrated: 0, errors: 0 }
+    };
+
+    // 1. Settings
+    if (settings) {
+      try {
+        await SiteSettings.findOneAndUpdate(
+          { key: 'site' },
+          {
+            $set: {
+              homeBg: settings.homeBg || '',
+              homeDetail: settings.homeDetail || '',
+              adminCode: settings.adminCode || 'MUGOTE2025',
+              contactPhone: settings.contactPhone || '+243 994 286 469',
+              classPrices: settings.classPrices || { VIP: 27, '1ère Classe': 27, '2ème Classe': 17, '3ème Classe': 10 },
+              updatedAt: new Date()
+            }
+          },
+          { upsert: true }
+        );
+        stats.settings.migrated++;
+      } catch (e) {
+        console.warn("Batch migrate settings error:", e);
+        stats.settings.errors++;
+      }
+    }
+
+    // 2. Schedules
+    if (Array.isArray(schedules)) {
+      for (const item of schedules) {
+        try {
+          await Schedule.findOneAndUpdate(
+            { $or: [{ firestoreId: item.id }, { departureTime: item.departureTime, itinerary: item.itinerary, ship: item.ship }] },
+            {
+              $set: {
+                firestoreId: item.id,
+                ship: item.ship || 'Mugote 1',
+                departureTime: item.departureTime || '07h30',
+                itinerary: item.itinerary || 'Bukavu-Goma',
+                frequency: item.frequency || 'Quotidien',
+                days: item.days || ['Tous les jours'],
+                isActive: item.isActive !== false
+              }
+            },
+            { upsert: true }
+          );
+          stats.schedules.migrated++;
+        } catch (e) {
+          stats.schedules.errors++;
+        }
+      }
+    }
+
+    // 3. Fleet
+    if (Array.isArray(fleet)) {
+      for (const item of fleet) {
+        try {
+          await Boat.findOneAndUpdate(
+            { $or: [{ firestoreId: item.id }, { name: item.name }] },
+            {
+              $set: {
+                firestoreId: item.id,
+                name: item.name || 'Mugote',
+                capacity: Number(item.capacity || 120),
+                description: item.description || '',
+                imageUrl: item.imageUrl || '',
+                gallery: item.gallery || [],
+                status: item.status || 'ACTIF'
+              }
+            },
+            { upsert: true }
+          );
+          stats.fleet.migrated++;
+        } catch (e) {
+          stats.fleet.errors++;
+        }
+      }
+    }
+
+    // 4. News
+    if (Array.isArray(news)) {
+      for (const item of news) {
+        try {
+          await News.findOneAndUpdate(
+            { firestoreId: item.id },
+            {
+              $set: {
+                firestoreId: item.id,
+                title: item.title || 'Actualité AMR Mugote',
+                content: item.content || '',
+                imageUrl: item.imageUrl || '',
+                videoUrl: item.videoUrl || '',
+                media: item.media || [],
+                author: item.author || 'Direction AMR Mugote',
+                views: Number(item.views || 0),
+                publishedAt: item.publishedAt ? new Date(item.publishedAt) : new Date()
+              }
+            },
+            { upsert: true }
+          );
+          stats.news.migrated++;
+        } catch (e) {
+          stats.news.errors++;
+        }
+      }
+    }
+
+    // 5. Users
+    if (Array.isArray(users)) {
+      for (const item of users) {
+        try {
+          await User.findOneAndUpdate(
+            { uid: item.uid || item.id },
+            {
+              $set: {
+                firestoreId: item.id,
+                uid: item.uid || item.id,
+                email: item.email || '',
+                displayName: item.displayName || item.name || '',
+                phone: item.phone || '',
+                role: item.role || 'CLIENT',
+                isVerified: !!item.isVerified
+              }
+            },
+            { upsert: true }
+          );
+          stats.users.migrated++;
+        } catch (e) {
+          stats.users.errors++;
+        }
+      }
+    }
+
+    // 6. Reservations
+    if (Array.isArray(reservations)) {
+      for (const item of reservations) {
+        try {
+          await Reservation.findOneAndUpdate(
+            { $or: [{ firestoreId: item.id }, { ticketId: item.ticketId }] },
+            {
+              $set: {
+                firestoreId: item.id,
+                ticketId: item.ticketId || `AMR-${(item.id || '').substring(0, 6).toUpperCase()}`,
+                fullName: item.fullName || 'Passager',
+                lastName: item.lastName || '',
+                phone: item.phone || '',
+                email: item.email || '',
+                itinerary: item.itinerary || 'Bukavu-Goma',
+                ship: item.ship || 'Mugote 1',
+                travelDate: item.travelDate || new Date().toISOString().split('T')[0],
+                departureTime: item.departureTime || '07h30',
+                travelClass: item.travelClass || '2ème Classe',
+                passengersCount: Number(item.passengersCount || 1),
+                status: item.status || 'PENDING',
+                paymentMethod: item.paymentMethod || 'Mobile Money',
+                transactionId: item.transactionId || '',
+                amount: Number(item.amount || 20),
+                userId: item.userId || '',
+                isUsed: !!item.isUsed,
+                validatedAt: item.validatedAt ? new Date(item.validatedAt) : undefined,
+                createdAt: item.createdAt ? new Date(item.createdAt) : new Date()
+              }
+            },
+            { upsert: true }
+          );
+          stats.reservations.migrated++;
+        } catch (e) {
+          stats.reservations.errors++;
+        }
+      }
+    }
+
+    res.json({
+      success: true,
+      message: "Synchronisation par lot effectuée avec succès dans MongoDB Atlas.",
+      stats
+    });
+  } catch (error: any) {
+    console.error("Batch migration fatal error:", error);
+    res.status(500).json({ error: "Erreur lors de la synchronisation par lot.", details: error?.message });
+  }
+});
+
 export default router;
