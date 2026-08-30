@@ -146,14 +146,21 @@ export function MongoMigrationView() {
       // 2. Send batch to backend MongoDB endpoint
       addLog('info', "Envoi des données vers MongoDB Atlas...");
       
-      const batchRes = await mongoApi.batchMigration({
-        settings: settingsData ? sanitizeFirestoreDoc(settingsData) : null,
-        schedules: schedulesList,
-        fleet: fleetList,
-        news: newsList,
-        users: usersList,
-        reservations: resList
-      });
+      let batchRes: any;
+      try {
+        batchRes = await mongoApi.batchMigration({
+          settings: settingsData ? sanitizeFirestoreDoc(settingsData) : null,
+          schedules: schedulesList,
+          fleet: fleetList,
+          news: newsList,
+          users: usersList,
+          reservations: resList
+        });
+      } catch (batchErr: any) {
+        console.warn("Direct batch migration failed, trying server-side direct migration:", batchErr);
+        addLog('info', "Tentative de migration directe côté serveur...");
+        batchRes = await mongoApi.triggerMigration();
+      }
 
       setMigrationResult(batchRes);
       const resMigrated = batchRes.stats?.reservations?.migrated || 0;
