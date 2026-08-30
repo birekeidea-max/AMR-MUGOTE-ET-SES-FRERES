@@ -20,6 +20,31 @@ import { mongoApi } from '../services/api';
 import { db } from '../lib/firebase';
 import { collection, getDocs, doc, getDoc } from 'firebase/firestore';
 
+function sanitizeFirestoreDoc(obj: any): any {
+  if (!obj || typeof obj !== 'object') return obj;
+  if (obj.toDate && typeof obj.toDate === 'function') {
+    try {
+      return obj.toDate().toISOString();
+    } catch {
+      return new Date().toISOString();
+    }
+  }
+  if ('seconds' in obj && typeof obj.seconds === 'number') {
+    return new Date(obj.seconds * 1000).toISOString();
+  }
+  if (Array.isArray(obj)) {
+    return obj.map(sanitizeFirestoreDoc);
+  }
+  const result: any = {};
+  for (const key of Object.keys(obj)) {
+    const val = obj[key];
+    if (val !== undefined) {
+      result[key] = sanitizeFirestoreDoc(val);
+    }
+  }
+  return result;
+}
+
 export function MongoMigrationView() {
   const [healthData, setHealthData] = useState<{
     server: string;
@@ -110,17 +135,17 @@ export function MongoMigrationView() {
         getDocs(collection(db, 'reservations')).catch(() => null),
       ]);
 
-      const schedulesList = schedSnap ? schedSnap.docs.map(d => ({ id: d.id, ...d.data() })) : [];
-      const fleetList = fleetSnap ? fleetSnap.docs.map(d => ({ id: d.id, ...d.data() })) : [];
-      const newsList = newsSnap ? newsSnap.docs.map(d => ({ id: d.id, ...d.data() })) : [];
-      const usersList = usersSnap ? usersSnap.docs.map(d => ({ id: d.id, ...d.data() })) : [];
-      const resList = resSnap ? resSnap.docs.map(d => ({ id: d.id, ...d.data() })) : [];
+      const schedulesList = schedSnap ? schedSnap.docs.map(d => sanitizeFirestoreDoc({ id: d.id, ...d.data() })) : [];
+      const fleetList = fleetSnap ? fleetSnap.docs.map(d => sanitizeFirestoreDoc({ id: d.id, ...d.data() })) : [];
+      const newsList = newsSnap ? newsSnap.docs.map(d => sanitizeFirestoreDoc({ id: d.id, ...d.data() })) : [];
+      const usersList = usersSnap ? usersSnap.docs.map(d => sanitizeFirestoreDoc({ id: d.id, ...d.data() })) : [];
+      const resList = resSnap ? resSnap.docs.map(d => sanitizeFirestoreDoc({ id: d.id, ...d.data() })) : [];
 
       addLog('info', `Firestore lu : ${resList.length} réservations, ${schedListCount(schedulesList)} horaires, ${fleetList.length} navires.`);
 
       // 2. Send batch to backend MongoDB endpoint
       const batchRes = await mongoApi.batchMigration({
-        settings: settingsData,
+        settings: settingsData ? sanitizeFirestoreDoc(settingsData) : null,
         schedules: schedulesList,
         fleet: fleetList,
         news: newsList,
@@ -129,21 +154,15 @@ export function MongoMigrationView() {
       });
 
       setMigrationResult(batchRes);
-      const totalMigrated = (batchRes.stats?.reservations?.migrated || 0) + (batchRes.stats?.schedules?.migrated || 0);
-      addLog('success', `Migration terminée avec succès ! (${batchRes.stats?.reservations?.migrated || 0} réservations, ${batchRes.stats?.schedules?.migrated || 0} horaires, ${batchRes.stats?.fleet?.migrated || 0} navires sauvegardés dans MongoDB Atlas)`);
+      const resMigrated = batchRes.stats?.reservations?.migrated || 0;
+      const schedMigrated = batchRes.stats?.schedules?.migrated || 0;
+      const fleetMigrated = batchRes.stats?.fleet?.migrated || 0;
+      addLog('success', `Migration terminée avec succès ! (${resMigrated} réservations, ${schedMigrated} horaires, ${fleetMigrated} navires sauvegardés dans MongoDB Atlas)`);
       fetchHealth();
     } catch (err: any) {
-      console.warn("Direct batch migration failed, trying server fallback:", err);
-      // Fallback to server-side trigger
-      try {
-        const fallbackRes = await mongoApi.triggerMigration();
-        setMigrationResult(fallbackRes);
-        addLog('success', `Migration serveur terminée ! (${fallbackRes.stats?.reservations?.migrated || 0} réservations migrées)`);
-        fetchHealth();
-      } catch (fallbackErr: any) {
-        setMigrationError(fallbackErr?.message || err?.message || "Échec de la migration");
-        addLog('error', `Erreur de migration : ${fallbackErr?.message || err?.message || 'Erreur inconnue'}`);
-      }
+      console.error("Batch migration error:", err);
+      setMigrationError(err?.message || "Échec de la synchronisation vers MongoDB Atlas");
+      addLog('error', `Erreur de migration : ${err?.message || 'Erreur inconnue'}`);
     } finally {
       setMigrating(false);
     }

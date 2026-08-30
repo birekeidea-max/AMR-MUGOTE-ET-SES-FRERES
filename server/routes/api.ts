@@ -928,6 +928,24 @@ router.post('/migrate/firestore-to-mongodb', async (req: Request, res: Response)
   }
 });
 
+function parseToDate(val: any): Date | undefined {
+  if (!val) return undefined;
+  if (val instanceof Date) return isNaN(val.getTime()) ? undefined : val;
+  if (typeof val === 'object') {
+    if ('seconds' in val && typeof val.seconds === 'number') {
+      return new Date(val.seconds * 1000);
+    }
+    if ('_seconds' in val && typeof val._seconds === 'number') {
+      return new Date(val._seconds * 1000);
+    }
+  }
+  if (typeof val === 'string' || typeof val === 'number') {
+    const d = new Date(val);
+    return isNaN(d.getTime()) ? undefined : d;
+  }
+  return undefined;
+}
+
 // Batch migration endpoint: accepts arrays of documents read by the frontend client (which has authenticated access to Firestore)
 router.post('/migrate/batch', async (req: Request, res: Response) => {
   try {
@@ -1033,7 +1051,7 @@ router.post('/migrate/batch', async (req: Request, res: Response) => {
                 media: item.media || [],
                 author: item.author || 'Direction AMR Mugote',
                 views: Number(item.views || 0),
-                publishedAt: item.publishedAt ? new Date(item.publishedAt) : new Date()
+                publishedAt: parseToDate(item.publishedAt) || new Date()
               }
             },
             { upsert: true }
@@ -1097,14 +1115,17 @@ router.post('/migrate/batch', async (req: Request, res: Response) => {
                 amount: Number(item.amount || 20),
                 userId: item.userId || '',
                 isUsed: !!item.isUsed,
-                validatedAt: item.validatedAt ? new Date(item.validatedAt) : undefined,
-                createdAt: item.createdAt ? new Date(item.createdAt) : new Date()
+                validatedAt: parseToDate(item.validatedAt),
+                cancellationStatus: item.cancellationStatus || undefined,
+                cancellationProcessedAt: parseToDate(item.cancellationProcessedAt),
+                createdAt: parseToDate(item.createdAt) || new Date()
               }
             },
             { upsert: true }
           );
           stats.reservations.migrated++;
         } catch (e) {
+          console.warn("Reservation migration item error:", e);
           stats.reservations.errors++;
         }
       }
