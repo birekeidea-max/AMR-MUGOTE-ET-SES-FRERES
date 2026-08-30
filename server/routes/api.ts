@@ -41,7 +41,7 @@ async function generateUniqueTicketId(): Promise<string> {
 // -------------------------------------------------------------
 // 1. HEALTH & DATABASE STATUS ROUTE
 // -------------------------------------------------------------
-router.get('/health', async (req: Request, res: Response) => {
+router.get(['/health', '/status'], async (req: Request, res: Response) => {
   const dbStatus = getDatabaseStatus();
   let counts: Record<string, number> = {};
 
