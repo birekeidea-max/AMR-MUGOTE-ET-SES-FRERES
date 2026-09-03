@@ -16,7 +16,10 @@ import {
   Trash2, 
   Edit3,
   Loader2,
-  FileCheck2
+  FileCheck2,
+  Radio,
+  Zap,
+  Wifi
 } from 'lucide-react';
 import { mongoApi } from '../services/api';
 import { db } from '../lib/firebase';
@@ -75,6 +78,10 @@ export function MongoMigrationView() {
   const [crudLogs, setCrudLogs] = useState<Array<{ time: string; type: 'info' | 'success' | 'error'; message: string }>>([]);
   const [lastCreatedId, setLastCreatedId] = useState<string | null>(null);
 
+  // Real-Time MongoDB State
+  const [realtimeConnected, setRealtimeConnected] = useState(false);
+  const [realtimeEventsCount, setRealtimeEventsCount] = useState(0);
+
   const fetchHealth = async () => {
     setLoadingHealth(true);
     try {
@@ -107,14 +114,36 @@ export function MongoMigrationView() {
     }
   };
 
-  useEffect(() => {
-    fetchHealth();
-  }, []);
-
   const addLog = (type: 'info' | 'success' | 'error', message: string) => {
     const time = new Date().toLocaleTimeString('fr-FR');
     setCrudLogs(prev => [{ time, type, message }, ...prev.slice(0, 40)]);
   };
+
+  useEffect(() => {
+    fetchHealth();
+
+    // Connexion au flux Real-Time MongoDB Atlas
+    const unsubscribe = mongoApi.subscribeToRealtime((evt) => {
+      setRealtimeConnected(true);
+      setRealtimeEventsCount(c => c + 1);
+
+      if (evt.type !== 'heartbeat' && evt.action !== 'heartbeat') {
+        const typeLabel = evt.type || 'Événement';
+        const actionLabel = evt.action ? `[${evt.action.toUpperCase()}]` : '';
+        const summary = evt.data?.ticketId 
+          ? `Billet: ${evt.data.ticketId} (${evt.data.fullName || ''})` 
+          : evt.data?.name 
+            ? `Nom: ${evt.data.name}`
+            : evt.message || (typeof evt.data === 'string' ? evt.data : JSON.stringify(evt.data || {}).substring(0, 50));
+
+        addLog('info', `📡 [MongoDB Real-Time] ${actionLabel} ${typeLabel}: ${summary}`);
+      }
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, []);
 
   // 100% Client-Side Progressive Migration: reads Firestore docs and syncs one-by-one
   const handleMigration = async () => {
@@ -434,6 +463,17 @@ export function MongoMigrationView() {
               <RefreshCw size={14} className={loadingHealth ? 'animate-spin' : ''} />
               Actualiser
             </button>
+
+            <div className={`px-3.5 py-2 rounded-xl text-xs font-bold border flex items-center gap-2 ${
+              realtimeConnected
+                ? 'bg-cyan-500/10 text-cyan-400 border-cyan-500/30'
+                : 'bg-slate-800 text-slate-400 border-white/10'
+            }`}>
+              <Radio size={13} className={realtimeConnected ? 'animate-pulse text-cyan-400' : 'text-slate-500'} />
+              <span>
+                {realtimeConnected ? `Real-Time Actif (${realtimeEventsCount} évts)` : 'Real-Time En écoute...'}
+              </span>
+            </div>
 
             <div className={`px-3.5 py-2 rounded-xl text-xs font-bold border flex items-center gap-2 ${
               isConnected

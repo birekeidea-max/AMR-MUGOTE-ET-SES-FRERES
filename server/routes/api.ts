@@ -1,7 +1,9 @@
 import { Router, Request, Response } from 'express';
+import mongoose from 'mongoose';
 import admin from 'firebase-admin';
 import { getFirestore } from 'firebase-admin/firestore';
 import { getDatabaseStatus, connectMongoDB } from '../db';
+import { realtimeHub, handleSSEStream } from '../realtime';
 import {
   SiteSettings,
   Schedule,
@@ -87,6 +89,32 @@ router.post('/reconnect', async (req: Request, res: Response) => {
     status: dbStatus.databaseStatus,
     isConnected: dbStatus.isConnected,
     lastError: dbStatus.lastError
+  });
+});
+
+// -------------------------------------------------------------
+// 1.1 REAL-TIME MONGODB STREAMING & SYNCHRONISATION
+// -------------------------------------------------------------
+router.get(['/realtime/stream', '/stream'], (req: Request, res: Response) => {
+  handleSSEStream(req, res);
+});
+
+router.get(['/realtime/poll', '/poll'], (req: Request, res: Response) => {
+  const since = req.query.since ? Number(req.query.since) : undefined;
+  const events = realtimeHub.getRecentEvents(since);
+  res.json({
+    events,
+    timestamp: Date.now(),
+    status: realtimeHub.getStatus()
+  });
+});
+
+router.get('/realtime/status', (req: Request, res: Response) => {
+  res.json({
+    status: 'ok',
+    realtime: realtimeHub.getStatus(),
+    db: getDatabaseStatus(),
+    timestamp: Date.now()
   });
 });
 
@@ -316,6 +344,9 @@ router.get('/reservations/:id', async (req: Request, res: Response) => {
 
 router.post('/reservations', optionalFirebaseAuth, async (req: Request, res: Response) => {
   try {
+    // Garantir l'accès et la réutilisation de la connexion MongoDB Serverless
+    await connectMongoDB();
+
     const data = req.body;
     if (!data.fullName || !data.phone || !data.itinerary || !data.travelDate || !data.travelClass) {
       return res.status(400).json({ error: "Informations de réservation incomplètes." });
@@ -327,22 +358,26 @@ router.post('/reservations', optionalFirebaseAuth, async (req: Request, res: Res
       ticketId = await generateUniqueTicketId();
     }
 
+    // Nettoyage des identifiants non-ObjectId pour éviter les erreurs de cast Mongoose
+    const { _id, id, ...cleanData } = data;
+
     const reservation = await Reservation.create({
-      ...data,
+      ...cleanData,
+      firestoreId: cleanData.firestoreId || id || _id,
       ticketId,
-      passengersCount: Number(data.passengersCount || 1),
-      amount: Number(data.amount || 20),
-      status: data.status || 'PENDING',
-      createdAt: data.createdAt ? new Date(data.createdAt) : new Date()
+      passengersCount: Number(cleanData.passengersCount || 1),
+      amount: Number(cleanData.amount || 20),
+      status: cleanData.status || 'PENDING',
+      createdAt: cleanData.createdAt ? new Date(cleanData.createdAt) : new Date()
     });
 
     // Update user stats in MongoDB if userId provided
-    if (data.userId) {
+    if (cleanData.userId) {
       try {
         await User.findOneAndUpdate(
-          { uid: data.userId },
+          { uid: cleanData.userId },
           { 
-            $inc: { totalBookings: 1, totalSpent: Number(data.amount || 0) },
+            $inc: { totalBookings: 1, totalSpent: Number(cleanData.amount || 0) },
             $set: { lastLogin: new Date() }
           },
           { upsert: true }
@@ -352,19 +387,27 @@ router.post('/reservations', optionalFirebaseAuth, async (req: Request, res: Res
       }
     }
 
+    // Diffusion de l'événement Real-Time MongoDB
+    realtimeHub.emitEvent('reservation:created', 'created', reservation, 'reservations');
+
     res.status(201).json(reservation);
-  } catch (error: any) {
-    console.error("Error creating reservation in MongoDB:", error);
-    res.status(500).json({ error: "Erreur lors de l'enregistrement de la réservation." });
+  } catch (err: any) {
+    console.error("Error creating reservation in MongoDB:", err);
+    res.status(500).json({ error: err.message, stack: err.stack });
   }
 });
 
 router.put('/reservations/:id', async (req: Request, res: Response) => {
   try {
+    await connectMongoDB();
     const { id } = req.params;
-    const updateData = { ...req.body, updatedAt: new Date() };
+    const { _id, ...cleanUpdate } = req.body;
+    const updateData = { ...cleanUpdate, updatedAt: new Date() };
 
-    let reservation = await Reservation.findByIdAndUpdate(id, { $set: updateData }, { new: true });
+    let reservation = null;
+    if (mongoose.Types.ObjectId.isValid(id)) {
+      reservation = await Reservation.findByIdAndUpdate(id, { $set: updateData }, { new: true });
+    }
     if (!reservation) {
       reservation = await Reservation.findOneAndUpdate(
         { $or: [{ ticketId: id }, { firestoreId: id }] },
@@ -377,30 +420,46 @@ router.put('/reservations/:id', async (req: Request, res: Response) => {
       return res.status(404).json({ error: "Réservation introuvable." });
     }
 
+    // Diffusion de l'événement Real-Time
+    realtimeHub.emitEvent('reservation:updated', 'updated', reservation, 'reservations');
+
     res.json(reservation);
-  } catch (error: any) {
-    console.error("Error updating reservation in MongoDB:", error);
-    res.status(500).json({ error: "Erreur lors de la modification de la réservation." });
+  } catch (err: any) {
+    console.error("Error updating reservation in MongoDB:", err);
+    res.status(500).json({ error: err.message, stack: err.stack });
   }
 });
 
 router.delete('/reservations/:id', async (req: Request, res: Response) => {
   try {
+    await connectMongoDB();
     const { id } = req.params;
-    const deleted = await Reservation.findByIdAndDelete(id);
+    let deleted = null;
+    if (mongoose.Types.ObjectId.isValid(id)) {
+      deleted = await Reservation.findByIdAndDelete(id);
+    }
+    if (!deleted) {
+      deleted = await Reservation.findOneAndDelete({
+        $or: [{ ticketId: id }, { firestoreId: id }]
+      });
+    }
+
     if (!deleted) {
       return res.status(404).json({ error: "Réservation introuvable." });
     }
+
+    realtimeHub.emitEvent('reservation:deleted', 'deleted', { id, ticketId: deleted.ticketId }, 'reservations');
     res.json({ success: true, message: "Réservation supprimée avec succès." });
-  } catch (error: any) {
-    console.error("Error deleting reservation from MongoDB:", error);
-    res.status(500).json({ error: "Erreur lors de la suppression de la réservation." });
+  } catch (err: any) {
+    console.error("Error deleting reservation from MongoDB:", err);
+    res.status(500).json({ error: err.message, stack: err.stack });
   }
 });
 
 // Boarding Gate Scan Verification Route
 router.post('/reservations/scan-verify', async (req: Request, res: Response) => {
   try {
+    await connectMongoDB();
     const { rawCode, action } = req.body;
     if (!rawCode || !String(rawCode).trim()) {
       return res.status(400).json({ error: "Code scanné manquant." });
@@ -445,6 +504,7 @@ router.post('/reservations/scan-verify', async (req: Request, res: Response) => 
       reservation.isUsed = true;
       reservation.usedAt = new Date();
       await reservation.save();
+      realtimeHub.emitEvent('reservation:composted', 'composted', reservation, 'reservations');
     }
 
     res.json({
@@ -453,9 +513,9 @@ router.post('/reservations/scan-verify', async (req: Request, res: Response) => 
       reservation,
       message: `Billet vérifié avec succès pour ${reservation.fullName} (${reservation.travelClass} - ${reservation.ship}).`
     });
-  } catch (error: any) {
-    console.error("Scan verification error in MongoDB:", error);
-    res.status(500).json({ error: "Erreur lors de la validation du billet." });
+  } catch (err: any) {
+    console.error("Scan verification error in MongoDB:", err);
+    res.status(500).json({ error: err.message, stack: err.stack });
   }
 });
 
@@ -1016,21 +1076,28 @@ router.post('/sync/item', async (req: Request, res: Response) => {
 
       case 'boat':
       case 'fleet': {
-        const updated = await Boat.findOneAndUpdate(
-          { $or: [{ firestoreId: data.id }, { name: data.name }] },
-          {
-            $set: {
-              firestoreId: data.id,
-              name: data.name || 'Mugote',
-              capacity: Number(data.capacity || 150),
-              description: data.description || '',
-              imageUrl: data.imageUrl || '',
-              gallery: data.gallery || [],
-              status: data.status || 'ACTIF'
-            }
-          },
-          { upsert: true, new: true }
-        );
+        let existingBoat = null;
+        if (data.id) {
+          existingBoat = await Boat.findOne({ firestoreId: data.id });
+        }
+        if (!existingBoat && data.name) {
+          existingBoat = await Boat.findOne({ name: data.name });
+        }
+        const boatData = {
+          firestoreId: data.id,
+          name: data.name || 'Mugote',
+          capacity: Number(data.capacity || 150),
+          description: data.description || '',
+          imageUrl: data.imageUrl || '',
+          gallery: data.gallery || [],
+          status: data.status || 'ACTIF'
+        };
+        let updated;
+        if (existingBoat) {
+          updated = await Boat.findByIdAndUpdate(existingBoat._id, { $set: boatData }, { new: true });
+        } else {
+          updated = await Boat.create(boatData);
+        }
         resultId = updated?._id?.toString() || data.id;
         break;
       }
@@ -1079,37 +1146,47 @@ router.post('/sync/item', async (req: Request, res: Response) => {
 
       case 'reservation': {
         const ticketId = data.ticketId || `AMR-${(data.id || '').substring(0, 6).toUpperCase()}`;
-        const updated = await Reservation.findOneAndUpdate(
-          { $or: [{ firestoreId: data.id }, { ticketId }] },
-          {
-            $set: {
-              firestoreId: data.id,
-              ticketId,
-              fullName: data.fullName || 'Passager',
-              lastName: data.lastName || '',
-              phone: data.phone || '',
-              email: data.email || '',
-              itinerary: data.itinerary || 'Bukavu-Goma',
-              ship: data.ship || 'Mugote 1',
-              travelDate: data.travelDate || new Date().toISOString().split('T')[0],
-              departureTime: data.departureTime || '07h30',
-              travelClass: data.travelClass || '2ème Classe',
-              passengersCount: Number(data.passengersCount || 1),
-              status: data.status || 'PENDING',
-              paymentMethod: data.paymentMethod || 'Mobile Money',
-              transactionId: data.transactionId || '',
-              amount: Number(data.amount || 20),
-              userId: data.userId || '',
-              isUsed: !!data.isUsed,
-              validatedAt: parseToDate(data.validatedAt),
-              cancellationStatus: data.cancellationStatus || undefined,
-              cancellationProcessedAt: parseToDate(data.cancellationProcessedAt),
-              createdAt: parseToDate(data.createdAt) || new Date()
-            }
-          },
-          { upsert: true, new: true }
-        );
+        let existingRes = null;
+        if (data.id) {
+          existingRes = await Reservation.findOne({ firestoreId: data.id });
+        }
+        if (!existingRes && ticketId) {
+          existingRes = await Reservation.findOne({ ticketId });
+        }
+
+        const resFields = {
+          firestoreId: data.id,
+          ticketId,
+          fullName: data.fullName || 'Passager',
+          lastName: data.lastName || '',
+          phone: data.phone || '',
+          email: data.email || '',
+          itinerary: data.itinerary || 'Bukavu-Goma',
+          ship: data.ship || 'Mugote 1',
+          travelDate: data.travelDate || new Date().toISOString().split('T')[0],
+          departureTime: data.departureTime || '07h30',
+          travelClass: data.travelClass || '2ème Classe',
+          passengersCount: Number(data.passengersCount || 1),
+          status: data.status || 'PENDING',
+          paymentMethod: data.paymentMethod || 'Mobile Money',
+          transactionId: data.transactionId || '',
+          amount: Number(data.amount || 20),
+          userId: data.userId || '',
+          isUsed: !!data.isUsed,
+          validatedAt: parseToDate(data.validatedAt),
+          cancellationStatus: data.cancellationStatus || undefined,
+          cancellationProcessedAt: parseToDate(data.cancellationProcessedAt),
+          createdAt: parseToDate(data.createdAt) || new Date()
+        };
+
+        let updated;
+        if (existingRes) {
+          updated = await Reservation.findByIdAndUpdate(existingRes._id, { $set: resFields }, { new: true });
+        } else {
+          updated = await Reservation.create(resFields);
+        }
         resultId = updated?._id?.toString() || ticketId;
+        realtimeHub.emitEvent('reservation:synced', 'synced', updated, 'reservations');
         break;
       }
 
@@ -1118,9 +1195,9 @@ router.post('/sync/item', async (req: Request, res: Response) => {
     }
 
     res.json({ success: true, type, id: resultId, message: "Élément synchronisé dans MongoDB Atlas." });
-  } catch (error: any) {
-    console.error("Single item sync error in MongoDB:", error);
-    res.status(500).json({ error: "Erreur lors de la synchronisation de l'élément.", details: error?.message });
+  } catch (err: any) {
+    console.error("Single item sync error in MongoDB:", err);
+    res.status(500).json({ error: err.message, stack: err.stack });
   }
 });
 

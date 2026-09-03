@@ -239,4 +239,122 @@ export const mongoApi = {
   }>('/reconnect', {
     method: 'POST',
   }),
+
+  // 11. Real-Time MongoDB Atlas Event Stream & Polling
+  getRealtimeStatus: () => apiRequest<{
+    status: string;
+    realtime: {
+      activeListeners: number;
+      recentEventsCount: number;
+      changeStreamActive: boolean;
+      changeStreamError: string | null;
+      mongoReadyState: number;
+    };
+    db: {
+      isConnected: boolean;
+      databaseStatus: string;
+      dbName?: string;
+    };
+  }>('/realtime/status'),
+
+  pollRealtime: (since?: number) => {
+    const q = since ? `?since=${since}` : '';
+    return apiRequest<{
+      events: Array<{
+        id: string;
+        type: string;
+        action: string;
+        data?: any;
+        timestamp: number;
+      }>;
+      timestamp: number;
+      status: any;
+    }>(`/realtime/poll${q}`);
+  },
+
+  /**
+   * Connect to real-time Server-Sent Events (SSE) stream with automatic fallback and reconnection.
+   */
+  subscribeToRealtime: (onEvent: (event: any) => void) => {
+    if (typeof window === 'undefined') return () => {};
+
+    let eventSource: EventSource | null = null;
+    let fallbackInterval: any = null;
+    let lastTimestamp = Date.now();
+    let isConnected = false;
+
+    const connectSSE = () => {
+      try {
+        eventSource = new EventSource('/api/realtime/stream');
+
+        eventSource.onopen = () => {
+          isConnected = true;
+          if (fallbackInterval) {
+            clearInterval(fallbackInterval);
+            fallbackInterval = null;
+          }
+        };
+
+        eventSource.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            if (data.timestamp) lastTimestamp = data.timestamp;
+            onEvent(data);
+          } catch (e) {
+            // Ignore non-json or keepalive messages
+          }
+        };
+
+        eventSource.onerror = () => {
+          isConnected = false;
+          if (eventSource) {
+            eventSource.close();
+            eventSource = null;
+          }
+          // Start polling fallback if SSE encounters network issues
+          if (!fallbackInterval) {
+            fallbackInterval = setInterval(async () => {
+              try {
+                const res = await mongoApi.pollRealtime(lastTimestamp);
+                if (res?.events && res.events.length > 0) {
+                  for (const evt of res.events) {
+                    onEvent(evt);
+                  }
+                  lastTimestamp = res.timestamp;
+                }
+              } catch {
+                // Ignore transient polling failure
+              }
+            }, 3000);
+          }
+          // Try reconnecting SSE after 8 seconds
+          setTimeout(connectSSE, 8000);
+        };
+      } catch {
+        // SSE not supported or blocked, use polling fallback
+        if (!fallbackInterval) {
+          fallbackInterval = setInterval(async () => {
+            try {
+              const res = await mongoApi.pollRealtime(lastTimestamp);
+              if (res?.events && res.events.length > 0) {
+                for (const evt of res.events) {
+                  onEvent(evt);
+                }
+                lastTimestamp = res.timestamp;
+              }
+            } catch {
+              // Ignore
+            }
+          }, 3000);
+        }
+      }
+    };
+
+    connectSSE();
+
+    return () => {
+      if (eventSource) eventSource.close();
+      if (fallbackInterval) clearInterval(fallbackInterval);
+    };
+  }
 };
