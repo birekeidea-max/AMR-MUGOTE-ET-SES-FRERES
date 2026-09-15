@@ -1,6 +1,11 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
-import { getFirestore, enableIndexedDbPersistence } from 'firebase/firestore';
+import { 
+  getFirestore, 
+  initializeFirestore, 
+  persistentLocalCache, 
+  persistentMultipleTabManager 
+} from 'firebase/firestore';
 import { getStorage, ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { getAnalytics, logEvent, Analytics } from 'firebase/analytics';
 import firebaseConfigJson from '../../firebase-applet-config.json';
@@ -21,7 +26,29 @@ const firebaseConfig = {
 console.log('Firebase Config Keys:', Object.keys(firebaseConfig));
 
 const app = initializeApp(firebaseConfig);
-export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+
+// Initialisation robuste de Firestore avec transport long-polling forcé
+// Cela élimine le timeout de 10 secondes ("Could not reach Cloud Firestore backend") provoqué
+// par les proxies/iframes qui mettent en mémoire tampon les flux WebSockets/WebChannel gRPC
+let firestoreDb;
+try {
+  firestoreDb = initializeFirestore(app, {
+    experimentalForceLongPolling: true,
+    localCache: persistentLocalCache({
+      tabManager: persistentMultipleTabManager()
+    })
+  }, firebaseConfig.firestoreDatabaseId);
+} catch (e) {
+  try {
+    firestoreDb = initializeFirestore(app, {
+      experimentalForceLongPolling: true
+    }, firebaseConfig.firestoreDatabaseId);
+  } catch (err) {
+    firestoreDb = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+  }
+}
+
+export const db = firestoreDb;
 export const auth = getAuth(app);
 export const storage = getStorage(app);
 
@@ -100,6 +127,8 @@ export const logWebCrash = (error: any, context: string = "Non spécifié") => {
     fullText.includes('unimplemented') ||
     fullText.includes('unavailable') ||
     fullText.includes('failed-precondition') ||
+    fullText.includes('could not reach cloud firestore backend') ||
+    fullText.includes('backend didn\'t respond') ||
     fullText.includes('storage/') ||
     fullText.includes('auth/') ||
     fullText.includes('istrusted')
@@ -125,21 +154,6 @@ export const logWebCrash = (error: any, context: string = "Non spécifié") => {
     }
   }
 };
-
-// Enable offline persistence
-try {
-  enableIndexedDbPersistence(db).catch((err) => {
-    if (err.code === 'failed-precondition') {
-      // Multiple tabs open, persistence can only be enabled in one tab at a a time.
-      console.warn('Firestore persistence failed: Multiple tabs open');
-    } else if (err.code === 'unimplemented') {
-      // The current browser does not support all of the features required to enable persistence
-      console.warn('Firestore persistence failed: Browser not supported');
-    }
-  });
-} catch (error) {
-  console.warn('Firestore persistence initialization error:', error);
-}
 
 /**
  * Uploads a file to Firebase Storage and returns its download URL.

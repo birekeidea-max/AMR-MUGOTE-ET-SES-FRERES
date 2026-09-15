@@ -46,17 +46,24 @@ async function apiRequest<T>(
   if (!response.ok) {
     let errorMsg = `HTTP Error ${response.status}${response.statusText ? ` (${response.statusText})` : ''}`;
     try {
-      const errData = await response.json();
-      if (errData.error) {
-        errorMsg = errData.error;
-        if (errData.details) {
-          errorMsg += ` : ${errData.details}`;
+      const rawText = await response.text();
+      try {
+        const errData = JSON.parse(rawText);
+        if (errData.error) {
+          errorMsg = errData.error;
+          if (errData.details) {
+            errorMsg += ` : ${errData.details}`;
+          }
+        } else if (errData.message) {
+          errorMsg = errData.message;
         }
-      } else if (errData.message) {
-        errorMsg = errData.message;
+      } catch {
+        if (rawText && rawText.length < 300) {
+          errorMsg += ` - ${rawText.replace(/<[^>]*>?/gm, '').trim()}`;
+        }
       }
     } catch {
-      // Ignore JSON parse error
+      // Ignore reading error
     }
     throw new Error(errorMsg);
   }

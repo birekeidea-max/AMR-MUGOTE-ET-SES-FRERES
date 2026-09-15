@@ -6,6 +6,21 @@ import { logWebCrash } from './lib/firebase.ts';
 
 // Catch and report unhandled runtime errors globally to Google Analytics
 try {
+  // Prevent Firebase Firestore offline/connection advisory from triggering false positive error alarms
+  const origConsoleError = console.error;
+  console.error = (...args: any[]) => {
+    const text = args.map(a => typeof a === 'string' ? a : (a?.message || '')).join(' ');
+    if (
+      text.includes('Could not reach Cloud Firestore backend') ||
+      text.includes('client will operate in offline mode') ||
+      text.includes("Backend didn't respond within 10 seconds")
+    ) {
+      console.warn('[Firestore Connection Advisory]:', ...args);
+      return;
+    }
+    origConsoleError.apply(console, args);
+  };
+
   window.addEventListener('error', (event) => {
     if (event.defaultPrevented) return;
     const errorObj = event.error;
@@ -32,6 +47,8 @@ try {
       fullText.includes('unimplemented') ||
       fullText.includes('unavailable') ||
       fullText.includes('failed-precondition') ||
+      fullText.includes('could not reach cloud firestore backend') ||
+      fullText.includes("backend didn't respond") ||
       fullText.includes('storage/') ||
       fullText.includes('auth/') ||
       fullText.includes('istrusted') ||
@@ -100,6 +117,8 @@ try {
       fullText.includes('unimplemented') ||
       fullText.includes('unavailable') ||
       fullText.includes('failed-precondition') ||
+      fullText.includes('could not reach cloud firestore backend') ||
+      fullText.includes("backend didn't respond") ||
       fullText.includes('storage/') ||
       fullText.includes('auth/') ||
       fullText.includes('istrusted') ||

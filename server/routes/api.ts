@@ -1050,26 +1050,34 @@ router.post('/sync/item', async (req: Request, res: Response) => {
         const depTime = data.departureTime || data.time || '07h30';
         const itin = data.itinerary || (data.from && data.to ? `${data.from}-${data.to}` : 'Bukavu-Goma');
         const shipName = data.ship || 'Mugote 1';
-        const query: any = data.id ? { firestoreId: data.id } : { departureTime: depTime, itinerary: itin, ship: shipName };
 
-        const updated = await Schedule.findOneAndUpdate(
-          query,
-          {
-            $set: {
-              firestoreId: data.id || undefined,
-              ship: shipName,
-              departureTime: depTime,
-              time: depTime,
-              itinerary: itin,
-              from: data.from || itin.split('-')[0] || 'Bukavu',
-              to: data.to || itin.split('-')[1] || 'Goma',
-              frequency: data.frequency || 'Quotidien',
-              days: data.days || ['Tous les jours'],
-              isActive: data.isActive !== false
-            }
-          },
-          { upsert: true, new: true }
-        );
+        let existingSched = null;
+        if (data.id) {
+          existingSched = await Schedule.findOne({ firestoreId: data.id });
+        }
+        if (!existingSched) {
+          existingSched = await Schedule.findOne({ departureTime: depTime, itinerary: itin, ship: shipName });
+        }
+
+        const schedFields = {
+          firestoreId: data.id || undefined,
+          ship: shipName,
+          departureTime: depTime,
+          time: depTime,
+          itinerary: itin,
+          from: data.from || itin.split('-')[0] || 'Bukavu',
+          to: data.to || itin.split('-')[1] || 'Goma',
+          frequency: data.frequency || 'Quotidien',
+          days: Array.isArray(data.days) ? data.days : ['Tous les jours'],
+          isActive: data.isActive !== false
+        };
+
+        let updated;
+        if (existingSched) {
+          updated = await Schedule.findByIdAndUpdate(existingSched._id, { $set: schedFields }, { new: true });
+        } else {
+          updated = await Schedule.create(schedFields);
+        }
         resultId = updated?._id?.toString() || data.id;
         break;
       }
@@ -1089,7 +1097,7 @@ router.post('/sync/item', async (req: Request, res: Response) => {
           capacity: Number(data.capacity || 150),
           description: data.description || '',
           imageUrl: data.imageUrl || '',
-          gallery: data.gallery || [],
+          gallery: Array.isArray(data.gallery) ? data.gallery : [],
           status: data.status || 'ACTIF'
         };
         let updated;
@@ -1103,49 +1111,96 @@ router.post('/sync/item', async (req: Request, res: Response) => {
       }
 
       case 'news': {
-        const updated = await News.findOneAndUpdate(
-          { firestoreId: data.id },
-          {
-            $set: {
-              firestoreId: data.id,
-              title: data.title || 'Actualité AMR Mugote',
-              content: data.content || '',
-              imageUrl: data.imageUrl || '',
-              videoUrl: data.videoUrl || '',
-              media: data.media || [],
-              author: data.author || 'Direction AMR Mugote',
-              views: Number(data.views || 0),
-              publishedAt: parseToDate(data.publishedAt) || new Date()
-            }
-          },
-          { upsert: true, new: true }
-        );
+        let existingNews = null;
+        if (data.id) {
+          existingNews = await News.findOne({ firestoreId: data.id });
+        }
+        if (!existingNews && data.title) {
+          existingNews = await News.findOne({ title: data.title });
+        }
+
+        const newsFields = {
+          firestoreId: data.id,
+          title: data.title || 'Actualité AMR Mugote',
+          content: data.content || '',
+          imageUrl: data.imageUrl || '',
+          videoUrl: data.videoUrl || '',
+          media: Array.isArray(data.media) ? data.media : [],
+          author: data.author || 'Direction AMR Mugote',
+          views: Number(data.views || 0),
+          publishedAt: parseToDate(data.publishedAt) || new Date()
+        };
+
+        let updated;
+        if (existingNews) {
+          updated = await News.findByIdAndUpdate(existingNews._id, { $set: newsFields }, { new: true });
+        } else {
+          updated = await News.create(newsFields);
+        }
         resultId = updated?._id?.toString() || data.id;
         break;
       }
 
       case 'user': {
-        const updated = await User.findOneAndUpdate(
-          { uid: data.uid || data.id },
-          {
-            $set: {
-              firestoreId: data.id,
-              uid: data.uid || data.id,
-              email: data.email || '',
-              displayName: data.displayName || data.name || '',
-              phone: data.phone || '',
-              role: data.role || 'CLIENT',
-              isVerified: !!data.isVerified
-            }
-          },
-          { upsert: true, new: true }
-        );
-        resultId = updated?._id?.toString() || data.uid || data.id;
+        const rawUid = String(data.uid || data.id || data.phone || '').trim();
+        const uid = rawUid || `usr_${new mongoose.Types.ObjectId()}`;
+        const normalizedRole: 'CLIENT' | 'ADMIN' | 'STAFF' = (() => {
+          const r = String(data.role || '').toUpperCase();
+          if (r.includes('ADMIN')) return 'ADMIN';
+          if (r.includes('STAFF')) return 'STAFF';
+          return 'CLIENT';
+        })();
+
+        let existingUser = null;
+        if (data.id) {
+          existingUser = await User.findOne({ $or: [{ firestoreId: data.id }, { uid }] });
+        } else if (uid) {
+          existingUser = await User.findOne({ uid });
+        }
+
+        const userFields = {
+          firestoreId: data.id || uid,
+          uid,
+          email: data.email || '',
+          displayName: data.displayName || data.name || data.fullName || 'Passager',
+          phone: data.phone || data.telephone || data.tel || '',
+          photoURL: data.photoURL || '',
+          role: normalizedRole,
+          isVerified: !!data.isVerified,
+          totalBookings: Number(data.totalBookings || data.bookingsCount || 0),
+          totalSpent: Number(data.totalSpent || 0),
+          lastLogin: parseToDate(data.lastLogin) || new Date()
+        };
+
+        let updated;
+        if (existingUser) {
+          updated = await User.findByIdAndUpdate(existingUser._id, { $set: userFields }, { new: true });
+        } else {
+          updated = await User.create(userFields);
+        }
+        resultId = updated?._id?.toString() || uid;
         break;
       }
 
       case 'reservation': {
-        const ticketId = data.ticketId || `AMR-${(data.id || '').substring(0, 6).toUpperCase()}`;
+        const ticketId = String(data.ticketId || '').trim() || `AMR-${(data.id || Math.random().toString(36).substring(2, 8)).substring(0, 6).toUpperCase()}`;
+        const phone = String(data.phone || data.telephone || data.tel || '').trim() || 'N/A';
+        const fullName = String(data.fullName || data.nom || data.name || 'Passager').trim();
+        const travelDate = String(data.travelDate || data.date || '').trim() || new Date().toISOString().split('T')[0];
+        const travelClass = data.travelClass || data.classe || '2ème Classe';
+        const rawCount = Number(data.passengersCount ?? data.places ?? data.nbrPassagers ?? 1);
+        const passengersCount = isNaN(rawCount) || rawCount < 1 ? 1 : rawCount;
+        const rawAmount = Number(data.amount ?? data.prix ?? data.price ?? data.totalAmount ?? 20);
+        const amount = isNaN(rawAmount) ? 20 : rawAmount;
+
+        const normalizedStatus: 'PENDING' | 'VALIDATED' | 'REJECTED' | 'CANCELLED' = (() => {
+          const s = String(data.status || '').toUpperCase();
+          if (s.includes('VALID') || s.includes('CONFIRM')) return 'VALIDATED';
+          if (s.includes('REJECT') || s.includes('REFUS')) return 'REJECTED';
+          if (s.includes('CANCEL') || s.includes('ANNUL')) return 'CANCELLED';
+          return 'PENDING';
+        })();
+
         let existingRes = null;
         if (data.id) {
           existingRes = await Reservation.findOne({ firestoreId: data.id });
@@ -1155,24 +1210,29 @@ router.post('/sync/item', async (req: Request, res: Response) => {
         }
 
         const resFields = {
-          firestoreId: data.id,
+          firestoreId: data.id || undefined,
           ticketId,
-          fullName: data.fullName || 'Passager',
+          fullName,
           lastName: data.lastName || '',
-          phone: data.phone || '',
+          phone,
           email: data.email || '',
-          itinerary: data.itinerary || 'Bukavu-Goma',
+          itinerary: data.itinerary || (data.from && data.to ? `${data.from}-${data.to}` : 'Bukavu-Goma'),
           ship: data.ship || 'Mugote 1',
-          travelDate: data.travelDate || new Date().toISOString().split('T')[0],
-          departureTime: data.departureTime || '07h30',
-          travelClass: data.travelClass || '2ème Classe',
-          passengersCount: Number(data.passengersCount || 1),
-          status: data.status || 'PENDING',
+          travelDate,
+          departureTime: data.departureTime || data.time || '07h30',
+          travelClass,
+          passengersCount,
+          passengersList: Array.isArray(data.passengersList) ? data.passengersList : [],
+          status: normalizedStatus,
           paymentMethod: data.paymentMethod || 'Mobile Money',
           transactionId: data.transactionId || '',
-          amount: Number(data.amount || 20),
+          trackingRef: data.trackingRef || '',
+          amount,
+          currency: data.currency || 'USD',
           userId: data.userId || '',
+          notes: data.notes || '',
           isUsed: !!data.isUsed,
+          usedAt: parseToDate(data.usedAt),
           validatedAt: parseToDate(data.validatedAt),
           cancellationStatus: data.cancellationStatus || undefined,
           cancellationProcessedAt: parseToDate(data.cancellationProcessedAt),
@@ -1340,23 +1400,44 @@ router.post('/migrate/batch', async (req: Request, res: Response) => {
     if (Array.isArray(users)) {
       for (const item of users) {
         try {
-          await User.findOneAndUpdate(
-            { uid: item.uid || item.id },
-            {
-              $set: {
-                firestoreId: item.id,
-                uid: item.uid || item.id,
-                email: item.email || '',
-                displayName: item.displayName || item.name || '',
-                phone: item.phone || '',
-                role: item.role || 'CLIENT',
-                isVerified: !!item.isVerified
-              }
-            },
-            { upsert: true }
-          );
+          const rawUid = String(item.uid || item.id || item.phone || '').trim();
+          const uid = rawUid || `usr_${new mongoose.Types.ObjectId()}`;
+          const normalizedRole: 'CLIENT' | 'ADMIN' | 'STAFF' = (() => {
+            const r = String(item.role || '').toUpperCase();
+            if (r.includes('ADMIN')) return 'ADMIN';
+            if (r.includes('STAFF')) return 'STAFF';
+            return 'CLIENT';
+          })();
+
+          let existingUser = null;
+          if (item.id) {
+            existingUser = await User.findOne({ $or: [{ firestoreId: item.id }, { uid }] });
+          } else if (uid) {
+            existingUser = await User.findOne({ uid });
+          }
+
+          const userFields = {
+            firestoreId: item.id || uid,
+            uid,
+            email: item.email || '',
+            displayName: item.displayName || item.name || item.fullName || 'Passager',
+            phone: item.phone || item.telephone || item.tel || '',
+            photoURL: item.photoURL || '',
+            role: normalizedRole,
+            isVerified: !!item.isVerified,
+            totalBookings: Number(item.totalBookings || item.bookingsCount || 0),
+            totalSpent: Number(item.totalSpent || 0),
+            lastLogin: parseToDate(item.lastLogin) || new Date()
+          };
+
+          if (existingUser) {
+            await User.findByIdAndUpdate(existingUser._id, { $set: userFields }, { new: true });
+          } else {
+            await User.create(userFields);
+          }
           stats.users.migrated++;
         } catch (e) {
+          console.warn("User migration item error:", e);
           stats.users.errors++;
         }
       }
@@ -1366,36 +1447,67 @@ router.post('/migrate/batch', async (req: Request, res: Response) => {
     if (Array.isArray(reservations)) {
       for (const item of reservations) {
         try {
-          await Reservation.findOneAndUpdate(
-            { $or: [{ firestoreId: item.id }, { ticketId: item.ticketId }] },
-            {
-              $set: {
-                firestoreId: item.id,
-                ticketId: item.ticketId || `AMR-${(item.id || '').substring(0, 6).toUpperCase()}`,
-                fullName: item.fullName || 'Passager',
-                lastName: item.lastName || '',
-                phone: item.phone || '',
-                email: item.email || '',
-                itinerary: item.itinerary || 'Bukavu-Goma',
-                ship: item.ship || 'Mugote 1',
-                travelDate: item.travelDate || new Date().toISOString().split('T')[0],
-                departureTime: item.departureTime || '07h30',
-                travelClass: item.travelClass || '2ème Classe',
-                passengersCount: Number(item.passengersCount || 1),
-                status: item.status || 'PENDING',
-                paymentMethod: item.paymentMethod || 'Mobile Money',
-                transactionId: item.transactionId || '',
-                amount: Number(item.amount || 20),
-                userId: item.userId || '',
-                isUsed: !!item.isUsed,
-                validatedAt: parseToDate(item.validatedAt),
-                cancellationStatus: item.cancellationStatus || undefined,
-                cancellationProcessedAt: parseToDate(item.cancellationProcessedAt),
-                createdAt: parseToDate(item.createdAt) || new Date()
-              }
-            },
-            { upsert: true }
-          );
+          const ticketId = String(item.ticketId || '').trim() || `AMR-${(item.id || Math.random().toString(36).substring(2, 8)).substring(0, 6).toUpperCase()}`;
+          const phone = String(item.phone || item.telephone || item.tel || '').trim() || 'N/A';
+          const fullName = String(item.fullName || item.nom || item.name || 'Passager').trim();
+          const travelDate = String(item.travelDate || item.date || '').trim() || new Date().toISOString().split('T')[0];
+          const travelClass = item.travelClass || item.classe || '2ème Classe';
+          const rawCount = Number(item.passengersCount ?? item.places ?? item.nbrPassagers ?? 1);
+          const passengersCount = isNaN(rawCount) || rawCount < 1 ? 1 : rawCount;
+          const rawAmount = Number(item.amount ?? item.prix ?? item.price ?? item.totalAmount ?? 20);
+          const amount = isNaN(rawAmount) ? 20 : rawAmount;
+
+          const normalizedStatus: 'PENDING' | 'VALIDATED' | 'REJECTED' | 'CANCELLED' = (() => {
+            const s = String(item.status || '').toUpperCase();
+            if (s.includes('VALID') || s.includes('CONFIRM')) return 'VALIDATED';
+            if (s.includes('REJECT') || s.includes('REFUS')) return 'REJECTED';
+            if (s.includes('CANCEL') || s.includes('ANNUL')) return 'CANCELLED';
+            return 'PENDING';
+          })();
+
+          let existingRes = null;
+          if (item.id) {
+            existingRes = await Reservation.findOne({ firestoreId: item.id });
+          }
+          if (!existingRes && ticketId) {
+            existingRes = await Reservation.findOne({ ticketId });
+          }
+
+          const resFields = {
+            firestoreId: item.id || undefined,
+            ticketId,
+            fullName,
+            lastName: item.lastName || '',
+            phone,
+            email: item.email || '',
+            itinerary: item.itinerary || (item.from && item.to ? `${item.from}-${item.to}` : 'Bukavu-Goma'),
+            ship: item.ship || 'Mugote 1',
+            travelDate,
+            departureTime: item.departureTime || item.time || '07h30',
+            travelClass,
+            passengersCount,
+            passengersList: Array.isArray(item.passengersList) ? item.passengersList : [],
+            status: normalizedStatus,
+            paymentMethod: item.paymentMethod || 'Mobile Money',
+            transactionId: item.transactionId || '',
+            trackingRef: item.trackingRef || '',
+            amount,
+            currency: item.currency || 'USD',
+            userId: item.userId || '',
+            notes: item.notes || '',
+            isUsed: !!item.isUsed,
+            usedAt: parseToDate(item.usedAt),
+            validatedAt: parseToDate(item.validatedAt),
+            cancellationStatus: item.cancellationStatus || undefined,
+            cancellationProcessedAt: parseToDate(item.cancellationProcessedAt),
+            createdAt: parseToDate(item.createdAt) || new Date()
+          };
+
+          if (existingRes) {
+            await Reservation.findByIdAndUpdate(existingRes._id, { $set: resFields }, { new: true });
+          } else {
+            await Reservation.create(resFields);
+          }
           stats.reservations.migrated++;
         } catch (e) {
           console.warn("Reservation migration item error:", e);

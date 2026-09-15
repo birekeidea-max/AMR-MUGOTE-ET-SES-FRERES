@@ -287,32 +287,49 @@ export function MongoMigrationView() {
       // 6. Sync Users
       for (let i = 0; i < usersList.length; i++) {
         const item = usersList[i];
-        const label = item.displayName || item.email || item.phone || item.uid || `Utilisateur ${i + 1}`;
+        const cleanUser = {
+          ...item,
+          uid: (item.uid || item.id || item.phone || '').trim(),
+          phone: item.phone || item.telephone || item.tel || '',
+          displayName: item.displayName || item.name || item.fullName || 'Passager'
+        };
+        const label = cleanUser.displayName || cleanUser.email || cleanUser.phone || `Passager ${i + 1}`;
         updateProgress(`Passager ${i + 1}/${usersList.length} : ${label}`, "Utilisateurs");
         try {
-          await mongoApi.syncItem('user', item);
+          await mongoApi.syncItem('user', cleanUser);
           stats.users.migrated++;
           addLog('success', `✓ [Passager ${i + 1}/${usersList.length}] ${label} synchronisé.`);
         } catch (e: any) {
           stats.users.errors++;
           addLog('error', `✗ [Passager ${i + 1}/${usersList.length}] ${label} erreur : ${e.message}`);
         }
+        // Micro-pause pour préserver la bande passante et éviter les blocages Vercel
+        await new Promise(r => setTimeout(r, 40));
       }
 
       // 7. Sync Reservations
       for (let i = 0; i < resList.length; i++) {
         const item = resList[i];
-        const ticketCode = item.ticketId || `AMR-${(item.id || '').substring(0, 6).toUpperCase()}`;
-        const label = `${ticketCode} - ${item.fullName || 'Passager'} (${item.travelClass || 'Classe'})`;
+        const cleanRes = {
+          ...item,
+          phone: (item.phone || item.telephone || item.tel || '').trim() || 'N/A',
+          fullName: (item.fullName || item.nom || item.name || 'Passager').trim(),
+          travelClass: item.travelClass || item.classe || '2ème Classe',
+          ticketId: item.ticketId || `AMR-${(item.id || '').substring(0, 6).toUpperCase()}`
+        };
+        const ticketCode = cleanRes.ticketId;
+        const label = `${ticketCode} - ${cleanRes.fullName} (${cleanRes.travelClass})`;
         updateProgress(`Réservation ${i + 1}/${resList.length} : ${label}`, "Réservations");
         try {
-          await mongoApi.syncItem('reservation', item);
+          await mongoApi.syncItem('reservation', cleanRes);
           stats.reservations.migrated++;
           addLog('success', `✓ [Billet ${i + 1}/${resList.length}] ${label} validé dans MongoDB Atlas.`);
         } catch (e: any) {
           stats.reservations.errors++;
           addLog('error', `✗ [Billet ${i + 1}/${resList.length}] ${label} erreur : ${e.message}`);
         }
+        // Micro-pause pour préserver la bande passante et éviter les blocages Vercel
+        await new Promise(r => setTimeout(r, 40));
       }
 
       const totalMigrated = stats.settings.migrated + stats.schedules.migrated + stats.fleet.migrated + stats.news.migrated + stats.users.migrated + stats.reservations.migrated;

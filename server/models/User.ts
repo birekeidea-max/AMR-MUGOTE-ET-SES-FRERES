@@ -18,12 +18,12 @@ export interface IUser extends Document {
 
 const UserSchema = new Schema<IUser>({
   firestoreId: { type: String, index: true },
-  uid: { type: String, required: true, unique: true, index: true },
+  uid: { type: String, required: true, unique: true, sparse: true, index: true },
   email: { type: String, index: true, default: '' },
   displayName: { type: String, default: '' },
   phone: { type: String, default: '' },
   photoURL: { type: String, default: '' },
-  role: { type: String, enum: ['CLIENT', 'ADMIN', 'STAFF'], default: 'CLIENT', index: true },
+  role: { type: String, default: 'CLIENT', index: true },
   isVerified: { type: Boolean, default: false },
   totalBookings: { type: Number, default: 0 },
   totalSpent: { type: Number, default: 0 },
