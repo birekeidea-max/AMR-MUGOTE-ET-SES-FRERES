@@ -58,6 +58,13 @@ class RealtimeManager extends EventEmitter {
   public initMongoChangeStreams() {
     if (this.changeStreamActive) return;
 
+    // Disable Change Streams in serverless environments (Vercel, AWS Lambda)
+    if (process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME) {
+      this.changeStreamActive = false;
+      this.changeStreamError = "Environnement Serverless détecté (Change Streams désactivés pour optimiser les performances).";
+      return;
+    }
+
     try {
       if (mongoose.connection.readyState !== 1) {
         return;

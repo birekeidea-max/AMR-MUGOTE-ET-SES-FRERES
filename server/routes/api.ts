@@ -1246,7 +1246,11 @@ router.post('/sync/item', async (req: Request, res: Response) => {
           updated = await Reservation.create(resFields);
         }
         resultId = updated?._id?.toString() || ticketId;
-        realtimeHub.emitEvent('reservation:synced', 'synced', updated, 'reservations');
+        try {
+          realtimeHub.emitEvent('reservation:synced', 'synced', updated, 'reservations');
+        } catch (emitErr) {
+          // Non-blocking event emission
+        }
         break;
       }
 
@@ -1257,7 +1261,10 @@ router.post('/sync/item', async (req: Request, res: Response) => {
     res.json({ success: true, type, id: resultId, message: "Élément synchronisé dans MongoDB Atlas." });
   } catch (err: any) {
     console.error("Single item sync error in MongoDB:", err);
-    res.status(500).json({ error: err.message, stack: err.stack });
+    res.status(500).json({
+      error: err.message || "Erreur lors de la synchronisation de l'élément",
+      details: err.stack || String(err)
+    });
   }
 });
 

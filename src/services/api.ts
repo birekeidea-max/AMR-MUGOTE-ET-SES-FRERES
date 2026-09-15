@@ -52,14 +52,18 @@ async function apiRequest<T>(
         if (errData.error) {
           errorMsg = errData.error;
           if (errData.details) {
-            errorMsg += ` : ${errData.details}`;
+            errorMsg += ` : ${typeof errData.details === 'string' ? errData.details : JSON.stringify(errData.details)}`;
           }
         } else if (errData.message) {
           errorMsg = errData.message;
         }
       } catch {
-        if (rawText && rawText.length < 300) {
-          errorMsg += ` - ${rawText.replace(/<[^>]*>?/gm, '').trim()}`;
+        if (rawText) {
+          if (rawText.includes("FUNCTION_INVOCATION_FAILED")) {
+            errorMsg = `Erreur 500 Vercel Serverless (FUNCTION_INVOCATION_FAILED). Le bundle API n'a pas pu être exécuté par Vercel.`;
+          } else if (rawText.length < 300) {
+            errorMsg += ` - ${rawText.replace(/<[^>]*>?/gm, '').trim()}`;
+          }
         }
       }
     } catch {
@@ -78,6 +82,7 @@ export const mongoApi = {
     database: string;
     databaseStatus: string;
     isConnected: boolean;
+    dbName?: string;
     counts?: Record<string, number>;
   }>('/health'),
 

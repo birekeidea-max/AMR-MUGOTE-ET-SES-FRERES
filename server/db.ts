@@ -37,8 +37,9 @@ export async function connectMongoDB(): Promise<boolean> {
     return true;
   }
 
-  // 2. Lecture sécurisée de la chaîne de connexion MONGODB_URI
-  const uri = process.env.MONGODB_URI ? process.env.MONGODB_URI.trim() : '';
+  // 2. Lecture sécurisée de la chaîne de connexion MONGODB_URI avec fallback de secours
+  const DEFAULT_URI = "mongodb+srv://birekeidea_db_user:ftTd0ga6DlinPxt0@cluster0.bf7ikuc.mongodb.net/amr_mugote?retryWrites=true&w=majority&appName=Cluster0";
+  const uri = (process.env.MONGODB_URI ? process.env.MONGODB_URI.trim() : '') || DEFAULT_URI;
 
   if (!uri) {
     const msg = "MONGODB_URI n'est pas configuré dans process.env.";

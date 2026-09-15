@@ -167,6 +167,23 @@ export function MongoMigrationView() {
     };
 
     try {
+      // 0. Pre-flight check: verify that backend API and MongoDB are reachable
+      addLog('info', "🔍 Vérification de la connectivité du backend MongoDB Atlas (/api/health)...");
+      try {
+        const health = await mongoApi.getHealth();
+        if (health && health.server === 'ok') {
+          addLog('success', `✓ Backend API opérationnel. Connexion MongoDB Atlas : ${health.databaseStatus || 'connecté'} (${health.dbName || 'amr_mugote'}).`);
+        } else {
+          throw new Error("Réponse inattendue du backend lors du test de santé.");
+        }
+      } catch (healthErr: any) {
+        addLog('error', `❌ Échec du pré-contrôle de connectivité API : ${healthErr.message}`);
+        addLog('info', "💡 Conseil : Le serveur API n'est pas joignable (ex: HTTP 500 sur Vercel si le bundle n'est pas déployé). Déployez la dernière version ou utilisez l'environnement Cloud Run.");
+        setMigrationError(`Impossible de joindre le serveur API : ${healthErr.message}`);
+        setMigrating(false);
+        return;
+      }
+
       // 1. Read all Firestore collections directly via Firebase Web SDK
       addLog('info', "📖 Extraction des données depuis Firestore (SDK Client Web)...");
 
