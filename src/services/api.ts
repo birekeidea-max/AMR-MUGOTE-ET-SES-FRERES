@@ -269,6 +269,109 @@ export const mongoApi = {
     };
   }>('/realtime/status'),
 
+  // ==========================================
+  // 🔔 GMAIL & EMAIL DEPARTURE REMINDERS
+  // ==========================================
+  getNotificationStatus: () => apiRequest<{
+    configured: boolean;
+    provider: string;
+    fromAddress: string;
+    host: string;
+    port: number;
+    user: string;
+    today: string;
+    pendingRemindersCount: number;
+    sentRemindersCount: number;
+  }>('/notifications/status'),
+
+  sendDepartureReminder: (ticketOrId: string) => apiRequest<{
+    success: boolean;
+    message: string;
+    result: any;
+    reservation: any;
+  }>(`/notifications/send-reminder/${encodeURIComponent(ticketOrId)}`, {
+    method: 'POST'
+  }),
+
+  sendBulkDepartureReminders: (targetDate?: string) => apiRequest<{
+    success: boolean;
+    message: string;
+    summary: {
+      totalFound: number;
+      sentCount: number;
+      failedCount: number;
+      skippedNoEmail: number;
+      details: Array<any>;
+    };
+  }>('/notifications/cron-reminders', {
+    method: 'POST',
+    body: JSON.stringify({ targetDate })
+  }),
+
+  sendTestEmail: (email: string) => apiRequest<{
+    success: boolean;
+    message: string;
+    result: any;
+  }>('/notifications/test-email', {
+    method: 'POST',
+    body: JSON.stringify({ email })
+  }),
+
+  // ==========================================
+  // 🗓️ AGENDA SERVEUR & ALERTES BATEAU TEMPS RÉEL
+  // ==========================================
+  getServerAgenda: (params?: { travelDate?: string; ship?: string; email?: string; status?: string; search?: string }) => {
+    const query = new URLSearchParams();
+    if (params?.travelDate) query.append('travelDate', params.travelDate);
+    if (params?.ship) query.append('ship', params.ship);
+    if (params?.email) query.append('email', params.email);
+    if (params?.status) query.append('status', params.status);
+    if (params?.search) query.append('search', params.search);
+    return apiRequest<any[]>(`/agenda?${query.toString()}`);
+  },
+
+  getServerAgendaStats: () => apiRequest<{
+    today: string;
+    totalScheduled: number;
+    todayScheduled: number;
+    totalNotified: number;
+    byShip: Array<{ ship: string; count: number }>;
+  }>('/agenda/stats'),
+
+  broadcastBoatAlert: (data: {
+    ship: string;
+    travelDate?: string;
+    alertTitle: string;
+    alertMessage: string;
+    boatStatus?: string;
+  }) => apiRequest<{
+    success: boolean;
+    message: string;
+    summary: {
+      totalFound: number;
+      sentCount: number;
+      failedCount: number;
+      details: any[];
+    };
+  }>('/agenda/broadcast-boat', {
+    method: 'POST',
+    body: JSON.stringify(data)
+  }),
+
+  sendIndividualAgendaAlert: (id: string, data: { alertTitle: string; alertMessage: string }) => apiRequest<{
+    success: boolean;
+    message: string;
+    result: any;
+  }>(`/agenda/send-alert/${encodeURIComponent(id)}`, {
+    method: 'POST',
+    body: JSON.stringify(data)
+  }),
+
+  deleteAgendaEntry: (id: string) => apiRequest<{ success: boolean; message: string }>(`/agenda/${encodeURIComponent(id)}`, {
+    method: 'DELETE'
+  }),
+
+
   pollRealtime: (since?: number) => {
     const q = since ? `?since=${since}` : '';
     return apiRequest<{

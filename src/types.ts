@@ -36,6 +36,10 @@ export interface Reservation {
   usedAt?: any;
   cancellationStatus?: 'pending' | 'approved' | 'rejected' | string;
   cancellationProcessedAt?: any;
+  reminderEmailSent?: boolean;
+  reminderEmailSentAt?: any;
+  confirmationEmailSent?: boolean;
+  confirmationEmailSentAt?: any;
 }
 
 export interface Schedule {

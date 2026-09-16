@@ -65,6 +65,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { MongoMigrationView } from './components/MongoMigrationView';
+import { AdminRemindersView } from './components/AdminRemindersView';
 import { mongoApi } from './services/api';
 import { auth, db, handleFirestoreError, OperationType, uploadToStorage } from './lib/firebase';
 import { 
@@ -3711,6 +3712,15 @@ function Booking({ onReserved, user, onLoginRequest, siteSettings }: { onReserve
       return;
     }
 
+    // Validation du format Gmail / Email si renseigné
+    if (formData.email && formData.email.trim()) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(formData.email.trim())) {
+        setErrorLocal("L'adresse email saisie n'est pas valide. Veuillez saisir une adresse Gmail valide (ex: passager@gmail.com).");
+        return;
+      }
+    }
+
     if (!user) {
       onLoginRequest();
       return;
@@ -3724,6 +3734,7 @@ function Booking({ onReserved, user, onLoginRequest, siteSettings }: { onReserve
 
     const resData: Reservation = {
       ...formData,
+      email: formData.email.trim().toLowerCase(),
       userId: user.uid,
       status: 'PENDING',
       amount,
@@ -3971,6 +3982,82 @@ function Booking({ onReserved, user, onLoginRequest, siteSettings }: { onReserve
                         className="w-full px-3 py-1.5 lg:px-5 lg:py-3 bg-slate-50 border-2 border-maritime/30 rounded-lg lg:rounded-2xl focus:outline-none focus:ring-4 focus:ring-gold/10 focus:border-gold transition-all font-mono font-black text-[11px] lg:text-sm text-maritime"
                         placeholder="Ex: 0991234567 ou +243991234567"
                       />
+                    </div>
+                  </div>
+                </div>
+
+                {/* 🗓️ SECTION DÉDIÉE : GMAIL & AGENDA EN TEMPS RÉEL DU SERVEUR POUR LES ALERTES BATEAU */}
+                <div className="flex flex-col sm:flex-row group transition-colors hover:bg-slate-50/50 border-t border-slate-100">
+                  <div className="p-2 lg:p-6 sm:border-r border-slate-100 bg-blue-50/30 sm:w-[150px] lg:w-[200px] shrink-0">
+                    <div className="flex flex-col gap-0.5 lg:gap-1">
+                      <label className="text-[8px] lg:text-[10px] font-black uppercase text-maritime tracking-widest flex items-center gap-1.5 lg:gap-2">
+                        <Mail size={12} className="text-blue-600" /> Agenda Serveur
+                      </label>
+                      <span className="text-[7px] lg:text-[8px] font-extrabold text-blue-600 uppercase tracking-wider">
+                        Alertes Bateau Direct
+                      </span>
+                    </div>
+                  </div>
+                  <div className="p-2.5 lg:p-6 flex-1 space-y-3">
+                    <div className="bg-gradient-to-br from-blue-900/5 via-slate-50 to-blue-500/5 p-3.5 lg:p-5 rounded-2xl border-2 border-blue-200 shadow-sm space-y-3">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 border-b border-blue-100 pb-2.5">
+                        <span className="text-[9px] lg:text-[11px] font-black uppercase text-blue-950 tracking-wider flex items-center gap-1.5">
+                          <span className="inline-flex items-center gap-0.5 font-black text-sm">
+                            <span className="text-blue-600">G</span><span className="text-rose-500">m</span><span className="text-amber-500">a</span><span className="text-blue-600">i</span><span className="text-emerald-500">l</span>
+                          </span> 
+                          & Surveillance Bateau en Temps Réel
+                        </span>
+                        <span className="inline-flex items-center gap-1 text-[8px] lg:text-[9px] font-black uppercase bg-blue-600 text-white px-2.5 py-1 rounded-full shadow-xs self-start sm:self-auto">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                          Agenda Central du Serveur
+                        </span>
+                      </div>
+
+                      <p className="text-[9px] lg:text-[11px] text-slate-700 font-medium leading-relaxed">
+                        Le serveur central AMR Mugote utilise votre adresse Gmail pour vous transmettre automatiquement des <strong>notifications en temps réel concernant votre bateau</strong>. Dès que votre réservation est validée, votre adresse est immédiatement inscrite dans <strong>l'agenda en direct du serveur</strong> pour vous prévenir de l'heure de départ, de l'ouverture de l'embarquement et des statuts de navigation sur le Lac Kivu.
+                      </p>
+
+                      <div className="space-y-1.5 pt-1">
+                        <div className="flex items-center justify-between">
+                          <label className="text-[8px] lg:text-[10px] font-black uppercase tracking-[0.1em] text-slate-700 flex items-center gap-1.5">
+                            <Mail size={12} className="text-blue-600" /> Insérer votre compte Gmail
+                          </label>
+                          {user?.email && (
+                            <button
+                              type="button"
+                              onClick={() => setFormData(prev => ({ ...prev, email: user.email || '' }))}
+                              className="text-[8px] lg:text-[9px] font-bold text-blue-700 hover:text-blue-900 underline flex items-center gap-1 cursor-pointer"
+                            >
+                              <CheckCircle2 size={10} className="text-blue-600" /> Utiliser mon Gmail de connexion ({user.email})
+                            </button>
+                          )}
+                        </div>
+
+                        <div className="relative">
+                          <input 
+                            type="email" 
+                            value={formData.email}
+                            onChange={e => setFormData({ ...formData, email: e.target.value })}
+                            className="w-full pl-9 pr-3 py-2 lg:pl-11 lg:pr-5 lg:py-3 bg-white border-2 border-blue-300 rounded-lg lg:rounded-2xl focus:outline-none focus:ring-4 focus:ring-blue-500/20 focus:border-blue-600 transition-all font-mono font-bold text-[11px] lg:text-sm text-slate-900 shadow-inner"
+                            placeholder="Ex: voyageur@gmail.com"
+                          />
+                          <Mail className="absolute left-3 lg:left-4 top-1/2 -translate-y-1/2 text-blue-500" size={16} />
+                        </div>
+
+                        {formData.email && formData.email.includes('@') ? (
+                          <div className="flex items-center gap-1.5 text-[9px] lg:text-[11px] text-emerald-800 bg-emerald-50 border border-emerald-200 px-3 py-2 rounded-xl font-bold mt-1.5">
+                            <CheckCircle size={14} className="text-emerald-600 shrink-0" />
+                            <span>
+                              ✓ Parfait : Dès la réservation, <strong>{formData.email}</strong> sera envoyé à l'agenda du serveur pour surveiller en temps réel le navire <strong>{formData.ship || 'Mugote 1'}</strong> (Départ prévu : {formData.departureTime || '07h30'}).
+                            </span>
+                          </div>
+                        ) : (
+                          <p className="text-[8px] lg:text-[10px] text-slate-500 font-medium flex items-center gap-1 mt-1">
+                            <Clock size={11} className="text-blue-500 shrink-0" />
+                            Insérez votre adresse Gmail pour activer la surveillance du bateau et recevoir votre rappel d'heure de départ.
+                          </p>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -4419,6 +4506,26 @@ function Payment({ reservation, onComplete, siteSettings }: { reservation: Reser
                   <span className="text-[9px] font-black text-slate-400 uppercase block">Téléphone Déclaré</span>
                   <p className="text-sm font-mono text-slate-700">{currentRes.phone}</p>
                 </div>
+                {currentRes.email && (
+                  <div className="col-span-2 sm:col-span-3 bg-blue-50/90 border border-blue-200 rounded-xl p-3 flex items-start gap-2.5">
+                    <div className="w-7 h-7 rounded-lg bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-xs mt-0.5">
+                      <Mail size={15} />
+                    </div>
+                    <div className="space-y-0.5 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-[10px] font-black uppercase text-blue-950 tracking-wider">
+                          🗓️ Inscrit à l'Agenda en Temps Réel du Serveur
+                        </span>
+                        <span className="bg-emerald-100 text-emerald-800 text-[8px] font-extrabold px-1.5 py-0.5 rounded-full border border-emerald-300">
+                          Actif
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-blue-900 font-medium leading-tight">
+                        Votre adresse <span className="font-mono font-bold text-blue-950">{currentRes.email}</span> a été transmise à l'agenda central du serveur. Les notifications en temps réel concernant votre bateau <span className="font-bold">{currentRes.ship}</span> (départ prévu à {currentRes.departureTime || '07h30'}, embarquement et alertes navigation) vous parviendront automatiquement.
+                      </p>
+                    </div>
+                  </div>
+                )}
                 <div>
                   <span className="text-[9px] font-black text-slate-400 uppercase block">Montant à Verser</span>
                   <p className="text-base font-black text-emerald-600 font-mono">{currentRes.amount}.00 $</p>
@@ -4527,7 +4634,7 @@ function Payment({ reservation, onComplete, siteSettings }: { reservation: Reser
 }
 
 function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlocked, setIsAdminUnlocked, setUser }: { siteSettings?: { homeBg: string, homeDetail: string }, onNavigate: (page: string) => void, schedules: any[], isAdmin: boolean, isAdminUnlocked: boolean, setIsAdminUnlocked: (val: boolean) => void, setUser?: (u: any) => void }) {
-  const [tab, setTab] = useState<'reservations' | 'tarifs' | 'users' | 'fleet' | 'media' | 'settings' | 'messages' | 'schedules' | 'scanner' | 'mongodb'>('reservations');
+  const [tab, setTab] = useState<'reservations' | 'reminders' | 'tarifs' | 'users' | 'fleet' | 'media' | 'settings' | 'messages' | 'schedules' | 'scanner' | 'mongodb'>('reservations');
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [usersList, setUsersList] = useState<any[]>([]);
   const [fleetList, setFleetList] = useState<any[]>([]);
@@ -5215,6 +5322,18 @@ function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlock
         console.warn("Mongo status sync:", mErr);
       }
 
+      // Envoi automatique du rappel d'heure de départ par Gmail si un email est associé
+      if (action === 'VALIDATED') {
+        const targetRes = reservations.find(r => r.id === resId);
+        if (targetRes?.email && targetRes.email.includes('@')) {
+          try {
+            await mongoApi.sendDepartureReminder(ticketId || resId);
+          } catch (e) {
+            console.warn("Auto departure reminder notification note:", e);
+          }
+        }
+      }
+
       alert(action === 'VALIDATED' ? "Billet validé avec succès !" : "Billet rejeté avec succès.");
     } catch (error) {
       console.error("Action failed", error);
@@ -5408,6 +5527,7 @@ function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlock
             <div className="flex flex-wrap justify-center gap-2">
               {[
                 { id: 'reservations', label: 'Réservations', icon: Ticket },
+                { id: 'reminders', label: 'Rappels Gmail', icon: Mail },
                 { id: 'tarifs', label: 'Tarifs & Classes', icon: DollarSign },
                 { id: 'scanner', label: 'Scanner Port', icon: Camera },
                 { id: 'users', label: 'Utilisateurs', icon: Users },
@@ -5709,6 +5829,8 @@ function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlock
             </table>
             {reservations.length === 0 && <div className="p-20 text-center text-slate-400 font-bold uppercase tracking-widest text-[10px]">Aucun passager enregistré.</div>}
           </div>
+        ) : tab === 'reminders' ? (
+          <AdminRemindersView reservations={reservations} />
         ) : tab === 'tarifs' ? (
           <AdminTarifsView siteSettings={siteSettings} />
         ) : tab === 'users' ? (
@@ -7188,6 +7310,24 @@ function MyTickets({ user, siteSettings }: { user: FirebaseUser | null, siteSett
                     <p className="text-sm sm:text-base font-extrabold text-maritime mono tracking-tighter">{res.amount}$</p>
                   </div>
                   <div className="flex flex-col gap-2">
+                    {res.email && (
+                      <button
+                        onClick={async () => {
+                          try {
+                            const ticketKey = res.ticketId || res.id || (res as any)._id;
+                            const resp = await mongoApi.sendDepartureReminder(ticketKey);
+                            alert(resp.message || `Rappel d'heure de départ expédié à ${res.email}`);
+                          } catch (e: any) {
+                            alert("Erreur envoi rappel: " + e.message);
+                          }
+                        }}
+                        className="px-2.5 sm:px-3 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 text-[6.5px] sm:text-[7.5px] font-bold uppercase tracking-wider rounded-lg transition-colors flex items-center gap-1 shadow-sm"
+                        title="Recevoir le rappel de départ sur votre compte Gmail"
+                      >
+                        <Mail size={10} className="text-blue-600" />
+                        {(res as any).reminderEmailSent ? "Rappel Gmail ✓" : "Rappel Gmail"}
+                      </button>
+                    )}
                     {res.status === 'VALIDATED' && !(res as any).cancellationRequested && (
                       <button 
                         onClick={() => generateTicketPDF(res)}

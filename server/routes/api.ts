@@ -13,9 +13,11 @@ import {
   Comment,
   User,
   Conversation,
-  Message
+  Message,
+  ServerAgenda
 } from '../models';
 import { optionalFirebaseAuth } from '../middleware/auth';
+import { emailService } from '../services/emailService';
 
 const router = Router();
 
@@ -361,8 +363,22 @@ router.post('/reservations', optionalFirebaseAuth, async (req: Request, res: Res
     // Nettoyage des identifiants non-ObjectId pour éviter les erreurs de cast Mongoose
     const { _id, id, ...cleanData } = data;
 
+    // Récupération automatique du Gmail / Email du compte passager si non renseigné dans le formulaire
+    let passengerEmail = cleanData.email ? String(cleanData.email).trim() : '';
+    if (!passengerEmail && cleanData.userId) {
+      try {
+        const userAccount = await User.findOne({ uid: cleanData.userId });
+        if (userAccount && userAccount.email) {
+          passengerEmail = userAccount.email.trim();
+        }
+      } catch (uErr) {
+        console.warn("User account email lookup warning:", uErr);
+      }
+    }
+
     const reservation = await Reservation.create({
       ...cleanData,
+      email: passengerEmail,
       firestoreId: cleanData.firestoreId || id || _id,
       ticketId,
       passengersCount: Number(cleanData.passengersCount || 1),
@@ -384,6 +400,90 @@ router.post('/reservations', optionalFirebaseAuth, async (req: Request, res: Res
         );
       } catch (uErr) {
         console.warn("User stats update non-fatal error:", uErr);
+      }
+    }
+
+    // 🗓️ ENREGISTREMENT AUTOMATIQUE DANS L'AGENDA EN TEMPS RÉEL DU SERVEUR
+    let agendaEntry = null;
+    if (passengerEmail && passengerEmail.includes('@')) {
+      try {
+        const departureTime = cleanData.departureTime || '07h30';
+        // Calcul automatique de l'heure d'embarquement (45 min avant le départ)
+        let boardingTime = '06h45';
+        const match = departureTime.match(/(\d{1,2})[h:](\d{2})/i);
+        if (match) {
+          let h = parseInt(match[1], 10);
+          let m = parseInt(match[2], 10) - 45;
+          if (m < 0) {
+            m += 60;
+            h = (h - 1 + 24) % 24;
+          }
+          boardingTime = `${String(h).padStart(2, '0')}h${String(m).padStart(2, '0')}`;
+        }
+
+        const fullNameStr = `${cleanData.fullName || ''} ${cleanData.lastName || ''}`.trim() || 'Passager';
+
+        agendaEntry = await ServerAgenda.findOneAndUpdate(
+          { ticketId },
+          {
+            $set: {
+              email: passengerEmail.toLowerCase(),
+              fullName: fullNameStr,
+              phone: cleanData.phone || '',
+              ticketId,
+              reservationId: reservation._id.toString(),
+              userId: cleanData.userId || '',
+              ship: cleanData.ship || 'Mugote 1',
+              itinerary: cleanData.itinerary || 'Bukavu-Goma',
+              travelDate: cleanData.travelDate || new Date().toISOString().split('T')[0],
+              departureTime,
+              boardingTime,
+              travelClass: cleanData.travelClass || '2ème Classe',
+              passengersCount: Number(cleanData.passengersCount || 1),
+              amount: Number(cleanData.amount || 20),
+              status: 'SCHEDULED',
+              boatStatus: 'NORMAL',
+              realtimeAlertsSubscribed: true
+            }
+          },
+          { upsert: true, new: true }
+        );
+
+        // Diffuser en direct vers le hub temps réel
+        realtimeHub.emitEvent('agenda:registered', 'created', agendaEntry, 'agenda');
+
+        // Envoi automatique de la confirmation d'inscription à l'agenda et alertes bateau
+        emailService.sendAgendaRegistrationConfirmation({
+          email: passengerEmail,
+          fullName: fullNameStr,
+          ticketId,
+          ship: agendaEntry.ship,
+          itinerary: agendaEntry.itinerary,
+          travelDate: agendaEntry.travelDate,
+          departureTime: agendaEntry.departureTime,
+          boardingTime: agendaEntry.boardingTime,
+          travelClass: agendaEntry.travelClass
+        }).then(mailRes => {
+          if (mailRes.success && agendaEntry) {
+            ServerAgenda.updateOne(
+              { _id: agendaEntry._id },
+              {
+                $set: { confirmationSent: true, confirmationSentAt: new Date() },
+                $push: {
+                  notificationsLog: {
+                    type: 'CONFIRMATION',
+                    subject: mailRes.subject,
+                    message: "Billet inscrit à l'agenda en temps réel. Notification expédiée.",
+                    sentAt: new Date(),
+                    success: true
+                  }
+                }
+              }
+            ).exec();
+          }
+        }).catch(err => console.warn("Auto agenda confirmation non-blocking notice:", err));
+      } catch (agendaErr) {
+        console.warn("Agenda registration non-fatal notice:", agendaErr);
       }
     }
 
@@ -1531,6 +1631,456 @@ router.post('/migrate/batch', async (req: Request, res: Response) => {
   } catch (error: any) {
     console.error("Batch migration fatal error:", error);
     res.status(500).json({ error: "Erreur lors de la synchronisation par lot.", details: error?.message });
+  }
+});
+
+// ==========================================
+// 🔔 GMAIL & EMAIL DEPARTURE REMINDER SYSTEM
+// ==========================================
+
+// État du service d'emails et paramètres
+router.get('/notifications/status', async (req: Request, res: Response) => {
+  try {
+    await connectMongoDB();
+    const status = emailService.getStatus();
+
+    // Compter les réservations en attente de rappel pour aujourd'hui et les prochains jours
+    const todayStr = new Date().toISOString().split('T')[0];
+    const pendingRemindersCount = await Reservation.countDocuments({
+      status: { $in: ['VALIDATED', 'PENDING'] },
+      email: { $regex: '@', $options: 'i' },
+      isUsed: { $ne: true },
+      reminderEmailSent: { $ne: true }
+    });
+
+    const sentRemindersCount = await Reservation.countDocuments({
+      reminderEmailSent: true
+    });
+
+    res.json({
+      ...status,
+      today: todayStr,
+      pendingRemindersCount,
+      sentRemindersCount
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: "Erreur récupération statut notifications", details: err?.message });
+  }
+});
+
+// Envoi manuel ou immédiat d'un rappel de départ par Gmail à un passager spécifique
+router.post('/notifications/send-reminder/:id', async (req: Request, res: Response) => {
+  try {
+    await connectMongoDB();
+    const { id } = req.params;
+
+    let reservation = null;
+    if (mongoose.Types.ObjectId.isValid(id)) {
+      reservation = await Reservation.findById(id);
+    }
+    if (!reservation) {
+      reservation = await Reservation.findOne({
+        $or: [{ ticketId: id }, { firestoreId: id }]
+      });
+    }
+
+    if (!reservation) {
+      return res.status(404).json({ error: `Réservation introuvable pour l'identifiant ${id}` });
+    }
+
+    // Si pas d'email sur la réservation, tenter de le retrouver via le compte utilisateur
+    if (!reservation.email && reservation.userId) {
+      const userAccount = await User.findOne({ uid: reservation.userId });
+      if (userAccount && userAccount.email) {
+        reservation.email = userAccount.email.trim();
+        await reservation.save();
+      }
+    }
+
+    if (!reservation.email || !reservation.email.includes('@')) {
+      return res.status(400).json({
+        error: "Impossible d'envoyer le rappel : ce passager n'a pas renseigné d'adresse Gmail / Email lors de sa réservation ou inscription."
+      });
+    }
+
+    // Déclenchement de l'envoi du rappel
+    const result = await emailService.sendDepartureReminder({
+      fullName: reservation.fullName,
+      lastName: reservation.lastName,
+      email: reservation.email,
+      ticketId: reservation.ticketId,
+      itinerary: reservation.itinerary,
+      ship: reservation.ship,
+      travelDate: reservation.travelDate,
+      departureTime: reservation.departureTime,
+      travelClass: reservation.travelClass,
+      passengersCount: reservation.passengersCount
+    });
+
+    if (result.success) {
+      reservation.reminderEmailSent = true;
+      reservation.reminderEmailSentAt = new Date();
+      await reservation.save();
+
+      // Notifier en temps réel les clients connectés
+      realtimeHub.emitEvent('reservation:reminder-sent', 'updated', {
+        ticketId: reservation.ticketId,
+        recipient: reservation.email,
+        sentAt: reservation.reminderEmailSentAt
+      }, 'reservations');
+
+      return res.json({
+        success: true,
+        message: result.simulated 
+          ? `Rappel de départ simulé pour ${reservation.email} (mode développement).`
+          : `Rappel de départ envoyé avec succès sur le compte Gmail de ${reservation.email}.`,
+        result,
+        reservation
+      });
+    } else {
+      return res.status(500).json({
+        error: `Échec de l'envoi du rappel : ${result.error}`,
+        result
+      });
+    }
+  } catch (err: any) {
+    console.error("Error sending departure reminder:", err);
+    res.status(500).json({ error: "Erreur interne lors de l'envoi du rappel", details: err?.message });
+  }
+});
+
+// Envoi automatisé ou groupé de rappels de départ pour tous les départs imminents
+router.post('/notifications/cron-reminders', async (req: Request, res: Response) => {
+  try {
+    await connectMongoDB();
+    const { targetDate } = req.body;
+    
+    // Par défaut, cible les départs du jour ou du lendemain
+    const todayStr = new Date().toISOString().split('T')[0];
+    const tomorrowDate = new Date();
+    tomorrowDate.setDate(tomorrowDate.getDate() + 1);
+    const tomorrowStr = tomorrowDate.toISOString().split('T')[0];
+
+    const filterDates = targetDate ? [targetDate] : [todayStr, tomorrowStr];
+
+    const upcomingReservations = await Reservation.find({
+      travelDate: { $in: filterDates },
+      status: { $in: ['VALIDATED', 'PENDING'] },
+      isUsed: { $ne: true },
+      reminderEmailSent: { $ne: true }
+    });
+
+    const summary = {
+      totalFound: upcomingReservations.length,
+      sentCount: 0,
+      failedCount: 0,
+      skippedNoEmail: 0,
+      details: [] as Array<{ ticketId: string; email?: string; status: string; error?: string }>
+    };
+
+    for (const resItem of upcomingReservations) {
+      let email = resItem.email ? resItem.email.trim() : '';
+      if (!email && resItem.userId) {
+        const u = await User.findOne({ uid: resItem.userId });
+        if (u?.email) {
+          email = u.email.trim();
+          resItem.email = email;
+        }
+      }
+
+      if (!email || !email.includes('@')) {
+        summary.skippedNoEmail++;
+        summary.details.push({
+          ticketId: resItem.ticketId || resItem._id.toString(),
+          status: 'skipped_no_email'
+        });
+        continue;
+      }
+
+      try {
+        const result = await emailService.sendDepartureReminder({
+          fullName: resItem.fullName,
+          lastName: resItem.lastName,
+          email,
+          ticketId: resItem.ticketId,
+          itinerary: resItem.itinerary,
+          ship: resItem.ship,
+          travelDate: resItem.travelDate,
+          departureTime: resItem.departureTime,
+          travelClass: resItem.travelClass,
+          passengersCount: resItem.passengersCount
+        });
+
+        if (result.success) {
+          resItem.reminderEmailSent = true;
+          resItem.reminderEmailSentAt = new Date();
+          await resItem.save();
+          summary.sentCount++;
+          summary.details.push({
+            ticketId: resItem.ticketId || '',
+            email,
+            status: 'sent'
+          });
+        } else {
+          summary.failedCount++;
+          summary.details.push({
+            ticketId: resItem.ticketId || '',
+            email,
+            status: 'failed',
+            error: result.error
+          });
+        }
+      } catch (e: any) {
+        summary.failedCount++;
+        summary.details.push({
+          ticketId: resItem.ticketId || '',
+          email,
+          status: 'failed',
+          error: e.message
+        });
+      }
+    }
+
+    res.json({
+      success: true,
+      message: `Traitement des rappels de départ terminé : ${summary.sentCount} envoyé(s), ${summary.skippedNoEmail} sans email, ${summary.failedCount} échec(s).`,
+      summary
+    });
+  } catch (err: any) {
+    console.error("Error in cron departure reminders:", err);
+    res.status(500).json({ error: "Erreur traitement groupé des rappels", details: err?.message });
+  }
+});
+
+// Envoi d'un email de test pour valider la configuration SMTP / Gmail
+router.post('/notifications/test-email', async (req: Request, res: Response) => {
+  try {
+    const { email } = req.body;
+    if (!email || !email.includes('@')) {
+      return res.status(400).json({ error: "Veuillez fournir une adresse email valide pour le test." });
+    }
+
+    const result = await emailService.sendTestEmail(email.trim());
+    res.json({
+      success: result.success,
+      result,
+      message: result.simulated 
+        ? `Test d'email simulé avec succès pour ${email}. Configurez SMTP_USER et SMTP_PASS pour activer l'envoi réel.`
+        : `Email de test envoyé avec succès à ${email}.`
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: "Erreur lors du test d'envoi d'email", details: err?.message });
+  }
+});
+
+// ============================================================
+// 🗓️ AGENDA EN TEMPS RÉEL DU SERVEUR & ALERTES BATEAU
+// ============================================================
+
+// 1. Liste des passagers inscrits à l'agenda
+router.get('/agenda', async (req: Request, res: Response) => {
+  try {
+    await connectMongoDB();
+    const { travelDate, ship, email, status, search } = req.query;
+    const filter: any = {};
+
+    if (travelDate) filter.travelDate = travelDate;
+    if (ship) filter.ship = ship;
+    if (email) filter.email = String(email).toLowerCase();
+    if (status) filter.status = status;
+    if (search) {
+      filter.$or = [
+        { fullName: { $regex: String(search), $options: 'i' } },
+        { email: { $regex: String(search), $options: 'i' } },
+        { ticketId: { $regex: String(search), $options: 'i' } },
+        { phone: { $regex: String(search), $options: 'i' } }
+      ];
+    }
+
+    const agendaList = await ServerAgenda.find(filter)
+      .sort({ travelDate: 1, departureTime: 1, createdAt: -1 })
+      .limit(200);
+
+    res.json(agendaList);
+  } catch (err: any) {
+    res.status(500).json({ error: "Erreur récupération agenda", details: err?.message });
+  }
+});
+
+// 2. Statistiques et synthèse de l'agenda
+router.get('/agenda/stats', async (req: Request, res: Response) => {
+  try {
+    await connectMongoDB();
+    const today = new Date().toISOString().split('T')[0];
+    
+    const [totalScheduled, todayScheduled, byShip, totalNotified] = await Promise.all([
+      ServerAgenda.countDocuments(),
+      ServerAgenda.countDocuments({ travelDate: today }),
+      ServerAgenda.aggregate([
+        { $group: { _id: "$ship", count: { $sum: 1 } } }
+      ]),
+      ServerAgenda.countDocuments({ $or: [{ confirmationSent: true }, { reminderSent: true }] })
+    ]);
+
+    res.json({
+      today,
+      totalScheduled,
+      todayScheduled,
+      totalNotified,
+      byShip: byShip.map(b => ({ ship: b._id, count: b.count }))
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: "Erreur statistiques agenda", details: err?.message });
+  }
+});
+
+// 3. Diffusion d'une alerte en direct aux passagers d'un bateau dans l'agenda
+router.post('/agenda/broadcast-boat', async (req: Request, res: Response) => {
+  try {
+    await connectMongoDB();
+    const { ship, travelDate, alertTitle, alertMessage, boatStatus } = req.body;
+
+    if (!ship || !alertTitle || !alertMessage) {
+      return res.status(400).json({ error: "Champs requis : ship, alertTitle, alertMessage." });
+    }
+
+    const filter: any = { ship };
+    if (travelDate) filter.travelDate = travelDate;
+
+    const passengers = await ServerAgenda.find(filter);
+    const summary = {
+      totalFound: passengers.length,
+      sentCount: 0,
+      failedCount: 0,
+      details: [] as any[]
+    };
+
+    for (const p of passengers) {
+      try {
+        const mailRes = await emailService.sendBoatAlertNotification({
+          email: p.email,
+          fullName: p.fullName,
+          ticketId: p.ticketId,
+          ship: p.ship,
+          alertTitle,
+          alertMessage,
+          departureTime: p.departureTime,
+          travelDate: p.travelDate,
+          boatStatusText: boatStatus || p.boatStatus
+        });
+
+        if (mailRes.success) {
+          summary.sentCount++;
+          p.notificationsLog.push({
+            type: 'BOAT_ALERT',
+            subject: alertTitle,
+            message: alertMessage,
+            sentAt: new Date(),
+            success: true
+          });
+          if (boatStatus) p.boatStatus = boatStatus;
+          await p.save();
+
+          summary.details.push({ ticketId: p.ticketId, email: p.email, status: 'sent' });
+        } else {
+          summary.failedCount++;
+          summary.details.push({ ticketId: p.ticketId, email: p.email, status: 'failed', error: mailRes.error });
+        }
+      } catch (err: any) {
+        summary.failedCount++;
+        summary.details.push({ ticketId: p.ticketId, email: p.email, status: 'failed', error: err.message });
+      }
+    }
+
+    realtimeHub.emitEvent('agenda:broadcast', 'updated', {
+      ship,
+      travelDate,
+      alertTitle,
+      alertMessage,
+      sentCount: summary.sentCount
+    }, 'agenda');
+
+    res.json({
+      success: true,
+      message: `Alerte bateau transmise à ${summary.sentCount} voyageur(s) dans l'agenda.`,
+      summary
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: "Erreur diffusion alerte bateau", details: err?.message });
+  }
+});
+
+// 4. Envoi d'une alerte ou rappel individuel à un passager de l'agenda
+router.post('/agenda/send-alert/:id', async (req: Request, res: Response) => {
+  try {
+    await connectMongoDB();
+    const { id } = req.params;
+    const { alertTitle, alertMessage } = req.body;
+
+    let p = null;
+    if (mongoose.Types.ObjectId.isValid(id)) {
+      p = await ServerAgenda.findById(id);
+    }
+    if (!p) {
+      p = await ServerAgenda.findOne({ $or: [{ ticketId: id }, { email: id }] });
+    }
+
+    if (!p) {
+      return res.status(404).json({ error: "Entrée d'agenda introuvable." });
+    }
+
+    const title = alertTitle || "Information de Voyage";
+    const msg = alertMessage || `Rappel de votre traversée sur le ${p.ship} le ${p.travelDate} à ${p.departureTime}.`;
+
+    const mailRes = await emailService.sendBoatAlertNotification({
+      email: p.email,
+      fullName: p.fullName,
+      ticketId: p.ticketId,
+      ship: p.ship,
+      alertTitle: title,
+      alertMessage: msg,
+      departureTime: p.departureTime,
+      travelDate: p.travelDate,
+      boatStatusText: p.boatStatus
+    });
+
+    if (mailRes.success) {
+      p.notificationsLog.push({
+        type: 'BOAT_ALERT',
+        subject: title,
+        message: msg,
+        sentAt: new Date(),
+        success: true
+      });
+      await p.save();
+    }
+
+    res.json({
+      success: mailRes.success,
+      result: mailRes,
+      message: mailRes.success ? `Notification transmise avec succès à ${p.email}.` : "Échec de transmission de la notification."
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: "Erreur envoi notification individuelle", details: err?.message });
+  }
+});
+
+// 5. Suppression ou désinscription de l'agenda
+router.delete('/agenda/:id', async (req: Request, res: Response) => {
+  try {
+    await connectMongoDB();
+    const { id } = req.params;
+    let deleted = null;
+    if (mongoose.Types.ObjectId.isValid(id)) {
+      deleted = await ServerAgenda.findByIdAndDelete(id);
+    }
+    if (!deleted) {
+      deleted = await ServerAgenda.findOneAndDelete({ ticketId: id });
+    }
+
+    res.json({ success: true, message: "Entrée d'agenda supprimée." });
+  } catch (err: any) {
+    res.status(500).json({ error: "Erreur suppression agenda", details: err?.message });
   }
 });
 

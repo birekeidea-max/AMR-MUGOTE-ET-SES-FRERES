@@ -25,6 +25,10 @@ export interface IReservation extends Document {
   usedAt?: Date;
   isUsed?: boolean;
   validatedAt?: Date;
+  reminderEmailSent?: boolean;
+  reminderEmailSentAt?: Date;
+  confirmationEmailSent?: boolean;
+  confirmationEmailSentAt?: Date;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -61,7 +65,11 @@ const ReservationSchema = new Schema<IReservation>({
   notes: { type: String, default: '' },
   isUsed: { type: Boolean, default: false },
   usedAt: { type: Date },
-  validatedAt: { type: Date }
+  validatedAt: { type: Date },
+  reminderEmailSent: { type: Boolean, default: false, index: true },
+  reminderEmailSentAt: { type: Date },
+  confirmationEmailSent: { type: Boolean, default: false },
+  confirmationEmailSentAt: { type: Date }
 }, {
   timestamps: true,
   collection: 'reservations'
