@@ -19,11 +19,14 @@ import {
   FileCheck2,
   Radio,
   Zap,
-  Wifi
+  Wifi,
+  Calendar,
+  UserCheck
 } from 'lucide-react';
 import { mongoApi } from '../services/api';
 import { db } from '../lib/firebase';
 import { collection, getDocs, doc, getDoc } from 'firebase/firestore';
+import { DailyBoardingRecapTable } from './DailyBoardingRecapTable';
 
 function sanitizeFirestoreDoc(obj: any): any {
   if (!obj || typeof obj !== 'object') return obj;
@@ -81,6 +84,9 @@ export function MongoMigrationView() {
   // Real-Time MongoDB State
   const [realtimeConnected, setRealtimeConnected] = useState(false);
   const [realtimeEventsCount, setRealtimeEventsCount] = useState(0);
+
+  // Active View Tab inside Database Console: Default to 'recap' (Tableau Récapitulatif Journalier)
+  const [activeDbView, setActiveDbView] = useState<'recap' | 'sync' | 'tests'>('recap');
 
   const fetchHealth = async () => {
     setLoadingHealth(true);
@@ -462,28 +468,38 @@ export function MongoMigrationView() {
 
   return (
     <div className="space-y-6">
-      {/* Header & Status Card */}
-      <div className="bg-slate-900 border border-white/10 rounded-3xl p-6 shadow-2xl relative overflow-hidden">
+      {/* Header & Status Card - Signature MongoDB Atlas Branding */}
+      <div className="bg-[#001E2B] border-2 border-[#00ED64]/30 rounded-3xl p-6 sm:p-7 shadow-2xl shadow-[#00ED64]/10 relative overflow-hidden">
+        {/* Top glowing MongoDB signature leaf accent line */}
+        <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-[#00ED64] via-[#00684A] to-[#00ED64]" />
+
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="space-y-1">
-            <div className="flex items-center gap-2">
-              <span className="p-2 bg-emerald-500/10 text-emerald-400 rounded-xl border border-emerald-500/20">
-                <Database size={20} />
+          <div className="space-y-1.5">
+            <div className="flex items-center gap-3">
+              <span className="p-2.5 bg-[#00ED64]/15 text-[#00ED64] rounded-2xl border border-[#00ED64]/30 shadow-lg shadow-[#00ED64]/20">
+                <Database size={24} />
               </span>
-              <h2 className="text-xl font-bold text-white tracking-wide">
-                MongoDB Atlas & Architecture Backend
-              </h2>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h2 className="text-xl font-black text-white tracking-wide">
+                    MongoDB Atlas & Architecture Base de Données
+                  </h2>
+                  <span className="text-[8px] font-black bg-[#00ED64] text-[#001E2B] px-2 py-0.5 rounded uppercase tracking-wider hidden sm:inline-block">
+                    DATABASE CLUSTER
+                  </span>
+                </div>
+                <p className="text-xs text-[#00ED64]/80 font-medium">
+                  Base de données principale NoSQL haute disponibilité & passerelle Express / Mongoose
+                </p>
+              </div>
             </div>
-            <p className="text-xs text-slate-400">
-              Supervision de l'état de la base de données principale et passerelle Express / Mongoose.
-            </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
             <button
               onClick={handleReconnect}
               disabled={reconnecting}
-              className="px-3.5 py-2 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30 rounded-xl text-xs font-semibold flex items-center gap-2 transition cursor-pointer disabled:opacity-50"
+              className="px-4 py-2.5 bg-[#00ED64] hover:bg-[#00c853] text-[#001E2B] font-black rounded-xl text-xs flex items-center gap-2 transition cursor-pointer shadow-lg shadow-[#00ED64]/20 active:scale-95 disabled:opacity-50"
             >
               <RefreshCw size={14} className={reconnecting ? 'animate-spin' : ''} />
               {reconnecting ? 'Connexion...' : 'Tester / Reconnecter'}
@@ -492,7 +508,7 @@ export function MongoMigrationView() {
             <button
               onClick={fetchHealth}
               disabled={loadingHealth}
-              className="px-3.5 py-2 bg-white/5 hover:bg-white/10 text-slate-300 border border-white/10 rounded-xl text-xs font-semibold flex items-center gap-2 transition cursor-pointer"
+              className="px-3.5 py-2.5 bg-[#002B3B] hover:bg-[#00384D] text-[#00ED64] border border-[#00ED64]/30 rounded-xl text-xs font-bold flex items-center gap-2 transition cursor-pointer"
             >
               <RefreshCw size={14} className={loadingHealth ? 'animate-spin' : ''} />
               Actualiser
@@ -501,7 +517,7 @@ export function MongoMigrationView() {
             <div className={`px-3.5 py-2 rounded-xl text-xs font-bold border flex items-center gap-2 ${
               realtimeConnected
                 ? 'bg-cyan-500/10 text-cyan-400 border-cyan-500/30'
-                : 'bg-slate-800 text-slate-400 border-white/10'
+                : 'bg-[#002B3B] text-slate-400 border-white/10'
             }`}>
               <Radio size={13} className={realtimeConnected ? 'animate-pulse text-cyan-400' : 'text-slate-500'} />
               <span>
@@ -511,13 +527,13 @@ export function MongoMigrationView() {
 
             <div className={`px-3.5 py-2 rounded-xl text-xs font-bold border flex items-center gap-2 ${
               isConnected
-                ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
+                ? 'bg-[#00ED64]/15 text-[#00ED64] border-[#00ED64]/40 shadow-sm shadow-[#00ED64]/20'
                 : healthData?.databaseStatus === 'connecting'
                   ? 'bg-amber-500/10 text-amber-400 border-amber-500/30'
                   : 'bg-rose-500/10 text-rose-400 border-rose-500/30'
             }`}>
               <div className={`w-2 h-2 rounded-full ${
-                isConnected ? 'bg-emerald-400 animate-pulse' : 'bg-rose-400'
+                isConnected ? 'bg-[#00ED64] animate-pulse' : 'bg-rose-400'
               }`} />
               {isConnected 
                 ? 'MongoDB Atlas Connecté' 
@@ -541,258 +557,312 @@ export function MongoMigrationView() {
           </div>
         )}
 
-        {/* Database Metrics Grid */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mt-6 pt-6 border-t border-white/10">
-          <div className="bg-white/5 border border-white/5 rounded-2xl p-4">
-            <span className="text-[11px] text-slate-400 uppercase tracking-wider block">Réservations</span>
-            <span className="text-xl font-black text-white mt-1 block">
+        {/* Database Metrics Grid with MongoDB styling */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mt-6 pt-6 border-t border-[#00ED64]/20">
+          <div className="bg-[#002B3B]/60 border border-[#00ED64]/25 hover:border-[#00ED64]/60 transition-all rounded-2xl p-4">
+            <span className="text-[11px] text-slate-300 uppercase tracking-wider block">Réservations</span>
+            <span className="text-2xl font-black text-white mt-1 block">
               {healthData?.counts?.reservations ?? '0'}
             </span>
-            <span className="text-[10px] text-emerald-400 font-medium">Atlas Collection</span>
+            <span className="text-[10px] text-[#00ED64] font-bold">Atlas Collection</span>
           </div>
 
-          <div className="bg-white/5 border border-white/5 rounded-2xl p-4">
-            <span className="text-[11px] text-slate-400 uppercase tracking-wider block">Horaires</span>
-            <span className="text-xl font-black text-white mt-1 block">
+          <div className="bg-[#002B3B]/60 border border-[#00ED64]/25 hover:border-[#00ED64]/60 transition-all rounded-2xl p-4">
+            <span className="text-[11px] text-slate-300 uppercase tracking-wider block">Horaires</span>
+            <span className="text-2xl font-black text-white mt-1 block">
               {healthData?.counts?.schedules ?? '0'}
             </span>
-            <span className="text-[10px] text-emerald-400 font-medium">Liaisons actives</span>
+            <span className="text-[10px] text-[#00ED64] font-bold">Liaisons actives</span>
           </div>
 
-          <div className="bg-white/5 border border-white/5 rounded-2xl p-4">
-            <span className="text-[11px] text-slate-400 uppercase tracking-wider block">Flotte</span>
-            <span className="text-xl font-black text-white mt-1 block">
+          <div className="bg-[#002B3B]/60 border border-[#00ED64]/25 hover:border-[#00ED64]/60 transition-all rounded-2xl p-4">
+            <span className="text-[11px] text-slate-300 uppercase tracking-wider block">Flotte</span>
+            <span className="text-2xl font-black text-white mt-1 block">
               {healthData?.counts?.fleet ?? '0'}
             </span>
-            <span className="text-[10px] text-emerald-400 font-medium">Navires rapides</span>
+            <span className="text-[10px] text-[#00ED64] font-bold">Navires rapides</span>
           </div>
 
-          <div className="bg-white/5 border border-white/5 rounded-2xl p-4">
-            <span className="text-[11px] text-slate-400 uppercase tracking-wider block">Actualités</span>
-            <span className="text-xl font-black text-white mt-1 block">
+          <div className="bg-[#002B3B]/60 border border-[#00ED64]/25 hover:border-[#00ED64]/60 transition-all rounded-2xl p-4">
+            <span className="text-[11px] text-slate-300 uppercase tracking-wider block">Actualités</span>
+            <span className="text-2xl font-black text-white mt-1 block">
               {healthData?.counts?.news ?? '0'}
             </span>
-            <span className="text-[10px] text-emerald-400 font-medium">Publications</span>
+            <span className="text-[10px] text-[#00ED64] font-bold">Publications</span>
           </div>
 
-          <div className="bg-white/5 border border-white/5 rounded-2xl p-4 col-span-2 sm:col-span-1">
-            <span className="text-[11px] text-slate-400 uppercase tracking-wider block">Passagers</span>
-            <span className="text-xl font-black text-white mt-1 block">
+          <div className="bg-[#002B3B]/60 border border-[#00ED64]/25 hover:border-[#00ED64]/60 transition-all rounded-2xl p-4 col-span-2 sm:col-span-1">
+            <span className="text-[11px] text-slate-300 uppercase tracking-wider block">Passagers</span>
+            <span className="text-2xl font-black text-white mt-1 block">
               {healthData?.counts?.users ?? '0'}
             </span>
-            <span className="text-[10px] text-emerald-400 font-medium">Comptes sync</span>
+            <span className="text-[10px] text-[#00ED64] font-bold">Comptes sync</span>
           </div>
         </div>
       </div>
 
-      {/* Architecture Flow Diagram */}
-      <div className="bg-slate-900 border border-white/10 rounded-3xl p-6 space-y-4">
-        <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
-          <Layers size={16} className="text-gold" />
-          Flux de Synchronisation Progressive (Client-Side)
-        </h3>
+      {/* Database Console Sub-Tabs Navigation Bar */}
+      <div className="bg-[#001E2B] border-2 border-[#00ED64]/30 rounded-2xl p-2 flex flex-wrap gap-2 shadow-xl shadow-[#00ED64]/5">
+        <button
+          onClick={() => setActiveDbView('recap')}
+          className={`flex-1 min-w-[220px] px-4 py-3 rounded-xl text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2.5 transition-all cursor-pointer ${
+            activeDbView === 'recap'
+              ? 'bg-[#00ED64] text-[#001E2B] shadow-lg shadow-[#00ED64]/30 scale-[1.01]'
+              : 'bg-[#002B3B] text-[#00ED64] hover:bg-[#00384D] border border-[#00ED64]/20'
+          }`}
+        >
+          <Calendar size={16} />
+          <span>Tableau Récapitulatif par Jour & Embarquement</span>
+          <span className="text-[9px] px-2 py-0.5 rounded-md font-black bg-[#001E2B]/20 uppercase">
+            Par Ordre
+          </span>
+        </button>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-3 text-center">
-          <div className="bg-white/5 border border-white/10 rounded-2xl p-3.5 space-y-1">
-            <span className="text-[10px] font-bold text-blue-400 uppercase tracking-widest block">1. Extraction Directe</span>
-            <p className="text-xs font-bold text-white">Firestore Web SDK</p>
-            <p className="text-[11px] text-slate-400">Lectures authentifiées client</p>
-          </div>
+        <button
+          onClick={() => setActiveDbView('sync')}
+          className={`flex-1 min-w-[200px] px-4 py-3 rounded-xl text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2.5 transition-all cursor-pointer ${
+            activeDbView === 'sync'
+              ? 'bg-[#00ED64] text-[#001E2B] shadow-lg shadow-[#00ED64]/30 scale-[1.01]'
+              : 'bg-[#002B3B] text-slate-300 hover:text-white hover:bg-[#00384D] border border-white/10'
+          }`}
+        >
+          <UploadCloud size={16} />
+          <span>Synchronisation & Migration Atlas</span>
+        </button>
 
-          <div className="bg-white/5 border border-white/10 rounded-2xl p-3.5 space-y-1">
-            <span className="text-[10px] font-bold text-amber-400 uppercase tracking-widest block">2. Traitement Progressif</span>
-            <p className="text-xs font-bold text-white">Unité par Unité</p>
-            <p className="text-[11px] text-slate-400">Suivi temps réel & Tolérance</p>
-          </div>
-
-          <div className="bg-white/5 border border-white/10 rounded-2xl p-3.5 space-y-1">
-            <span className="text-[10px] font-bold text-purple-400 uppercase tracking-widest block">3. Passerelle API</span>
-            <p className="text-xs font-bold text-white">/api/sync/item</p>
-            <p className="text-[11px] text-slate-400">Validation & Upsert sécurisé</p>
-          </div>
-
-          <div className="bg-white/5 border border-white/10 rounded-2xl p-3.5 space-y-1">
-            <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest block">4. Persistance</span>
-            <p className="text-xs font-bold text-white">MongoDB Atlas</p>
-            <p className="text-[11px] text-slate-400">Stockage final sans doublon</p>
-          </div>
-        </div>
+        <button
+          onClick={() => setActiveDbView('tests')}
+          className={`flex-1 min-w-[180px] px-4 py-3 rounded-xl text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2.5 transition-all cursor-pointer ${
+            activeDbView === 'tests'
+              ? 'bg-[#00ED64] text-[#001E2B] shadow-lg shadow-[#00ED64]/30 scale-[1.01]'
+              : 'bg-[#002B3B] text-slate-300 hover:text-white hover:bg-[#00384D] border border-white/10'
+          }`}
+        >
+          <ShieldCheck size={16} />
+          <span>Banc d'Essai CRUD & Logs</span>
+        </button>
       </div>
 
-      {/* Migration Trigger Card */}
-      <div className="bg-gradient-to-br from-slate-900 to-slate-950 border border-white/10 rounded-3xl p-6 space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div className="space-y-1">
-            <h3 className="text-base font-bold text-white flex items-center gap-2">
-              <UploadCloud className="text-gold" size={20} />
-              Synchronisation Progressive Firestore ➔ MongoDB Atlas
-            </h3>
-            <p className="text-xs text-slate-400 max-w-2xl leading-relaxed">
-              Exécute l'envoi document par document depuis le navigateur vers MongoDB Atlas via les endpoints unitaires. 
-              Chaque réservation, navire et tarif est inséré ou mis à jour sans jamais supprimer vos données existantes.
-            </p>
-          </div>
+      {/* Sub-View 1: Daily Boarding & Passenger Manifest Recap Table */}
+      {activeDbView === 'recap' && (
+        <DailyBoardingRecapTable onRefresh={fetchHealth} sourceContext="mongodb" />
+      )}
 
-          <button
-            onClick={handleMigration}
-            disabled={migrating}
-            className="px-5 py-2.5 bg-gold hover:bg-gold-light text-slate-950 font-bold rounded-xl text-xs flex items-center gap-2 transition shadow-lg cursor-pointer whitespace-nowrap disabled:opacity-50"
-          >
-            {migrating ? (
-              <>
-                <Loader2 size={14} className="animate-spin" />
-                Synchronisation en cours...
-              </>
-            ) : (
-              <>
-                <UploadCloud size={14} />
-                Lancer la Synchronisation
-              </>
-            )}
-          </button>
-        </div>
-
-        {/* Real-time Progress Bar */}
-        {migrationProgress && (
-          <div className="bg-slate-950/80 border border-white/10 rounded-2xl p-4 space-y-3">
-            <div className="flex items-center justify-between text-xs">
-              <div className="flex items-center gap-2 text-white font-semibold">
-                <span className="px-2 py-0.5 bg-gold/20 text-gold rounded-md text-[10px] uppercase font-bold">
-                  {migrationProgress.category}
-                </span>
-                <span className="truncate max-w-xs sm:max-w-md text-slate-300">
-                  {migrationProgress.currentLabel}
-                </span>
-              </div>
-              <span className="font-mono font-bold text-gold text-xs">
-                {migrationProgress.current} / {migrationProgress.total} ({migrationProgress.percent}%)
-              </span>
-            </div>
-
-            {/* Visual Bar */}
-            <div className="w-full h-2.5 bg-white/10 rounded-full overflow-hidden">
-              <div 
-                className="h-full bg-gradient-to-r from-gold to-emerald-400 transition-all duration-300 rounded-full"
-                style={{ width: `${migrationProgress.percent}%` }}
-              />
-            </div>
-          </div>
-        )}
-
-        {migrationResult && (
-          <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-2xl p-4 text-xs text-emerald-300 space-y-2">
-            <div className="flex items-center gap-2 font-bold text-emerald-400">
-              <CheckCircle2 size={16} />
-              {migrationResult.message}
-            </div>
-            {migrationResult.stats && (
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2 pt-2 text-white">
-                <div className="bg-black/30 p-2 rounded-xl text-center">
-                  <span className="text-[10px] text-slate-400 block">Paramètres</span>
-                  <span className="font-bold text-emerald-400">{migrationResult.stats.settings?.migrated || 0}</span>
-                </div>
-                <div className="bg-black/30 p-2 rounded-xl text-center">
-                  <span className="text-[10px] text-slate-400 block">Horaires</span>
-                  <span className="font-bold text-emerald-400">{migrationResult.stats.schedules?.migrated || 0}</span>
-                </div>
-                <div className="bg-black/30 p-2 rounded-xl text-center">
-                  <span className="text-[10px] text-slate-400 block">Flotte</span>
-                  <span className="font-bold text-emerald-400">{migrationResult.stats.fleet?.migrated || 0}</span>
-                </div>
-                <div className="bg-black/30 p-2 rounded-xl text-center">
-                  <span className="text-[10px] text-slate-400 block">Articles</span>
-                  <span className="font-bold text-emerald-400">{migrationResult.stats.news?.migrated || 0}</span>
-                </div>
-                <div className="bg-black/30 p-2 rounded-xl text-center">
-                  <span className="text-[10px] text-slate-400 block">Passagers</span>
-                  <span className="font-bold text-emerald-400">{migrationResult.stats.users?.migrated || 0}</span>
-                </div>
-                <div className="bg-black/30 p-2 rounded-xl text-center">
-                  <span className="text-[10px] text-slate-400 block">Réservations</span>
-                  <span className="font-bold text-emerald-400">{migrationResult.stats.reservations?.migrated || 0}</span>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {migrationError && (
-          <div className="bg-rose-500/10 border border-rose-500/30 rounded-2xl p-4 text-xs text-rose-300 flex items-center gap-2">
-            <AlertCircle size={16} className="text-rose-400 shrink-0" />
-            <span>{migrationError}</span>
-          </div>
-        )}
-      </div>
-
-      {/* CRUD Test Console for MongoDB Atlas */}
-      <div className="bg-slate-900 border border-white/10 rounded-3xl p-6 space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="space-y-1">
+      {/* Sub-View 2: Progressive Synchronization & Architecture */}
+      {activeDbView === 'sync' && (
+        <div className="space-y-6">
+          {/* Architecture Flow Diagram */}
+          <div className="bg-slate-900 border border-white/10 rounded-3xl p-6 space-y-4">
             <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
-              <ShieldCheck size={16} className="text-emerald-400" />
-              Journal & Banc de Test Opérationnel (MongoDB Atlas)
+              <Layers size={16} className="text-gold" />
+              Flux de Synchronisation Progressive (Client-Side)
             </h3>
-            <p className="text-xs text-slate-400">
-              Affichage en temps réel de chaque document synchronisé et tests interactifs directs.
-            </p>
-          </div>
 
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              onClick={handleTestCreate}
-              disabled={crudLoading}
-              className="px-3 py-1.5 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30 rounded-xl text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
-            >
-              <PlusCircle size={13} /> Test CREATE
-            </button>
-            <button
-              onClick={handleTestRead}
-              disabled={crudLoading}
-              className="px-3 py-1.5 bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 border border-blue-500/30 rounded-xl text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
-            >
-              <Search size={13} /> Test READ
-            </button>
-            <button
-              onClick={handleTestUpdate}
-              disabled={crudLoading || !lastCreatedId}
-              className="px-3 py-1.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 rounded-xl text-xs font-bold flex items-center gap-1.5 transition cursor-pointer disabled:opacity-40"
-            >
-              <Edit3 size={13} /> Test UPDATE
-            </button>
-            <button
-              onClick={handleTestDelete}
-              disabled={crudLoading || !lastCreatedId}
-              className="px-3 py-1.5 bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/30 rounded-xl text-xs font-bold flex items-center gap-1.5 transition cursor-pointer disabled:opacity-40"
-            >
-              <Trash2 size={13} /> Test DELETE
-            </button>
-          </div>
-        </div>
-
-        {/* Live Logs Terminal */}
-        <div className="bg-slate-950 border border-white/10 rounded-2xl p-4 font-mono text-xs max-h-72 overflow-y-auto space-y-1.5">
-          {crudLogs.length === 0 ? (
-            <div className="text-slate-500 italic">
-              Cliquez sur « Lancer la Synchronisation » ou sur un des boutons de test pour observer les transactions MongoDB Atlas en direct...
-            </div>
-          ) : (
-            crudLogs.map((log, i) => (
-              <div key={i} className="flex items-start gap-2">
-                <span className="text-slate-500 shrink-0">[{log.time}]</span>
-                <span className={
-                  log.type === 'success' 
-                    ? 'text-emerald-400' 
-                    : log.type === 'error' 
-                      ? 'text-rose-400' 
-                      : 'text-cyan-400'
-                }>
-                  {log.message}
-                </span>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-3 text-center">
+              <div className="bg-white/5 border border-white/10 rounded-2xl p-3.5 space-y-1">
+                <span className="text-[10px] font-bold text-blue-400 uppercase tracking-widest block">1. Extraction Directe</span>
+                <p className="text-xs font-bold text-white">Firestore Web SDK</p>
+                <p className="text-[11px] text-slate-400">Lectures authentifiées client</p>
               </div>
-            ))
-          )}
+
+              <div className="bg-white/5 border border-white/10 rounded-2xl p-3.5 space-y-1">
+                <span className="text-[10px] font-bold text-amber-400 uppercase tracking-widest block">2. Traitement Progressif</span>
+                <p className="text-xs font-bold text-white">Unité par Unité</p>
+                <p className="text-[11px] text-slate-400">Suivi temps réel & Tolérance</p>
+              </div>
+
+              <div className="bg-white/5 border border-white/10 rounded-2xl p-3.5 space-y-1">
+                <span className="text-[10px] font-bold text-purple-400 uppercase tracking-widest block">3. Passerelle API</span>
+                <p className="text-xs font-bold text-white">/api/sync/item</p>
+                <p className="text-[11px] text-slate-400">Validation & Upsert sécurisé</p>
+              </div>
+
+              <div className="bg-white/5 border border-white/10 rounded-2xl p-3.5 space-y-1">
+                <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest block">4. Persistance</span>
+                <p className="text-xs font-bold text-white">MongoDB Atlas</p>
+                <p className="text-[11px] text-slate-400">Stockage final sans doublon</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Migration Trigger Card */}
+          <div className="bg-gradient-to-br from-slate-900 to-slate-950 border border-white/10 rounded-3xl p-6 space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="space-y-1">
+                <h3 className="text-base font-bold text-white flex items-center gap-2">
+                  <UploadCloud className="text-gold" size={20} />
+                  Synchronisation Progressive Firestore ➔ MongoDB Atlas
+                </h3>
+                <p className="text-xs text-slate-400 max-w-2xl leading-relaxed">
+                  Exécute l'envoi document par document depuis le navigateur vers MongoDB Atlas via les endpoints unitaires. 
+                  Chaque réservation, navire et tarif est inséré ou mis à jour sans jamais supprimer vos données existantes.
+                </p>
+              </div>
+
+              <button
+                onClick={handleMigration}
+                disabled={migrating}
+                className="px-5 py-2.5 bg-gold hover:bg-gold-light text-slate-950 font-bold rounded-xl text-xs flex items-center gap-2 transition shadow-lg cursor-pointer whitespace-nowrap disabled:opacity-50"
+              >
+                {migrating ? (
+                  <>
+                    <Loader2 size={14} className="animate-spin" />
+                    Synchronisation en cours...
+                  </>
+                ) : (
+                  <>
+                    <UploadCloud size={14} />
+                    Lancer la Synchronisation
+                  </>
+                )}
+              </button>
+            </div>
+
+            {/* Real-time Progress Bar */}
+            {migrationProgress && (
+              <div className="bg-slate-950/80 border border-white/10 rounded-2xl p-4 space-y-3">
+                <div className="flex items-center justify-between text-xs">
+                  <div className="flex items-center gap-2 text-white font-semibold">
+                    <span className="px-2 py-0.5 bg-gold/20 text-gold rounded-md text-[10px] uppercase font-bold">
+                      {migrationProgress.category}
+                    </span>
+                    <span className="truncate max-w-xs sm:max-w-md text-slate-300">
+                      {migrationProgress.currentLabel}
+                    </span>
+                  </div>
+                  <span className="font-mono font-bold text-gold text-xs">
+                    {migrationProgress.current} / {migrationProgress.total} ({migrationProgress.percent}%)
+                  </span>
+                </div>
+
+                {/* Visual Bar */}
+                <div className="w-full h-2.5 bg-white/10 rounded-full overflow-hidden">
+                  <div 
+                    className="h-full bg-gradient-to-r from-gold to-emerald-400 transition-all duration-300 rounded-full"
+                    style={{ width: `${migrationProgress.percent}%` }}
+                  />
+                </div>
+              </div>
+            )}
+
+            {migrationResult && (
+              <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-2xl p-4 text-xs text-emerald-300 space-y-2">
+                <div className="flex items-center gap-2 font-bold text-emerald-400">
+                  <CheckCircle2 size={16} />
+                  {migrationResult.message}
+                </div>
+                {migrationResult.stats && (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2 pt-2 text-white">
+                    <div className="bg-black/30 p-2 rounded-xl text-center">
+                      <span className="text-[10px] text-slate-400 block">Paramètres</span>
+                      <span className="font-bold text-emerald-400">{migrationResult.stats.settings?.migrated || 0}</span>
+                    </div>
+                    <div className="bg-black/30 p-2 rounded-xl text-center">
+                      <span className="text-[10px] text-slate-400 block">Horaires</span>
+                      <span className="font-bold text-emerald-400">{migrationResult.stats.schedules?.migrated || 0}</span>
+                    </div>
+                    <div className="bg-black/30 p-2 rounded-xl text-center">
+                      <span className="text-[10px] text-slate-400 block">Flotte</span>
+                      <span className="font-bold text-emerald-400">{migrationResult.stats.fleet?.migrated || 0}</span>
+                    </div>
+                    <div className="bg-black/30 p-2 rounded-xl text-center">
+                      <span className="text-[10px] text-slate-400 block">Articles</span>
+                      <span className="font-bold text-emerald-400">{migrationResult.stats.news?.migrated || 0}</span>
+                    </div>
+                    <div className="bg-black/30 p-2 rounded-xl text-center">
+                      <span className="text-[10px] text-slate-400 block">Passagers</span>
+                      <span className="font-bold text-emerald-400">{migrationResult.stats.users?.migrated || 0}</span>
+                    </div>
+                    <div className="bg-black/30 p-2 rounded-xl text-center">
+                      <span className="text-[10px] text-slate-400 block">Réservations</span>
+                      <span className="font-bold text-emerald-400">{migrationResult.stats.reservations?.migrated || 0}</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {migrationError && (
+              <div className="bg-rose-500/10 border border-rose-500/30 rounded-2xl p-4 text-xs text-rose-300 flex items-center gap-2">
+                <AlertCircle size={16} className="text-rose-400 shrink-0" />
+                <span>{migrationError}</span>
+              </div>
+            )}
+          </div>
         </div>
-      </div>
+      )}
+
+      {/* Sub-View 3: CRUD Tests & Interactive Console */}
+      {activeDbView === 'tests' && (
+        <div className="bg-slate-900 border border-white/10 rounded-3xl p-6 space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="space-y-1">
+              <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                <ShieldCheck size={16} className="text-emerald-400" />
+                Journal & Banc de Test Opérationnel (MongoDB Atlas)
+              </h3>
+              <p className="text-xs text-slate-400">
+                Affichage en temps réel de chaque document synchronisé et tests interactifs directs.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                onClick={handleTestCreate}
+                disabled={crudLoading}
+                className="px-3 py-1.5 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30 rounded-xl text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
+              >
+                <PlusCircle size={13} /> Test CREATE
+              </button>
+              <button
+                onClick={handleTestRead}
+                disabled={crudLoading}
+                className="px-3 py-1.5 bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 border border-blue-500/30 rounded-xl text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
+              >
+                <Search size={13} /> Test READ
+              </button>
+              <button
+                onClick={handleTestUpdate}
+                disabled={crudLoading || !lastCreatedId}
+                className="px-3 py-1.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 rounded-xl text-xs font-bold flex items-center gap-1.5 transition cursor-pointer disabled:opacity-40"
+              >
+                <Edit3 size={13} /> Test UPDATE
+              </button>
+              <button
+                onClick={handleTestDelete}
+                disabled={crudLoading || !lastCreatedId}
+                className="px-3 py-1.5 bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/30 rounded-xl text-xs font-bold flex items-center gap-1.5 transition cursor-pointer disabled:opacity-40"
+              >
+                <Trash2 size={13} /> Test DELETE
+              </button>
+            </div>
+          </div>
+
+          {/* Live Logs Terminal */}
+          <div className="bg-slate-950 border border-white/10 rounded-2xl p-4 font-mono text-xs max-h-72 overflow-y-auto space-y-1.5">
+            {crudLogs.length === 0 ? (
+              <div className="text-slate-500 italic">
+                Cliquez sur « Lancer la Synchronisation » ou sur un des boutons de test pour observer les transactions MongoDB Atlas en direct...
+              </div>
+            ) : (
+              crudLogs.map((log, i) => (
+                <div key={i} className="flex items-start gap-2">
+                  <span className="text-slate-500 shrink-0">[{log.time}]</span>
+                  <span className={
+                    log.type === 'success' 
+                      ? 'text-emerald-400' 
+                      : log.type === 'error' 
+                        ? 'text-rose-400' 
+                        : 'text-cyan-400'
+                  }>
+                    {log.message}
+                  </span>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
