@@ -2,7 +2,7 @@ import {StrictMode} from 'react';
 import {createRoot} from 'react-dom/client';
 import App from './App.tsx';
 import './index.css';
-import { logWebCrash } from './lib/firebase.ts';
+import { logWebCrash } from './lib/firebase';
 
 // Catch and report unhandled runtime errors globally to Google Analytics
 try {

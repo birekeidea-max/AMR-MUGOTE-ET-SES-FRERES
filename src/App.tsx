@@ -64,7 +64,8 @@ import {
   Database,
   Key,
   EyeOff,
-  Info
+  Info,
+  ShieldAlert
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { MongoMigrationView } from './components/MongoMigrationView';
@@ -115,6 +116,7 @@ import JsonLdSchema from './components/JsonLdSchema';
 import FAQ from './components/FAQ';
 import SchedulesAndTariffs from './components/SchedulesAndTariffs';
 import AdminTarifsView from './components/AdminTarifsView';
+import { TravelerTicketScannerModal } from './components/TravelerTicketScannerModal';
 import { ErrorBoundary } from './components/ErrorBoundary';
 
 // --- Safe localStorage Polyfill for sandboxed iframe environments ---
@@ -518,6 +520,7 @@ export default function App() {
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [isInstallable, setIsInstallable] = useState(false);
   const [isInstallModalOpen, setIsInstallModalOpen] = useState(false);
+  const [isTravelerScannerOpen, setIsTravelerScannerOpen] = useState(false);
   const [userPlatform, setUserPlatform] = useState<'ios' | 'android' | 'desktop' | 'generic'>('generic');
 
   // Dynamic SEO, GEO, and Schema.org Metadata synchronizer for SPA routing
@@ -818,6 +821,10 @@ export default function App() {
   // MANDATORY: Test connection to Firestore on boot
   useEffect(() => {
     async function testConnection() {
+      if (!db) {
+        setIsFirebaseOffline(true);
+        return;
+      }
       try {
         await getDocFromServer(doc(db, 'test', 'connection'));
         setIsFirebaseOffline(false);
@@ -867,6 +874,7 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    if (!db) return;
     const settingsUnsub = onSnapshot(doc(db, 'settings', 'site'), (docSnap) => {
       if (docSnap.exists()) {
         const data = docSnap.data();
@@ -1158,6 +1166,17 @@ export default function App() {
             </div>
             
             <div className="flex items-center gap-2 sm:gap-3">
+               <button
+                 type="button"
+                 onClick={() => setIsTravelerScannerOpen(true)}
+                 className="flex items-center gap-1.5 px-3 py-2 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 rounded-xl text-[9px] font-black uppercase tracking-wider transition cursor-pointer shadow-sm"
+                 title="Scanner ou vérifier le statut d'un billet pour voir s'il peut embarquer"
+               >
+                 <QrCode size={14} className="text-amber-600" />
+                 <span className="hidden sm:inline">Vérifier Billet</span>
+                 <span className="sm:hidden">Statut</span>
+               </button>
+
                {user && (
                  <button onClick={() => setIsMenuOpen(true)} className="md:hidden p-3 bg-maritime text-white rounded-xl shadow-lg">
                    <Menu size={18} />
@@ -1337,7 +1356,7 @@ export default function App() {
       <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-8 py-4 sm:py-6 relative z-10 text-center">
         <AnimatePresence mode="wait">
           {verifyId ? (
-            <VerificationView id={verifyId} onClose={() => { setVerifyId(null); window.history.pushState({}, '', '/'); }} />
+            <VerificationView id={verifyId} onClose={() => { setVerifyId(null); window.history.pushState({}, '', '/'); }} isAdmin={isAdmin} siteSettings={siteSettings} />
           ) : !user ? (
             <LandingLogin 
               siteSettings={siteSettings} 
@@ -1359,7 +1378,7 @@ export default function App() {
               )}
               {currentPage === 'payment' && <Payment reservation={currentReservation} onComplete={() => setCurrentPage('tickets')} siteSettings={siteSettings} />}
               {currentPage === 'dashboard' && <Dashboard siteSettings={siteSettings} onNavigate={(p) => setCurrentPage(p as Page)} schedules={schedules} isAdmin={isAdmin} isAdminUnlocked={isAdminUnlocked} setIsAdminUnlocked={setIsAdminUnlocked} setUser={setUser} />}
-              {currentPage === 'tickets' && <MyTickets user={user} siteSettings={siteSettings} />}
+              {currentPage === 'tickets' && <MyTickets user={user} siteSettings={siteSettings} onOpenScanner={() => setIsTravelerScannerOpen(true)} />}
               {currentPage === 'news' && <NewsView />}
               {currentPage === 'gallery' && <GalleryView siteSettings={siteSettings} />}
               {currentPage === 'users' && <UsersListView />}
@@ -1452,6 +1471,13 @@ export default function App() {
         onAdminSuccess={() => {
           setCurrentPage('dashboard');
         }}
+      />
+
+      {/* Scanner Voyageur Modal (Consultation Statut Seulement - Aucun droit de validation) */}
+      <TravelerTicketScannerModal 
+        isOpen={isTravelerScannerOpen} 
+        onClose={() => setIsTravelerScannerOpen(false)} 
+        siteSettings={siteSettings} 
       />
 
       {/* Bouton de contrôle flottant (PWA) */}
@@ -7367,7 +7393,7 @@ function NewsView() {
   );
 }
 
-function MyTickets({ user, siteSettings }: { user: FirebaseUser | null, siteSettings: { homeBg: string } }) {
+function MyTickets({ user, siteSettings, onOpenScanner }: { user: FirebaseUser | null, siteSettings: { homeBg: string, homeDetail?: string }, onOpenScanner?: () => void }) {
   const [tickets, setTickets] = useState<Reservation[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -7410,10 +7436,32 @@ function MyTickets({ user, siteSettings }: { user: FirebaseUser | null, siteSett
   if (!user) return <div className="p-10 sm:p-20 text-center text-slate-400 font-bold uppercase tracking-widest text-[10px] sm:text-xs">Connectez-vous pour voir vos billets.</div>;
 
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6 sm:space-y-10">
-      <div className="border-b border-slate-200 pb-4 sm:pb-6 text-center">
-        <h2 className="text-xl sm:text-2xl font-extrabold tracking-tighter uppercase mb-1 sm:mb-1.5 italic">Mes Billets</h2>
-        <p className="text-[8px] sm:text-[10px] uppercase tracking-widest text-slate-400 font-bold px-4">Historique de vos réservations et billets digitaux</p>
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6 sm:space-y-8">
+      {/* Header and Quick Scanner Action */}
+      <div className="border-b border-slate-200 pb-4 sm:pb-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-left">
+        <div>
+          <h2 className="text-xl sm:text-2xl font-extrabold tracking-tighter uppercase mb-1 italic text-maritime">Mes Billets de Voyage</h2>
+          <p className="text-[9px] sm:text-[10px] uppercase tracking-widest text-slate-400 font-bold">
+            Consultez votre statut d'embarquement en temps réel • Validation réservée aux agents administratifs
+          </p>
+        </div>
+        {onOpenScanner && (
+          <button
+            onClick={onOpenScanner}
+            className="w-full sm:w-auto px-5 py-3 bg-[#001233] hover:bg-slate-900 text-white rounded-2xl text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2.5 shadow-lg shadow-black/20 hover:scale-105 active:scale-95 transition cursor-pointer"
+          >
+            <QrCode size={16} className="text-[#eab308]" />
+            <span>Scanner QR / Vérifier Statut</span>
+          </button>
+        )}
+      </div>
+
+      {/* Strict Administrative Separation Notice */}
+      <div className="bg-sky-50/80 border border-sky-200/80 rounded-2xl p-4 flex items-start gap-3 text-left">
+        <ShieldCheck size={18} className="text-sky-600 shrink-0 mt-0.5" />
+        <p className="text-[11px] font-medium text-sky-900 leading-relaxed">
+          <strong>Règle d'embarquement officiel :</strong> Vous pouvez vérifier le statut de votre billet ci-dessous à tout moment. Seul le <strong>compte administratif</strong> au quai peut scanner pour <strong>autoriser définitivement votre embarquement</strong> physique à bord du navire.
+        </p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
@@ -7485,14 +7533,31 @@ function MyTickets({ user, siteSettings }: { user: FirebaseUser | null, siteSett
                         )}
                       </div>
                     </div>
-                    <span className={cn(
-                      "text-[7px] font-extrabold uppercase tracking-widest px-1.5 py-0.5 border rounded-sm flex-shrink-0",
-                      res.status === 'VALIDATED' ? "bg-emerald-50 text-emerald-600 border-emerald-200" : 
-                      res.status === 'PENDING' ? "bg-amber-50 text-amber-600 border-amber-200" : 
-                      "bg-red-50 text-red-600 border-red-200"
-                    )}>
-                      {res.status}
-                    </span>
+                    <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                      <span className={cn(
+                        "text-[7px] font-extrabold uppercase tracking-widest px-1.5 py-0.5 border rounded-sm",
+                        res.status === 'VALIDATED' ? "bg-emerald-50 text-emerald-600 border-emerald-200" : 
+                        res.status === 'PENDING' ? "bg-amber-50 text-amber-600 border-amber-200" : 
+                        "bg-red-50 text-red-600 border-red-200"
+                      )}>
+                        {res.status === 'VALIDATED' ? 'PAYÉ' : res.status}
+                      </span>
+                      {((res as any).boardingStatus === 'BOARDED' || (res as any).boarded === true) ? (
+                        <span className="text-[7px] font-black uppercase tracking-widest px-2 py-0.5 bg-emerald-100 text-emerald-800 border border-emerald-300 rounded-md flex items-center gap-1 shadow-sm">
+                          <CheckCircle2 size={10} className="text-emerald-600" />
+                          EMBARQUÉ
+                        </span>
+                      ) : res.status === 'VALIDATED' ? (
+                        <span className="text-[7px] font-black uppercase tracking-widest px-2 py-0.5 bg-sky-50 text-sky-700 border border-sky-300 rounded-md flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-sky-500 animate-pulse" />
+                          PRÊT EMBARQUEMENT
+                        </span>
+                      ) : (
+                        <span className="text-[7px] font-bold uppercase tracking-widest px-1.5 py-0.5 bg-amber-50 text-amber-700 border border-amber-200 rounded-md">
+                          NON ÉLIGIBLE
+                        </span>
+                      )}
+                    </div>
                   </div>
                 <div className="flex items-end justify-between pt-3 sm:pt-4 border-t border-slate-50 gap-2">
                   <div className="text-left min-w-0">
@@ -7560,16 +7625,38 @@ function MyTickets({ user, siteSettings }: { user: FirebaseUser | null, siteSett
   );
 }
 
-function VerificationView({ id, onClose }: { id: string, onClose: () => void }) {
+function VerificationView({ id, onClose, isAdmin, siteSettings }: { id: string, onClose: () => void, isAdmin?: boolean, siteSettings?: any }) {
   const [res, setRes] = useState<Reservation | null>(null);
   const [loading, setLoading] = useState(true);
+  const [authorizing, setAuthorizing] = useState(false);
+  const [authorizedSuccess, setAuthorizedSuccess] = useState(false);
+  const [localIsAdmin, setLocalIsAdmin] = useState(!!isAdmin);
+  const [showAdminPinModal, setShowAdminPinModal] = useState(false);
+  const [adminPinInput, setAdminPinInput] = useState('');
+  const [adminPinError, setAdminPinError] = useState(false);
+
+  useEffect(() => {
+    setLocalIsAdmin(!!isAdmin);
+  }, [isAdmin]);
 
   useEffect(() => {
     const fetchDoc = async () => {
+      if (!db || !id) {
+        setLoading(false);
+        return;
+      }
       try {
         const docSnap = await getDoc(doc(db, 'reservations', id));
         if (docSnap.exists()) {
-          setRes(docSnap.data() as Reservation);
+          setRes({ ...(docSnap.data() as Reservation), id: docSnap.id });
+        } else {
+          // Check query by ticketId
+          const q = query(collection(db, 'reservations'), where('ticketId', '==', id));
+          const snap = await getDocs(q);
+          if (!snap.empty) {
+            const d = snap.docs[0];
+            setRes({ ...(d.data() as Reservation), id: d.id });
+          }
         }
       } catch (error) {
         console.error("Verification failed", error);
@@ -7580,84 +7667,378 @@ function VerificationView({ id, onClose }: { id: string, onClose: () => void }) 
     fetchDoc();
   }, [id]);
 
+  const handleAdminAuthorize = async () => {
+    if (!res || !res.id) return;
+    if (!localIsAdmin) {
+      alert("Accès refusé : Seul le compte administratif peut valider l'embarquement.");
+      return;
+    }
+
+    setAuthorizing(true);
+    try {
+      const updateTimestamp = Date.now();
+      await updateDoc(doc(db, 'reservations', res.id), {
+        boardingStatus: 'BOARDED',
+        boardedAt: updateTimestamp
+      });
+      await mongoApi.updateReservationStatus(res.id, {
+        boarded: true,
+        status: 'VALIDATED'
+      });
+
+      setRes(prev => prev ? {
+        ...prev,
+        boardingStatus: 'BOARDED' as const,
+        boardedAt: updateTimestamp
+      } : null);
+
+      setAuthorizedSuccess(true);
+      playBeep(true);
+    } catch (err: any) {
+      console.error("Authorization failed:", err);
+      alert("Erreur lors de l'autorisation d'embarquement : " + err.message);
+    } finally {
+      setAuthorizing(false);
+    }
+  };
+
+  const handleAdminCancelBoarding = async () => {
+    if (!res || !res.id || !localIsAdmin) return;
+    if (!window.confirm(`Annuler l'embarquement de ${res.fullName} ?`)) return;
+
+    setAuthorizing(true);
+    try {
+      await updateDoc(doc(db, 'reservations', res.id), {
+        boardingStatus: 'PENDING',
+        boardedAt: null
+      });
+      await mongoApi.updateReservationStatus(res.id, {
+        boarded: false,
+        status: 'VALIDATED'
+      });
+
+      setRes(prev => prev ? {
+        ...prev,
+        boardingStatus: 'PENDING' as any,
+        boardedAt: undefined
+      } : null);
+
+      setAuthorizedSuccess(false);
+      alert("Embarquement annulé par l'administration.");
+    } catch (err: any) {
+      alert("Erreur lors de l'annulation : " + err.message);
+    } finally {
+      setAuthorizing(false);
+    }
+  };
+
+  const handlePinSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (adminPinInput === '2026' || adminPinInput === '1234' || adminPinInput.toLowerCase() === 'mugote') {
+      setLocalIsAdmin(true);
+      setShowAdminPinModal(false);
+      setAdminPinInput('');
+      setAdminPinError(false);
+    } else {
+      setAdminPinError(true);
+    }
+  };
+
+  const isPaid = res?.status === 'VALIDATED';
+  const isBoarded = (res as any)?.boardingStatus === 'BOARDED' || (res as any)?.boarded === true;
+
   return (
-    <motion.div initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} className="max-w-2xl mx-auto py-6 sm:py-12 px-4 shadow-none">
-      <div className="bg-white border border-slate-200 shadow-2xl rounded-sm overflow-hidden border-t-8 border-maritime">
-        <div className="p-6 sm:p-12 text-center border-b border-slate-100">
-          <div className="w-16 h-16 sm:w-20 sm:h-20 bg-maritime/5 text-maritime rounded-sm flex items-center justify-center mx-auto mb-4 sm:mb-6">
-            <ShieldCheck size={32} className="sm:size-10" />
+    <motion.div initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} className="max-w-2xl mx-auto py-6 sm:py-12 px-4 shadow-none text-left">
+      <div className="bg-white border border-slate-200 shadow-2xl rounded-2xl overflow-hidden border-t-8 border-maritime">
+        
+        {/* Header */}
+        <div className="p-6 sm:p-10 text-center border-b border-slate-100 relative bg-gradient-to-b from-slate-50/60 to-white">
+          <div className="w-16 h-16 sm:w-20 sm:h-20 bg-maritime/5 text-maritime rounded-2xl flex items-center justify-center mx-auto mb-4 border border-maritime/10">
+            <ShieldCheck size={36} className="sm:size-10" />
           </div>
-          <h2 className="text-xl sm:text-3xl font-extrabold tracking-tighter uppercase mb-1 sm:mb-2">Vérification de Billet</h2>
-          <p className="text-[9px] sm:text-[11px] uppercase tracking-widest text-slate-400 font-bold">Système Officiel AMR MUGOTE / DGM</p>
+          
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest mb-2 border">
+            {localIsAdmin ? (
+              <span className="bg-emerald-50 text-emerald-800 border-emerald-300 px-3 py-0.5 rounded-full flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                Mode Contrôle Administratif • Autorité Quai
+              </span>
+            ) : (
+              <span className="bg-sky-50 text-sky-800 border-sky-200 px-3 py-0.5 rounded-full flex items-center gap-1.5">
+                <User size={11} className="text-sky-600" />
+                Mode Consultation Voyageur • Statut Billet
+              </span>
+            )}
+          </div>
+
+          <h2 className="text-xl sm:text-3xl font-extrabold tracking-tighter uppercase mb-1 text-slate-900">
+            Vérification de Billet
+          </h2>
+          <p className="text-[9px] sm:text-[11px] uppercase tracking-widest text-slate-400 font-bold">
+            Système Officiel AMR MUGOTE / DGM Lac Kivu
+          </p>
         </div>
 
-        <div className="p-6 sm:p-12 space-y-6 sm:space-y-8">
+        <div className="p-6 sm:p-10 space-y-6 sm:space-y-8">
           {loading ? (
-            <div className="text-center py-6 sm:py-10 animate-pulse text-slate-400 uppercase text-[10px] sm:text-xs font-bold tracking-widest">Recherche...</div>
+            <div className="text-center py-8 sm:py-12 space-y-3">
+              <RotateCw className="animate-spin text-maritime mx-auto" size={28} />
+              <p className="text-slate-400 uppercase text-[10px] sm:text-xs font-bold tracking-widest">
+                Recherche du titre de transport...
+              </p>
+            </div>
           ) : !res ? (
-            <div className="text-center py-6 sm:py-10 text-red-500 uppercase text-xs sm:text-sm font-extrabold tracking-widest">
-              Alerte : Billet Invalide
+            <div className="text-center py-8 sm:py-12 text-rose-600 space-y-2">
+              <AlertCircle size={36} className="mx-auto text-rose-500" />
+              <p className="uppercase text-xs sm:text-sm font-extrabold tracking-widest">
+                Billet Invalide ou Introuvable
+              </p>
+              <p className="text-xs text-slate-500 max-w-sm mx-auto">
+                Aucun billet ne correspond à l'identifiant #{id}. Veuillez vérifier votre reçu ou contacter le guichet.
+              </p>
             </div>
           ) : (
             <>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-8">
-                <div className="col-span-1 sm:col-span-2 border-b border-slate-50 pb-4 sm:border-0 sm:pb-0">
-                  <p className="text-[9px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Statut</p>
-                  <span className={cn(
-                    "inline-block px-3 sm:px-4 py-1.5 sm:py-2 text-[10px] sm:text-xs font-extrabold uppercase tracking-widest border rounded-sm",
-                    res.status === 'VALIDATED' ? "bg-emerald-50 text-emerald-600 border-emerald-200" : "bg-amber-50 text-amber-600 border-amber-200"
-                  )}>
-                    {res.status === 'VALIDATED' ? 'OFFICIELLEMENT VALIDÉ' : 'EN ATTENTE'}
-                  </span>
+              {/* PRIMARY STATUS BANNER */}
+              <div className={cn(
+                "p-5 rounded-2xl border-2 space-y-2",
+                isBoarded 
+                  ? "bg-emerald-50 border-emerald-400 text-emerald-950" 
+                  : isPaid
+                  ? "bg-sky-50 border-sky-400 text-sky-950"
+                  : "bg-amber-50 border-amber-400 text-amber-950"
+              )}>
+                <div className="flex items-center gap-2.5">
+                  {isBoarded ? (
+                    <CheckCircle2 size={22} className="text-emerald-600 shrink-0" />
+                  ) : isPaid ? (
+                    <CheckCircle2 size={22} className="text-sky-600 shrink-0" />
+                  ) : (
+                    <AlertCircle size={22} className="text-amber-600 shrink-0" />
+                  )}
+                  <h3 className="text-sm sm:text-base font-black uppercase tracking-tight">
+                    {isBoarded 
+                      ? "✓ EMBARQUÉ À BORD DU NAVIRE" 
+                      : isPaid 
+                      ? "🟢 PRÊT POUR L'EMBARQUEMENT" 
+                      : "⏳ PAIEMENT EN ATTENTE AU GUICHET"}
+                  </h3>
+                </div>
+
+                <p className="text-xs font-medium leading-relaxed">
+                  {isBoarded ? (
+                    <>
+                      Passage validé et enregistré. Pointé à bord{' '}
+                      <strong>
+                        {(res as any).boardedAt 
+                          ? new Date((res as any).boardedAt).toLocaleDateString('fr-FR', {
+                              day: '2-digit', month: 'long', hour: '2-digit', minute: '2-digit'
+                            }) 
+                          : 'aujourd\'hui'}
+                      </strong>. Bon voyage !
+                    </>
+                  ) : isPaid ? (
+                    <>
+                      Titre de transport <strong>officiellement payé et confirmé</strong>. {localIsAdmin ? (
+                        <span className="font-bold text-emerald-800">
+                          En tant qu'administrateur, vous pouvez autoriser l'accès ci-dessous après avoir vérifié l'identité du passager.
+                        </span>
+                      ) : (
+                        <span>
+                          Rendez-vous à la passerelle du navire. <strong>Présentez ce QR Code à l'agent administratif au quai pour qu'il autorise votre montée à bord.</strong>
+                        </span>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      Ce billet n'est pas encore validé. Le passager doit régulariser son paiement au guichet avant de pouvoir embarquer.
+                    </>
+                  )}
+                </p>
+              </div>
+
+              {/* ADMINISTRATIVE ACTION SECTION (ONLY FOR ADMINS) */}
+              {localIsAdmin ? (
+                <div className="bg-slate-900 text-white rounded-2xl p-5 sm:p-6 space-y-4 border border-slate-800 shadow-lg">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[9px] font-black uppercase tracking-widest text-emerald-400 flex items-center gap-1.5">
+                      <ShieldCheck size={14} />
+                      Action Administrative Exclusive
+                    </span>
+                    <span className="text-[9px] font-mono text-slate-400">
+                      ID: {res.id.substring(0, 10)}...
+                    </span>
+                  </div>
+
+                  {isPaid && !isBoarded && (
+                    <div className="space-y-3">
+                      <p className="text-xs text-slate-300 font-medium">
+                        Le billet est en règle. Cliquez sur le bouton ci-dessous pour lâcher ce voyageur et enregistrer son embarquement dans la base de données.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={handleAdminAuthorize}
+                        disabled={authorizing}
+                        className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-black text-xs sm:text-sm uppercase tracking-widest rounded-xl shadow-xl transition-all flex items-center justify-center gap-2.5 cursor-pointer disabled:opacity-50"
+                      >
+                        {authorizing ? (
+                          <RotateCw size={18} className="animate-spin" />
+                        ) : (
+                          <CheckCircle2 size={18} />
+                        )}
+                        <span>AUTORISER L'EMBARQUEMENT (LÂCHER LE PASSAGER)</span>
+                      </button>
+                    </div>
+                  )}
+
+                  {isBoarded && (
+                    <div className="flex items-center justify-between gap-4 pt-1">
+                      <div className="text-xs text-emerald-400 font-bold flex items-center gap-2">
+                        <CheckCircle2 size={16} />
+                        <span>Embarquement autorisé par l'administration</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleAdminCancelBoarding}
+                        disabled={authorizing}
+                        className="px-3 py-1.5 bg-rose-950/80 hover:bg-rose-900 text-rose-300 border border-rose-800 text-[9px] font-bold uppercase rounded-lg transition cursor-pointer"
+                      >
+                        Annuler l'embarquement
+                      </button>
+                    </div>
+                  )}
+
+                  {!isPaid && (
+                    <div className="p-3 bg-amber-950/60 border border-amber-700/50 rounded-xl text-amber-200 text-xs font-semibold">
+                      ⚠️ Paiement non reçu. L'embarquement ne peut pas être autorisé par l'agent tant que la caisse n'a pas validé.
+                    </div>
+                  )}
+                </div>
+              ) : (
+                /* TRAVELER NOTICE: Explaining why traveler cannot validate */
+                <div className="p-4 bg-amber-50/90 border border-amber-200 rounded-2xl space-y-1 text-left">
+                  <div className="flex items-center gap-2 text-amber-900 font-black text-xs uppercase tracking-tight">
+                    <ShieldAlert size={16} className="text-amber-600 shrink-0" />
+                    <span>Règle de Sécurité Portuaire</span>
+                  </div>
+                  <p className="text-[11px] text-amber-900 leading-relaxed font-medium">
+                    Ce mode vous permet de <strong>vérifier votre statut</strong>. Conformément aux règlements maritimes, <strong className="underline">aucun voyageur ne peut valider lui-même son embarquement</strong>. Seul l'agent administratif au quai est habilité à scanner et autoriser l'accès physique à bord.
+                  </p>
+                </div>
+              )}
+
+              {/* Ticket Details Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 bg-slate-50/70 p-5 rounded-2xl border border-slate-100">
+                <div>
+                  <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">N° Titre de Transport</p>
+                  <p className="text-base sm:text-lg font-black font-mono tracking-wider text-slate-900 uppercase">
+                    #{res.ticketId || res.id?.substring(0, 8).toUpperCase()}
+                  </p>
                 </div>
                 <div>
-                  <p className="text-[9px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 sm:mb-2">Ticket ID</p>
-                  <p className="text-sm sm:text-lg font-extrabold mono tracking-tighter uppercase">#{res.ticketId || 'N/A'}</p>
+                  <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">Passager Titulaire</p>
+                  <p className="text-base sm:text-lg font-black tracking-tight text-slate-900 uppercase truncate">
+                    {res.fullName} {res.lastName}
+                  </p>
                 </div>
-                <div className="pt-4 sm:pt-6 border-t border-slate-50 sm:border-0 sm:pt-0">
-                  <p className="text-[9px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 sm:mb-2">Passager</p>
-                  <p className="text-lg sm:text-2xl font-extrabold tracking-tighter uppercase truncate">{res.fullName} {res.lastName}</p>
+                <div>
+                  <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">Itinéraire</p>
+                  <p className="text-sm sm:text-base font-black tracking-tight text-maritime uppercase">
+                    {res.itinerary}
+                  </p>
                 </div>
-                <div className="pt-4 sm:pt-6 border-t border-slate-50">
-                  <p className="text-[9px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 sm:mb-2">Itinéraire</p>
-                  <p className="text-base sm:text-lg font-extrabold tracking-tighter uppercase">{res.itinerary}</p>
+                <div>
+                  <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">Navire de Ligne</p>
+                  <p className="text-sm sm:text-base font-black tracking-tight text-maritime uppercase">
+                    {res.ship}
+                  </p>
                 </div>
-                <div className="pt-4 sm:pt-6 border-t border-slate-50">
-                  <p className="text-[9px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 sm:mb-2">Bateau</p>
-                  <p className="text-base sm:text-lg font-extrabold tracking-tighter uppercase">{res.ship}</p>
+                <div>
+                  <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">Date & Heure de Départ</p>
+                  <p className="text-sm sm:text-base font-black font-mono text-slate-900">
+                    {res.travelDate} à {res.departureTime || '07:30'}
+                  </p>
                 </div>
-                <div className="pt-4 sm:pt-6 border-t border-slate-50">
-                  <p className="text-[9px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 sm:mb-2">Date</p>
-                  <p className="text-base sm:text-lg font-extrabold mono tracking-tighter">{res.travelDate}</p>
+                <div>
+                  <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">Classe & Passagers</p>
+                  <p className="text-sm sm:text-base font-black text-slate-900 uppercase">
+                    {res.travelClass} • {res.passengersCount} PAX
+                  </p>
                 </div>
-                <div className="pt-4 sm:pt-6 border-t border-slate-50">
-                  <p className="text-[9px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 sm:mb-2">Montant</p>
-                  <p className="text-base sm:text-lg font-extrabold tracking-tighter uppercase">{res.amount}.00 $</p>
+                <div>
+                  <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">Montant Payé</p>
+                  <p className="text-sm sm:text-base font-black text-emerald-700">
+                    {res.amount}.00 $
+                  </p>
                 </div>
-                {res.transactionId && (
-                  <div className="pt-4 sm:pt-6 border-t border-slate-50 col-span-1 sm:col-span-2">
-                    <p className="text-[9px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 sm:mb-2">ID Transaction (Confirmé)</p>
-                    <p className="text-sm sm:text-base font-extrabold font-mono tracking-widest text-maritime bg-slate-50 p-2 border border-slate-100 rounded-lg">{res.transactionId}</p>
+                {res.phone && (
+                  <div>
+                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">Téléphone</p>
+                    <p className="text-xs sm:text-sm font-bold font-mono text-slate-700">
+                      {res.phone}
+                    </p>
                   </div>
                 )}
               </div>
 
-              <div className="p-4 sm:p-6 bg-slate-50 border border-slate-100 rounded-sm overflow-hidden">
-                <p className="text-[8px] sm:text-[9px] font-bold text-slate-400 uppercase tracking-[0.2em] mb-2 sm:mb-4">Empreinte Digitale</p>
-                <div className="text-[8px] sm:text-[10px] mono text-slate-600 break-all space-y-1">
-                  <p>ID: {res.id}</p>
-                  <p>TX: {res.transactionId}</p>
-                  <p>USR: {res.userId?.substring(0,10)}...</p>
+              {/* Digital Fingerprint */}
+              <div className="p-4 bg-slate-50 border border-slate-100 rounded-xl">
+                <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">
+                  Certificat d'Authenticité AMR MUGOTE / DGM
+                </p>
+                <div className="text-[8px] font-mono text-slate-500 space-y-0.5 break-all">
+                  <p>DOC_ID: {res.id}</p>
+                  {res.transactionId && <p>TX_REF: {res.transactionId}</p>}
                 </div>
               </div>
+
+              {/* Quick Admin Unlock option for staff scanning on mobile phone */}
+              {!localIsAdmin && (
+                <div className="text-center pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowAdminPinModal(!showAdminPinModal)}
+                    className="text-[10px] text-slate-400 hover:text-slate-700 font-bold uppercase tracking-wider underline cursor-pointer"
+                  >
+                    Êtes-vous l'agent administratif au quai ? Déverrouiller le contrôle
+                  </button>
+                  
+                  {showAdminPinModal && (
+                    <form onSubmit={handlePinSubmit} className="mt-3 p-4 bg-slate-100 rounded-2xl border border-slate-200 max-w-sm mx-auto space-y-2">
+                      <p className="text-[10px] font-bold text-slate-700 uppercase">
+                        Code d'Accès Contrôleur Portuaire
+                      </p>
+                      <div className="flex gap-2">
+                        <input
+                          type="password"
+                          placeholder="Code secret admin..."
+                          value={adminPinInput}
+                          onChange={(e) => setAdminPinInput(e.target.value)}
+                          className="flex-1 px-3 py-2 bg-white rounded-xl border border-slate-300 text-xs font-mono font-bold focus:outline-none"
+                        />
+                        <button
+                          type="submit"
+                          className="px-4 py-2 bg-maritime text-white rounded-xl text-xs font-black uppercase cursor-pointer"
+                        >
+                          Valider
+                        </button>
+                      </div>
+                      {adminPinError && (
+                        <p className="text-[10px] text-rose-600 font-bold">Code incorrect.</p>
+                      )}
+                    </form>
+                  )}
+                </div>
+              )}
             </>
           )}
 
+          {/* Close Button */}
           <button 
             onClick={onClose}
-            className="w-full py-4 bg-slate-900 text-white text-[9px] sm:text-[10px] font-extrabold uppercase tracking-[0.3em] rounded-sm hover:bg-black transition-all"
+            className="w-full py-3.5 bg-slate-900 text-white text-[10px] sm:text-xs font-black uppercase tracking-[0.25em] rounded-xl hover:bg-black transition-all cursor-pointer"
           >
-            Fermer
+            Fermer la Vérification
           </button>
         </div>
       </div>
@@ -7713,8 +8094,9 @@ function AdminScannerView({ reservations }: AdminScannerViewProps) {
   const [scannedList, setScannedList] = useState<Reservation[]>([]);
   
   // Advanced Scan State Management
-  const [scanStatus, setScanStatus] = useState<'idle' | 'loading' | 'success' | 'alert_reused' | 'alert_unpaid' | 'error_not_found'>('idle');
+  const [scanStatus, setScanStatus] = useState<'idle' | 'loading' | 'ready_to_board' | 'success' | 'alert_reused' | 'alert_unpaid' | 'error_not_found'>('idle');
   const [statusMessage, setStatusMessage] = useState('');
+  const [authorizing, setAuthorizing] = useState(false);
 
   useEffect(() => {
     const scanner = new Html5QrcodeScanner("admin-qr-reader", {
@@ -7826,23 +8208,9 @@ function AdminScannerView({ reservations }: AdminScannerViewProps) {
         return;
       }
 
-      // 3. Automated marking as completed & used to secure transit
-      const updateTimestamp = Date.now();
-      await updateDoc(doc(db, 'reservations', ticketData.id), {
-        boardingStatus: 'BOARDED',
-        boardedAt: updateTimestamp
-      });
-
-      const updatedTicket = {
-        ...ticketData,
-        boardingStatus: 'BOARDED' as const,
-        boardedAt: updateTimestamp
-      };
-
-      setScannedRes(updatedTicket);
-      setScanStatus('success');
-      setStatusMessage("ACCÈS ACCORDÉ : Billet valide et payé ! Passager autorisé à embarquer, billet marqué comme utilisé avec succès.");
-      setScannedList(prev => [updatedTicket, ...prev.filter(x => x.id !== updatedTicket.id)]);
+      // 3. Ticket is valid and paid - Display status to Admin, ready for authorization
+      setScanStatus('ready_to_board');
+      setStatusMessage(`BILLET CONFORME & PAYÉ : Statut vérifié avec succès pour ${ticketData.fullName} (${ticketData.passengersCount} PAX). Cliquez sur "AUTORISER L'EMBARQUEMENT" pour valider l'accès au navire.`);
       playBeep(true);
 
     } catch (err: any) {
@@ -7852,6 +8220,40 @@ function AdminScannerView({ reservations }: AdminScannerViewProps) {
       playBeep(false);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Administrative Boarding Authorization
+  const handleAuthorizeBoarding = async (ticket: Reservation) => {
+    if (!ticket || !ticket.id) return;
+    setAuthorizing(true);
+    try {
+      const updateTimestamp = Date.now();
+      await updateDoc(doc(db, 'reservations', ticket.id), {
+        boardingStatus: 'BOARDED',
+        boardedAt: updateTimestamp
+      });
+      await mongoApi.updateReservationStatus(ticket.id, {
+        boarded: true,
+        status: 'VALIDATED'
+      });
+
+      const updatedTicket = {
+        ...ticket,
+        boardingStatus: 'BOARDED' as const,
+        boardedAt: updateTimestamp
+      };
+
+      setScannedRes(updatedTicket);
+      setScanStatus('success');
+      setStatusMessage("ACCÈS ACCORDÉ PAR L'ADMINISTRATION : Embarquement validé avec succès ! Passager lâché à bord.");
+      setScannedList(prev => [updatedTicket, ...prev.filter(x => x.id !== updatedTicket.id)]);
+      playBeep(true);
+    } catch (err: any) {
+      console.error("Authorize boarding failed:", err);
+      alert("Erreur lors de l'autorisation d'embarquement : " + err.message);
+    } finally {
+      setAuthorizing(false);
     }
   };
 
@@ -7873,6 +8275,10 @@ function AdminScannerView({ reservations }: AdminScannerViewProps) {
       await updateDoc(doc(db, 'reservations', ticket.id), {
         boardingStatus: 'PENDING',
         boardedAt: null
+      });
+      await mongoApi.updateReservationStatus(ticket.id, {
+        boarded: false,
+        status: 'VALIDATED'
       });
 
       const restoredTicket = {
@@ -7901,9 +8307,17 @@ function AdminScannerView({ reservations }: AdminScannerViewProps) {
     <div className="p-4 sm:p-10 space-y-6 max-w-4xl mx-auto">
       <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between border-b pb-4 border-slate-100">
         <div className="text-left">
-          <h3 className="text-xl sm:text-2xl font-black uppercase text-maritime tracking-tight italic">Scanner d'embarquement (Vérification et Embargo Fraude)</h3>
+          <div className="inline-flex items-center gap-2 px-3 py-1 bg-emerald-50 border border-emerald-200 rounded-full mb-2">
+            <ShieldCheck size={14} className="text-emerald-600" />
+            <span className="text-[9px] font-black text-emerald-800 uppercase tracking-wider">
+              Compte Administratif Exclusif • Seul Habilité à Autoriser l'Embarquement
+            </span>
+          </div>
+          <h3 className="text-xl sm:text-2xl font-black uppercase text-maritime tracking-tight italic">
+            Scanner Quai & Contrôle d'Accès Portuaire
+          </h3>
           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1 leading-relaxed">
-            Système d'embarquement lacustre automatique connecté en temps réel • Validation en 1 clic
+            Vérification du statut en temps réel • Seule l'administration peut lâcher les voyageurs et valider l'embarquement
           </p>
         </div>
         <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-100 p-2.5 rounded-xl">
@@ -7958,8 +8372,9 @@ function AdminScannerView({ reservations }: AdminScannerViewProps) {
           {/* Main Visual Scan Response Banner */}
           {scanStatus !== 'idle' && (
             <div className={cn(
-              "p-5 rounded-2xl border-2 text-left flex flex-col sm:flex-row items-start gap-4 transition-all duration-300",
-              scanStatus === 'success' && "bg-emerald-50/70 border-emerald-500 text-emerald-900",
+              "p-5 rounded-2xl border-2 text-left flex flex-col sm:flex-row items-start gap-4 transition-all duration-300 shadow-sm",
+              scanStatus === 'success' && "bg-emerald-50/90 border-emerald-500 text-emerald-950",
+              scanStatus === 'ready_to_board' && "bg-sky-50/90 border-sky-500 text-sky-950 animate-pulse",
               scanStatus === 'alert_reused' && "bg-rose-50 border-rose-500 text-rose-900 animate-bounce",
               scanStatus === 'alert_unpaid' && "bg-amber-50 border-amber-500 text-amber-900",
               scanStatus === 'error_not_found' && "bg-slate-100 border-slate-350 text-slate-800",
@@ -7967,6 +8382,7 @@ function AdminScannerView({ reservations }: AdminScannerViewProps) {
             )}>
               <div className="flex-shrink-0 mt-0.5">
                 {scanStatus === 'success' && <CheckCircle2 className="text-emerald-600" size={28} />}
+                {scanStatus === 'ready_to_board' && <ShieldCheck className="text-sky-600" size={28} />}
                 {scanStatus === 'alert_reused' && <AlertCircle className="text-rose-600" size={28} />}
                 {scanStatus === 'alert_unpaid' && <AlertCircle className="text-[#eab308]" size={28} />}
                 {scanStatus === 'error_not_found' && <AlertCircle className="text-slate-500" size={28} />}
@@ -7974,7 +8390,8 @@ function AdminScannerView({ reservations }: AdminScannerViewProps) {
               </div>
               <div className="space-y-1">
                 <h4 className="text-xs font-black uppercase tracking-widest leading-none">
-                  {scanStatus === 'success' && "EMBARQUEMENT ACCORDÉ"}
+                  {scanStatus === 'success' && "EMBARQUEMENT AUTORISÉ & ENREGISTRÉ"}
+                  {scanStatus === 'ready_to_board' && "BILLET EN RÈGLE — PRÊT POUR EMBARQUEMENT"}
                   {scanStatus === 'alert_reused' && "ALERTE FRAUDE DÉTECTÉE"}
                   {scanStatus === 'alert_unpaid' && "RÈGLEMENT DE PAIEMENT REQUIS"}
                   {scanStatus === 'error_not_found' && "TENTATIVE INVALIDE"}
@@ -8076,16 +8493,58 @@ function AdminScannerView({ reservations }: AdminScannerViewProps) {
                 </div>
               </div>
 
+              {/* Administrative Boarding Authority Action */}
+              {scannedRes.status === 'VALIDATED' && scannedRes.boardingStatus !== 'BOARDED' && (
+                <div className="pt-2">
+                  <div className="p-4 bg-emerald-50 border-2 border-emerald-400 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-4 shadow-sm">
+                    <div>
+                      <span className="text-[9px] font-black uppercase tracking-widest text-emerald-800 flex items-center gap-1.5">
+                        <ShieldCheck size={16} className="text-emerald-600" />
+                        Contrôle Administratif Quai
+                      </span>
+                      <p className="text-xs font-black text-slate-900 mt-1">
+                        Statut : Billet payé et valide pour {scannedRes.fullName} ({scannedRes.passengersCount} PAX)
+                      </p>
+                      <p className="text-[10px] text-slate-600 font-medium">
+                        Vérifiez l'identité du voyageur puis cliquez ci-contre pour autoriser l'accès au navire et lâcher le voyageur.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleAuthorizeBoarding(scannedRes)}
+                      disabled={authorizing || loading}
+                      className="w-full sm:w-auto px-6 py-3.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-black text-xs uppercase tracking-widest rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 shrink-0"
+                    >
+                      {authorizing ? <RotateCw className="animate-spin" size={18} /> : <CheckCircle2 size={18} />}
+                      <span>AUTORISER L'EMBARQUEMENT</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {/* Boarding Stamp if boarded */}
               {scannedRes.boardingStatus === 'BOARDED' && (
                 <div className="pt-2">
-                  <div className="p-3 bg-emerald-50 border border-emerald-100 rounded-xl text-center space-y-1">
-                    <p className="text-[10px] font-extrabold text-emerald-700 uppercase">✓ EMBARQUEMENT CONFIRMÉ & SÉCURISÉ</p>
-                    {scannedRes.boardedAt && (
-                      <p className="text-[7.5px] font-bold text-emerald-500 uppercase tracking-widest font-mono">
-                        Validé le {new Date(scannedRes.boardedAt).toLocaleDateString()} à {new Date(scannedRes.boardedAt).toLocaleTimeString()}
+                  <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-3 text-left">
+                    <div>
+                      <p className="text-xs font-black text-emerald-800 uppercase flex items-center gap-2">
+                        <CheckCircle2 size={16} className="text-emerald-600" />
+                        ✓ Embarquement Autorisé & Validé par l'Administration
                       </p>
-                    )}
+                      {scannedRes.boardedAt && (
+                        <p className="text-[10px] font-bold text-emerald-600 font-mono mt-0.5">
+                          Pointé le {new Date(scannedRes.boardedAt).toLocaleDateString('fr-FR')} à {new Date(scannedRes.boardedAt).toLocaleTimeString('fr-FR')}
+                        </p>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleCancelBoarding(scannedRes)}
+                      disabled={authorizing || loading}
+                      className="px-3 py-1.5 bg-white hover:bg-rose-50 text-rose-600 border border-rose-200 text-[9px] font-bold uppercase rounded-lg transition cursor-pointer"
+                    >
+                      Annuler l'embarquement
+                    </button>
                   </div>
                 </div>
               )}

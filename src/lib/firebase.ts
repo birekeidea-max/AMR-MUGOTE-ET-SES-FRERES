@@ -1,10 +1,11 @@
-import { initializeApp } from 'firebase/app';
+import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import { 
   getFirestore, 
   initializeFirestore, 
   persistentLocalCache, 
-  persistentMultipleTabManager 
+  persistentMultipleTabManager,
+  memoryLocalCache
 } from 'firebase/firestore';
 import { getStorage, ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { getAnalytics, logEvent, Analytics } from 'firebase/analytics';
@@ -25,26 +26,57 @@ const firebaseConfig = {
 // Log config keys for diagnostic (not values)
 console.log('Firebase Config Keys:', Object.keys(firebaseConfig));
 
-const app = initializeApp(firebaseConfig);
+export const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
+
+const targetDbId = firebaseConfig.firestoreDatabaseId || "ai-studio-020b031e-1447-4f1b-8ef0-ab4a23c0b6ab";
 
 // Initialisation robuste de Firestore avec transport long-polling forcé
-// Cela élimine le timeout de 10 secondes ("Could not reach Cloud Firestore backend") provoqué
-// par les proxies/iframes qui mettent en mémoire tampon les flux WebSockets/WebChannel gRPC
-let firestoreDb;
+// et résilience totale contre les plantages de cache persistant dans les iframes sandbox
+let firestoreDb: any = null;
+
+// Étape 1 : Si déjà initialisé, récupérer l'instance existante
 try {
-  firestoreDb = initializeFirestore(app, {
-    experimentalForceLongPolling: true,
-    localCache: persistentLocalCache({
-      tabManager: persistentMultipleTabManager()
-    })
-  }, firebaseConfig.firestoreDatabaseId);
-} catch (e) {
+  firestoreDb = getFirestore(app, targetDbId);
+} catch {
+  // Pas encore initialisé, on poursuit
+}
+
+// Étape 2 : Initialiser avec cache mémoire ou options fiables
+if (!firestoreDb) {
   try {
     firestoreDb = initializeFirestore(app, {
-      experimentalForceLongPolling: true
-    }, firebaseConfig.firestoreDatabaseId);
-  } catch (err) {
-    firestoreDb = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+      experimentalForceLongPolling: true,
+      localCache: memoryLocalCache()
+    }, targetDbId);
+  } catch (e1) {
+    try {
+      firestoreDb = initializeFirestore(app, {
+        experimentalForceLongPolling: true
+      }, targetDbId);
+    } catch (e2) {
+      try {
+        firestoreDb = getFirestore(app, targetDbId);
+      } catch (e3) {
+        try {
+          firestoreDb = getFirestore(app);
+        } catch (e4) {
+          console.error("[Firebase] Échec critique de l'initialisation Firestore:", e4);
+        }
+      }
+    }
+  }
+}
+
+// Étape 3 : Garantie absolue que db n'est jamais undefined
+if (!firestoreDb) {
+  try {
+    firestoreDb = getFirestore(app, targetDbId);
+  } catch {
+    try {
+      firestoreDb = getFirestore(app);
+    } catch {
+      console.warn("[Firebase] Attention: Firestore indisponible en mode hors-ligne complet.");
+    }
   }
 }
 
