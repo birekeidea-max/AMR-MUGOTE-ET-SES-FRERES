@@ -1,5 +1,7 @@
 import nodemailer from 'nodemailer';
-import type { Transporter } from 'nodemailer';
+import type { Transporter, SendMailOptions } from 'nodemailer';
+import { SiteSettings } from '../models/SiteSettings';
+import { connectMongoDB } from '../db';
 
 export interface EmailSendResult {
   success: boolean;
@@ -8,10 +10,12 @@ export interface EmailSendResult {
   recipient: string;
   subject: string;
   error?: string;
+  details?: string;
 }
 
 export interface EmailStatusResponse {
   configured: boolean;
+  source: 'env' | 'database' | 'none';
   provider: string;
   fromAddress: string;
   host: string;
@@ -19,63 +23,503 @@ export interface EmailStatusResponse {
   user: string;
 }
 
+export interface SmtpConfigOptions {
+  host?: string;
+  port?: number;
+  secure?: boolean;
+  user?: string;
+  pass?: string;
+  from?: string;
+}
+
 class EmailService {
   private transporter: Transporter | null = null;
   private isConfigured: boolean = false;
+  private configSource: 'env' | 'database' | 'none' = 'none';
+  private currentConfig: SmtpConfigOptions = {};
 
   constructor() {
-    this.initTransporter();
+    this.initFromEnv();
+    // Charge également la configuration depuis MongoDB en arrière-plan si env est vide
+    this.loadDbConfigIfAvailable().catch(err => {
+      console.warn("[EmailService] Note: initialisation DB config différée:", err?.message || err);
+    });
   }
 
-  public initTransporter() {
+  /**
+   * Initialise le transporteur depuis les variables d'environnement
+   */
+  public initFromEnv() {
     const host = process.env.SMTP_HOST || 'smtp.gmail.com';
     const port = Number(process.env.SMTP_PORT || (host === 'smtp.gmail.com' ? 465 : 587));
     const secure = process.env.SMTP_SECURE ? process.env.SMTP_SECURE === 'true' : port === 465;
-    const user = process.env.SMTP_USER ? process.env.SMTP_USER.trim() : '';
-    const pass = process.env.SMTP_PASS ? process.env.SMTP_PASS.trim() : '';
+    
+    // Support multi-alias pour les variables d'environnement (SMTP_USER, GMAIL_USER, EMAIL_USER...)
+    const user = (process.env.SMTP_USER || process.env.EMAIL_USER || process.env.GMAIL_USER || '').trim();
+    
+    // Mot de passe d'application Google ou mot de passe SMTP (avec suppression des espaces éventuels)
+    const rawPass = (process.env.SMTP_PASS || process.env.SMTP_PASSWORD || process.env.EMAIL_PASS || process.env.EMAIL_PASSWORD || process.env.GMAIL_APP_PASSWORD || process.env.GMAIL_PASS || '').trim();
+    const pass = rawPass.replace(/\s+/g, '');
+
+    const from = process.env.EMAIL_FROM || (user ? `AMR MUGOTE ET SES FRÈRES <${user}>` : 'AMR MUGOTE ET SES FRÈRES <no-reply@amrmugote.com>');
 
     if (user && pass) {
-      try {
-        this.transporter = nodemailer.createTransport({
-          host,
-          port,
-          secure,
-          auth: {
-            user,
-            pass
-          },
-          tls: {
-            rejectUnauthorized: false
-          }
-        });
-        this.isConfigured = true;
-        console.log(`✅ [EmailService] SMTP configuré pour ${user} via ${host}:${port}`);
-      } catch (err) {
-        console.error("❌ [EmailService] Erreur lors de l'initialisation SMTP:", err);
-        this.transporter = null;
-        this.isConfigured = false;
-      }
+      this.currentConfig = { host, port, secure, user, pass, from };
+      this.setupTransporter(this.currentConfig, 'env');
     } else {
       this.transporter = null;
       this.isConfigured = false;
-      console.log("ℹ️ [EmailService] Aucun identifiant SMTP configuré. Mode simulation actif (journaux console).");
+      this.configSource = 'none';
+      console.log("ℹ️ [EmailService] Aucun identifiant SMTP configuré dans process.env. Recherche en cours...");
+    }
+  }
+
+  /**
+   * Charge la configuration SMTP stockée dans la base MongoDB Atlas si absente de process.env
+   */
+  public async loadDbConfigIfAvailable(): Promise<boolean> {
+    if (this.isConfigured && this.configSource === 'env') {
+      return true;
+    }
+
+    try {
+      await connectMongoDB();
+      const settings = await SiteSettings.findOne({ key: 'site' }).lean();
+      if (settings && settings.smtpUser && settings.smtpPass) {
+        const host = settings.smtpHost || 'smtp.gmail.com';
+        const port = Number(settings.smtpPort || (host === 'smtp.gmail.com' ? 465 : 587));
+        const secure = typeof settings.smtpSecure === 'boolean' ? settings.smtpSecure : port === 465;
+        const user = String(settings.smtpUser).trim();
+        const pass = String(settings.smtpPass).trim().replace(/\s+/g, '');
+        const from = settings.emailFrom || `AMR MUGOTE ET SES FRÈRES <${user}>`;
+
+        if (user && pass) {
+          this.currentConfig = { host, port, secure, user, pass, from };
+          this.setupTransporter(this.currentConfig, 'database');
+          console.log(`✅ [EmailService] SMTP configuré depuis MongoDB pour ${user}`);
+          return true;
+        }
+      }
+    } catch (err: any) {
+      console.warn("⚠️ [EmailService] Impossible de charger les identifiants SMTP depuis MongoDB:", err?.message || err);
+    }
+    return false;
+  }
+
+  /**
+   * Configure et instancie le transporteur Nodemailer avec options de résilience
+   */
+  public setupTransporter(config: SmtpConfigOptions, source: 'env' | 'database' = 'env'): boolean {
+    const host = config.host || 'smtp.gmail.com';
+    const port = Number(config.port || (host === 'smtp.gmail.com' ? 465 : 587));
+    const secure = typeof config.secure === 'boolean' ? config.secure : port === 465;
+    const user = (config.user || '').trim();
+    const pass = (config.pass || '').trim().replace(/\s+/g, '');
+
+    if (!user || !pass) {
+      this.transporter = null;
+      this.isConfigured = false;
+      this.configSource = 'none';
+      return false;
+    }
+
+    try {
+      this.transporter = nodemailer.createTransport({
+        host,
+        port,
+        secure,
+        auth: { user, pass },
+        connectionTimeout: 15000, // 15s max pour éviter le blocage de requête
+        greetingTimeout: 15000,
+        socketTimeout: 20000,
+        tls: {
+          rejectUnauthorized: false
+        }
+      });
+
+      this.isConfigured = true;
+      this.configSource = source;
+      this.currentConfig = { host, port, secure, user, pass, from: config.from };
+      console.log(`✅ [EmailService] Transporteur SMTP initialisé (${source}) : ${user} via ${host}:${port} (secure=${secure})`);
+      return true;
+    } catch (err: any) {
+      console.error("❌ [EmailService] Échec création du transporteur SMTP:", err);
+      this.transporter = null;
+      this.isConfigured = false;
+      this.configSource = 'none';
+      return false;
+    }
+  }
+
+  /**
+   * Vérifie la connexion SMTP en direct avec le serveur distant (handshake d'authentification)
+   */
+  public async verifyConnection(): Promise<{ ok: boolean; message: string; code?: string }> {
+    if (!this.isConfigured || !this.transporter) {
+      // Tentative de recharger depuis la base de données
+      const loaded = await this.loadDbConfigIfAvailable();
+      if (!loaded || !this.transporter) {
+        return {
+          ok: false,
+          message: "Service SMTP non configuré. Renseignez votre adresse Gmail et votre Mot de passe d'application."
+        };
+      }
+    }
+
+    try {
+      await this.transporter.verify();
+      return {
+        ok: true,
+        message: `Connexion SMTP réussie avec ${this.currentConfig.host}:${this.currentConfig.port} pour ${this.currentConfig.user}`
+      };
+    } catch (err: any) {
+      console.error("❌ [EmailService] Échec du test de vérification SMTP:", err);
+      
+      // Analyse contextuelle de l'erreur
+      let explanation = err.message || String(err);
+      if (err.code === 'EAUTH' || explanation.includes('Username and Password not accepted') || explanation.includes('BadCredentials')) {
+        explanation = "Identifiants refusés par Google. Pour Gmail, vous devez générer un 'Mot de passe d'application' (16 lettres) sur https://myaccount.google.com/apppasswords et non votre mot de passe de compte personnel.";
+      } else if (err.code === 'ETIMEDOUT' || err.code === 'ECONNREFUSED') {
+        explanation = `Délai d'attente dépassé ou connexion refusée sur le port ${this.currentConfig.port}. Le port 587 (STARTTLS) sera automatiquement essayé en repli.`;
+      }
+
+      return {
+        ok: false,
+        message: explanation,
+        code: err.code
+      };
+    }
+  }
+
+  /**
+   * Envoie un mail avec mécanisme de repli automatique (465 SSL <-> 587 TLS)
+   */
+  private async executeSendMail(mailOptions: SendMailOptions): Promise<{ success: boolean; messageId?: string; error?: string }> {
+    if (!this.isConfigured || !this.transporter) {
+      await this.loadDbConfigIfAvailable();
+    }
+
+    if (!this.isConfigured || !this.transporter) {
+      return {
+        success: false,
+        error: "SMTP non configuré. Mode simulation."
+      };
+    }
+
+    try {
+      const info = await this.transporter.sendMail(mailOptions);
+      return { success: true, messageId: info.messageId };
+    } catch (primaryErr: any) {
+      console.warn(`⚠️ [EmailService] Échec envoi primaire (${this.currentConfig.host}:${this.currentConfig.port}):`, primaryErr.message);
+
+      // Si erreur réseau / port (ETIMEDOUT, ECONNREFUSED, ESOCKETTIMEDOUT), tenter le port alternatif
+      const isNetworkIssue = primaryErr.code === 'ETIMEDOUT' || 
+                             primaryErr.code === 'ECONNREFUSED' || 
+                             primaryErr.code === 'ESOCKETTIMEDOUT' ||
+                             String(primaryErr.message).includes('timeout');
+
+      if (isNetworkIssue && this.currentConfig.user && this.currentConfig.pass) {
+        const fallbackPort = this.currentConfig.port === 465 ? 587 : 465;
+        const fallbackSecure = fallbackPort === 465;
+        console.log(`🔄 [EmailService] Tentative de repli automatique sur le port ${fallbackPort} (secure=${fallbackSecure})...`);
+
+        try {
+          const fallbackTransporter = nodemailer.createTransport({
+            host: this.currentConfig.host || 'smtp.gmail.com',
+            port: fallbackPort,
+            secure: fallbackSecure,
+            auth: {
+              user: this.currentConfig.user,
+              pass: this.currentConfig.pass
+            },
+            connectionTimeout: 15000,
+            socketTimeout: 20000,
+            tls: { rejectUnauthorized: false }
+          });
+
+          const fallbackInfo = await fallbackTransporter.sendMail(mailOptions);
+          console.log(`✅ [EmailService] Envoi réussi via le port de repli ${fallbackPort} ! (Message ID: ${fallbackInfo.messageId})`);
+
+          // Conserver ce port réussi pour les prochains envois
+          this.transporter = fallbackTransporter;
+          this.currentConfig.port = fallbackPort;
+          this.currentConfig.secure = fallbackSecure;
+
+          return { success: true, messageId: fallbackInfo.messageId };
+        } catch (fallbackErr: any) {
+          console.error(`❌ [EmailService] Échec également sur le port de repli ${fallbackPort}:`, fallbackErr.message);
+          return {
+            success: false,
+            error: `Échec envoi SMTP (${primaryErr.message} / Repli: ${fallbackErr.message})`
+          };
+        }
+      }
+
+      return {
+        success: false,
+        error: primaryErr.message || String(primaryErr)
+      };
     }
   }
 
   public getStatus(): EmailStatusResponse {
+    const user = this.currentConfig.user || process.env.SMTP_USER || '';
+    const maskedUser = user ? (user.includes('@') ? `${user.split('@')[0].slice(0, 3)}***@${user.split('@')[1]}` : `${user.slice(0, 3)}***`) : 'Non configuré';
+    
     return {
       configured: this.isConfigured,
-      provider: process.env.SMTP_HOST ? 'Custom SMTP' : 'Gmail SMTP (smtp.gmail.com)',
-      fromAddress: process.env.EMAIL_FROM || (process.env.SMTP_USER ? `AMR MUGOTE <${process.env.SMTP_USER}>` : 'AMR MUGOTE ET SES FRÈRES <no-reply@amrmugote.com>'),
-      host: process.env.SMTP_HOST || 'smtp.gmail.com',
-      port: Number(process.env.SMTP_PORT || 465),
-      user: process.env.SMTP_USER ? `${process.env.SMTP_USER.substring(0, 3)}***@gmail.com` : 'Non configuré'
+      source: this.configSource,
+      provider: this.currentConfig.host ? (this.currentConfig.host.includes('gmail') ? 'Gmail SMTP' : this.currentConfig.host) : 'Gmail SMTP (smtp.gmail.com)',
+      fromAddress: this.currentConfig.from || process.env.EMAIL_FROM || (user ? `AMR MUGOTE <${user}>` : 'AMR MUGOTE ET SES FRÈRES <no-reply@amrmugote.com>'),
+      host: this.currentConfig.host || process.env.SMTP_HOST || 'smtp.gmail.com',
+      port: Number(this.currentConfig.port || process.env.SMTP_PORT || 465),
+      user: maskedUser
     };
   }
 
-  /**
-   * Envoi d'un rappel d'heure de départ à un passager par Gmail / Email
-   */
+  // =========================================================================
+  // 1. CONFIRMATION DE RÉSERVATION OFFICIELLE & BILLET ÉLECTRONIQUE (PRIORITAIRE)
+  // =========================================================================
+  public async sendBookingConfirmation(reservation: {
+    fullName: string;
+    lastName?: string;
+    email: string;
+    phone?: string;
+    ticketId?: string;
+    itinerary: string;
+    ship: string;
+    travelDate: string;
+    departureTime?: string;
+    travelClass?: string;
+    passengersCount?: number;
+    amount?: number;
+    status?: string;
+    transactionId?: string;
+  }): Promise<EmailSendResult> {
+    if (!reservation.email || !reservation.email.includes('@')) {
+      return {
+        success: false,
+        recipient: reservation.email || 'N/A',
+        subject: 'Confirmation de Réservation & Billet',
+        error: "Adresse email invalide ou manquante."
+      };
+    }
+
+    const recipient = reservation.email.trim();
+    const passengerName = `${reservation.fullName} ${reservation.lastName || ''}`.trim() || 'Cher Passager';
+    const departureTime = reservation.departureTime || '07h30';
+    const travelDate = reservation.travelDate || 'Date du jour';
+    const ticketId = reservation.ticketId || `AMR-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+    const ship = reservation.ship || 'Mugote 1';
+    const itinerary = reservation.itinerary || 'Bukavu ➔ Goma';
+    const travelClass = reservation.travelClass || '2ème Classe';
+    const passengersCount = Number(reservation.passengersCount || 1);
+    const amount = reservation.amount ? `${reservation.amount}.00 $` : '20.00 $';
+    const statusText = (reservation.status === 'VALIDATED' || reservation.status === 'CONFIRMED') ? 'VALIDÉ & ACTIF' : 'EN ATTENTE / CONFIRMÉ';
+
+    // Calcul de l'heure conseillée d'embarquement (45 min avant)
+    let boardingAdvice = "Arrivée recommandée 45 minutes avant le départ";
+    try {
+      const parts = departureTime.replace('h', ':').split(':');
+      if (parts.length >= 2) {
+        let h = parseInt(parts[0], 10);
+        let m = parseInt(parts[1], 10) - 45;
+        if (m < 0) {
+          m += 60;
+          h = (h - 1 + 24) % 24;
+        }
+        const hStr = h < 10 ? `0${h}` : `${h}`;
+        const mStr = m < 10 ? `0${m}` : `${m}`;
+        boardingAdvice = `Présentez-vous au quai dès ${hStr}h${mStr} (au moins 45 minutes avant)`;
+      }
+    } catch {
+      // ignore
+    }
+
+    const subject = `⚓ Billet Officiel & Confirmation de Réservation : ${itinerary} - N° ${ticketId} [AMR MUGOTE]`;
+
+    const html = `
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>${subject}</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #0b192c; margin: 0; padding: 24px 12px; color: #0f172a; }
+    .container { max-width: 620px; margin: 0 auto; background: #ffffff; border-radius: 20px; overflow: hidden; box-shadow: 0 20px 40px rgba(0,0,0,0.3); border: 1px solid #e2e8f0; }
+    
+    .header { background: linear-gradient(135deg, #001233 0%, #032b69 100%); padding: 36px 28px; text-align: center; color: #ffffff; border-bottom: 4px solid #d97706; }
+    .gold-badge { display: inline-block; background: #d97706; color: #ffffff; font-size: 11px; font-weight: 900; text-transform: uppercase; letter-spacing: 1.5px; padding: 5px 16px; border-radius: 9999px; margin-bottom: 12px; }
+    .title { margin: 0; font-size: 24px; font-weight: 900; letter-spacing: 1px; text-transform: uppercase; }
+    .subtitle { margin: 8px 0 0 0; color: #94a3b8; font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; }
+
+    .content { padding: 32px 28px; }
+    .greeting { font-size: 16px; color: #1e293b; margin-bottom: 22px; line-height: 1.6; }
+    
+    .ticket-hero { background: #f8fafc; border: 2px solid #001233; border-radius: 16px; padding: 24px; margin-bottom: 24px; position: relative; }
+    .ticket-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px dashed #cbd5e1; padding-bottom: 14px; margin-bottom: 18px; }
+    .ticket-id { font-size: 20px; font-weight: 900; color: #001233; font-family: monospace; letter-spacing: 1px; }
+    .ticket-status { background: #ecfdf5; border: 1px solid #10b981; color: #065f46; padding: 4px 12px; border-radius: 9999px; font-size: 11px; font-weight: 900; text-transform: uppercase; }
+
+    .route-banner { background: #001233; color: #ffffff; border-radius: 12px; padding: 18px; text-align: center; margin-bottom: 18px; }
+    .route-title { font-size: 22px; font-weight: 900; color: #ffffff; margin-bottom: 4px; }
+    .route-time { font-size: 14px; color: #fbbf24; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; }
+
+    .details-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; }
+    .detail-cell { background: #ffffff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 10px 14px; }
+    .detail-label { font-size: 9px; font-weight: 800; text-transform: uppercase; color: #64748b; letter-spacing: 0.5px; margin-bottom: 3px; }
+    .detail-val { font-size: 13px; font-weight: 800; color: #0f172a; }
+
+    .boarding-box { background: #fef3c7; border-left: 4px solid #d97706; padding: 16px 18px; border-radius: 0 10px 10px 0; margin-bottom: 24px; font-size: 13px; color: #78350f; line-height: 1.5; font-weight: 600; }
+
+    .action-box { text-align: center; margin: 28px 0; }
+    .btn-ticket { display: inline-block; background: #001233; color: #ffffff !important; font-size: 13px; font-weight: 900; text-transform: uppercase; letter-spacing: 1px; padding: 14px 28px; border-radius: 12px; text-decoration: none; box-shadow: 0 4px 12px rgba(0, 18, 51, 0.3); }
+
+    .guidelines { background: #f1f5f9; border-radius: 14px; padding: 20px; margin-bottom: 24px; }
+    .guidelines h4 { margin: 0 0 12px 0; font-size: 13px; font-weight: 800; text-transform: uppercase; color: #0f172a; }
+    .guidelines ul { margin: 0; padding-left: 20px; font-size: 13px; color: #475569; line-height: 1.6; }
+
+    .contacts { border-top: 1px solid #e2e8f0; padding-top: 20px; font-size: 12px; color: #64748b; line-height: 1.6; text-align: center; }
+    .contacts strong { color: #0f172a; }
+
+    .footer { background: #000c22; color: #94a3b8; padding: 22px; text-align: center; font-size: 11px; line-height: 1.5; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="gold-badge">⚓ Titre de Transport Maritime Officiel</div>
+      <h1 class="title">AMR MUGOTE ET SES FRÈRES</h1>
+      <p class="subtitle">Compagnie de Navigation du Lac Kivu • Bukavu - Goma</p>
+    </div>
+
+    <div class="content">
+      <p class="greeting">
+        Bonjour <strong>${passengerName}</strong>,<br>
+        Nous confirmons avec plaisir l'enregistrement de votre réservation sur nos lignes régulières du Lac Kivu. Votre billet électronique a été généré avec succès.
+      </p>
+
+      <div class="ticket-hero">
+        <div class="ticket-header">
+          <div>
+            <div style="font-size: 10px; font-weight: 800; text-transform: uppercase; color: #64748b;">Numéro de Billet</div>
+            <div class="ticket-id">${ticketId}</div>
+          </div>
+          <div class="ticket-status">${statusText}</div>
+        </div>
+
+        <div class="route-banner">
+          <div class="route-title">${itinerary}</div>
+          <div class="route-time">Départ : ${travelDate} à ${departureTime}</div>
+        </div>
+
+        <div class="details-grid">
+          <div class="detail-cell">
+            <div class="detail-label">Navire Assigné</div>
+            <div class="detail-val">${ship}</div>
+          </div>
+          <div class="detail-cell">
+            <div class="detail-label">Classe de Voyage</div>
+            <div class="detail-val">${travelClass}</div>
+          </div>
+          <div class="detail-cell">
+            <div class="detail-label">Nombre de Place(s)</div>
+            <div class="detail-val">${passengersCount} passager(s)</div>
+          </div>
+          <div class="detail-cell">
+            <div class="detail-label">Montant Total Réglé</div>
+            <div class="detail-val" style="color: #059669; font-family: monospace;">${amount}</div>
+          </div>
+          <div class="detail-cell">
+            <div class="detail-label">Passager Principal</div>
+            <div class="detail-val">${passengerName}</div>
+          </div>
+          <div class="detail-cell">
+            <div class="detail-label">Téléphone Déclaré</div>
+            <div class="detail-val">${reservation.phone || 'N/A'}</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="boarding-box">
+        ⚠️ <strong>Consigne d'Embarquement :</strong> ${boardingAdvice}. Les portes d'accès aux quais et le pointage ferment 15 minutes avant le largage des amarres pour les formalités de sécurité maritime.
+      </div>
+
+      <div class="guidelines">
+        <h4>📋 Formalités de Voyage sur le Lac Kivu</h4>
+        <ul>
+          <li><strong>Présentation du Billet :</strong> Vous pouvez présenter ce billet directement sur l'écran de votre téléphone (QR code) ou une version papier imprimée aux contrôleurs au quai.</li>
+          <li><strong>Pièce d'Identité :</strong> Une pièce d'identité valide (Carte d'électeur, Passeport ou Permis) est requise pour tout embarquement.</li>
+          <li><strong>Ports d'Accès :</strong> Port Ihusi à Bukavu / Port Public SNCC à Goma.</li>
+          <li><strong>Bagages :</strong> Les bagages doivent être étiquetés avant le chargement dans les cales du navire.</li>
+        </ul>
+      </div>
+
+      <div class="contacts">
+        <strong>Assistance & Permanence Portuaire 24/7 :</strong><br>
+        Port de Bukavu : <strong>+243 994 102 673</strong> &nbsp;|&nbsp; Port de Goma : <strong>+243 816 680 709</strong><br>
+        Email Direction : <a href="mailto:birekeidea@gmail.com" style="color: #0284c7; text-decoration: none;">birekeidea@gmail.com</a>
+      </div>
+    </div>
+
+    <div class="footer">
+      © ${new Date().getFullYear()} AMR MUGOTE ET SES FRÈRES • Transport Lacustre Bukavu - Goma.<br>
+      Ce message automatique certifie votre enregistrement sur les registres officiels de navigation.
+    </div>
+  </div>
+</body>
+</html>
+    `;
+
+    const from = this.currentConfig.from || process.env.EMAIL_FROM || (this.currentConfig.user ? `AMR MUGOTE <${this.currentConfig.user}>` : 'AMR MUGOTE ET SES FRÈRES <no-reply@amrmugote.com>');
+
+    // Exécution réelle si configuré
+    if (this.isConfigured) {
+      const sendRes = await this.executeSendMail({
+        from,
+        to: recipient,
+        subject,
+        html,
+        text: `Bonjour ${passengerName},\n\nVotre réservation AMR MUGOTE ET SES FRÈRES est confirmée.\nN° Billet: ${ticketId}\nTrajet: ${itinerary}\nNavire: ${ship} (${travelClass})\nDépart: ${travelDate} à ${departureTime}\n${boardingAdvice}.\nMontant: ${amount}.\nContacts: +243 994 102 673 / +243 816 680 709.`
+      });
+
+      if (sendRes.success) {
+        console.log(`✅ [EmailService] Confirmation de réservation envoyée à ${recipient} (Message ID: ${sendRes.messageId})`);
+        return {
+          success: true,
+          recipient,
+          subject,
+          messageId: sendRes.messageId
+        };
+      } else {
+        console.error(`❌ [EmailService] Échec de l'acheminement SMTP vers ${recipient}:`, sendRes.error);
+        return {
+          success: false,
+          recipient,
+          subject,
+          error: sendRes.error
+        };
+      }
+    }
+
+    // Mode simulation (en attendant configuration des identifiants SMTP réels)
+    console.log(`📫 [EmailService SIMULATION] Confirmation de réservation générée pour ${recipient}:`);
+    console.log(`   - Billet: ${ticketId} (${passengerName})`);
+    console.log(`   - Trajet: ${itinerary} à ${departureTime} le ${travelDate} sur ${ship}`);
+    console.log(`   - Note: Configurez SMTP_USER et SMTP_PASS pour un envoi direct par Gmail.`);
+
+    return {
+      success: true,
+      simulated: true,
+      recipient,
+      subject,
+      messageId: `sim-confirm-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`
+    };
+  }
+
+  // =========================================================================
+  // 2. RAPPEL D'HEURE DE DÉPART (H-45 MIN)
+  // =========================================================================
   public async sendDepartureReminder(reservation: {
     fullName: string;
     lastName?: string;
@@ -108,21 +552,19 @@ class EmailService {
 
     const subject = `⚓ Rappel de Départ : Voyage ${itinerary} à ${departureTime} - Billet N° ${ticketId}`;
 
-    // Calcul de l'heure conseillée d'embarquement (45 min avant)
     let boardingAdvice = "Arrivée recommandée 45 minutes avant le départ";
     try {
       const parts = departureTime.replace('h', ':').split(':');
       if (parts.length >= 2) {
         let h = parseInt(parts[0], 10);
-        let m = parseInt(parts[1], 10);
-        m -= 45;
+        let m = parseInt(parts[1], 10) - 45;
         if (m < 0) {
           m += 60;
-          h -= 1;
+          h = (h - 1 + 24) % 24;
         }
         const hStr = h < 10 ? `0${h}` : `${h}`;
         const mStr = m < 10 ? `0${m}` : `${m}`;
-        boardingAdvice = `Présentez-vous au port d'embarquement dès ${hStr}h${mStr} (au moins 45 minutes avant)`;
+        boardingAdvice = `Présentez-vous au quai dès ${hStr}h${mStr} (au moins 45 minutes avant)`;
       }
     } catch {
       // ignore
@@ -134,7 +576,7 @@ class EmailService {
 <head>
   <meta charset="UTF-8">
   <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f1f5f9; margin: 0; padding: 20px; color: #0f172a; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f1f5f9; margin: 0; padding: 20px; color: #0f172a; }
     .container { max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 10px 25px rgba(0,0,0,0.08); border: 1px solid #e2e8f0; }
     .header { background: linear-gradient(135deg, #001233 0%, #0A2540 100%); padding: 32px 24px; text-align: center; color: #ffffff; }
     .gold-pill { display: inline-block; background: #d97706; color: #ffffff; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 1.5px; padding: 4px 14px; border-radius: 20px; margin-bottom: 12px; }
@@ -142,28 +584,15 @@ class EmailService {
     .subtitle { margin: 8px 0 0 0; color: #cbd5e1; font-size: 13px; font-weight: 500; }
     .content { padding: 28px 24px; }
     .greeting { font-size: 16px; color: #334155; margin-bottom: 20px; line-height: 1.6; }
-    
-    .highlight-card { background: #f8fafc; border: 2px solid #0284c7; border-radius: 14px; padding: 20px; margin-bottom: 24px; }
-    .highlight-title { font-size: 12px; font-weight: 800; text-transform: uppercase; color: #0284c7; letter-spacing: 1px; margin-bottom: 12px; }
-    
     .departure-hero { text-align: center; background: #001233; color: #ffffff; border-radius: 12px; padding: 18px 12px; margin-bottom: 16px; }
     .departure-label { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: #f59e0b; font-weight: 800; }
     .departure-time { font-size: 38px; font-weight: 900; letter-spacing: -1px; margin: 4px 0; color: #ffffff; }
     .departure-date { font-size: 14px; color: #94a3b8; font-weight: 600; }
-    
     .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
     .info-box { background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px 14px; }
     .info-label { font-size: 10px; text-transform: uppercase; color: #64748b; font-weight: 700; margin-bottom: 4px; }
     .info-val { font-size: 14px; font-weight: 800; color: #0f172a; }
-    
     .advice-box { background: #fef3c7; border-left: 4px solid #d97706; padding: 14px 16px; border-radius: 0 8px 8px 0; margin-bottom: 24px; font-size: 13px; color: #78350f; font-weight: 600; line-height: 1.5; }
-    
-    .instructions { background: #f8fafc; border-radius: 12px; padding: 18px; margin-bottom: 24px; }
-    .instructions h4 { margin: 0 0 10px 0; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; color: #0f172a; }
-    .instructions ul { margin: 0; padding-left: 20px; font-size: 13px; color: #475569; line-height: 1.6; }
-    
-    .contacts { border-top: 1px solid #e2e8f0; padding-top: 20px; font-size: 12px; color: #64748b; line-height: 1.6; text-align: center; }
-    .contacts strong { color: #0f172a; }
     .footer { background: #000c22; color: #94a3b8; padding: 20px; text-align: center; font-size: 11px; line-height: 1.5; }
   </style>
 </head>
@@ -178,154 +607,110 @@ class EmailService {
     <div class="content">
       <p class="greeting">
         Bonjour <strong>${passengerName}</strong>,<br>
-        La compagnie <strong>AMR MUGOTE ET SES FRÈRES</strong> a le plaisir de vous rappeler l'heure de départ de votre prochain voyage sur le lac Kivu.
+        La compagnie <strong>AMR MUGOTE ET SES FRÈRES</strong> vous rappelle l'heure de départ de votre voyage aujourd'hui.
       </p>
 
-      <div class="highlight-card">
-        <div class="highlight-title">⚓ Détails de votre Traversée</div>
+      <div class="departure-hero">
+        <div class="departure-label">Heure Précise de Départ</div>
+        <div class="departure-time">${departureTime}</div>
+        <div class="departure-date">Date de Voyage : ${travelDate}</div>
+      </div>
 
-        <div class="departure-hero">
-          <div class="departure-label">Heure Précise de Départ</div>
-          <div class="departure-time">${departureTime}</div>
-          <div class="departure-date">Date de Voyage : ${travelDate}</div>
+      <div class="info-grid">
+        <div class="info-box">
+          <div class="info-label">N° de Billet</div>
+          <div class="info-val">${ticketId}</div>
         </div>
-
-        <div class="info-grid">
-          <div class="info-box">
-            <div class="info-label">N° de Billet</div>
-            <div class="info-val">${ticketId}</div>
-          </div>
-          <div class="info-box">
-            <div class="info-label">Bateau Assigne</div>
-            <div class="info-val">${ship}</div>
-          </div>
-          <div class="info-box">
-            <div class="info-label">Trajet Prévu</div>
-            <div class="info-val">${itinerary}</div>
-          </div>
-          <div class="info-box">
-            <div class="info-label">Classe de Voyage</div>
-            <div class="info-val">${travelClass}</div>
-          </div>
+        <div class="info-box">
+          <div class="info-label">Bateau Assigné</div>
+          <div class="info-val">${ship}</div>
+        </div>
+        <div class="info-box">
+          <div class="info-label">Trajet Prévu</div>
+          <div class="info-val">${itinerary}</div>
+        </div>
+        <div class="info-box">
+          <div class="info-label">Classe de Voyage</div>
+          <div class="info-val">${travelClass}</div>
         </div>
       </div>
 
       <div class="advice-box">
-        ⚠️ <strong>Consigne d'Embarquement :</strong> ${boardingAdvice}. Les portes d'accès aux quais ferment 15 minutes avant le largage des amarres.
-      </div>
-
-      <div class="instructions">
-        <h4>📋 Rappels pour votre Embarquement</h4>
-        <ul>
-          <li><strong>Billet :</strong> Ayez votre billet électronique (QR code sur votre téléphone) ou votre billet imprimé prêt pour le contrôle.</li>
-          <li><strong>Pièce d'Identité :</strong> Munissez-vous d'une pièce d'identité valide (Carte d'électeur, Passeport ou Permis de conduire).</li>
-          <li><strong>Bagages :</strong> Étiquetez vos bagages avant la remise au personnel de bord.</li>
-        </ul>
-      </div>
-
-      <div class="contacts">
-        <strong>Besoin d'assistance ou d'un renseignement ?</strong><br>
-        Contact Port Bukavu : <strong>+243 994 102 673</strong> | Contact Port Goma : <strong>+243 816 680 709</strong><br>
-        Email : birekeidea@gmail.com
+        ⚠️ <strong>Consigne d'Embarquement :</strong> ${boardingAdvice}. Les portes d'accès aux quais ferment 15 minutes avant le départ.
       </div>
     </div>
 
     <div class="footer">
-      © ${new Date().getFullYear()} AMR MUGOTE ET SES FRÈRES. Tous droits réservés.<br>
-      Ce message automatique vous est envoyé car vous avez réservé avec votre compte Gmail.
+      © ${new Date().getFullYear()} AMR MUGOTE ET SES FRÈRES. Permanence : +243 994 102 673 / +243 816 680 709.
     </div>
   </div>
 </body>
 </html>
     `;
 
-    const from = process.env.EMAIL_FROM || (process.env.SMTP_USER ? `AMR MUGOTE <${process.env.SMTP_USER}>` : 'AMR MUGOTE ET SES FRÈRES <no-reply@amrmugote.com>');
+    const from = this.currentConfig.from || process.env.EMAIL_FROM || (this.currentConfig.user ? `AMR MUGOTE <${this.currentConfig.user}>` : 'AMR MUGOTE ET SES FRÈRES <no-reply@amrmugote.com>');
 
-    // Mode Réel si configuré
-    if (this.isConfigured && this.transporter) {
-      try {
-        const info = await this.transporter.sendMail({
-          from,
-          to: recipient,
-          subject,
-          html,
-          text: `Bonjour ${passengerName},\n\nRappel de départ AMR MUGOTE ET SES FRÈRES.\nBillet: ${ticketId}\nTrajet: ${itinerary}\nDate: ${travelDate}\nHeure de départ: ${departureTime}\nBateau: ${ship}\nClasse: ${travelClass}\n\n${boardingAdvice}.\nContacts: +243 994 102 673 / +243 816 680 709.`
-        });
+    if (this.isConfigured) {
+      const sendRes = await this.executeSendMail({
+        from,
+        to: recipient,
+        subject,
+        html,
+        text: `Rappel de départ AMR MUGOTE: Billet ${ticketId}, Trajet ${itinerary} à ${departureTime} le ${travelDate}. ${boardingAdvice}.`
+      });
 
-        console.log(`✅ [EmailService] Rappel Gmail envoyé avec succès à ${recipient} (Message ID: ${info.messageId})`);
-        return {
-          success: true,
-          recipient,
-          subject,
-          messageId: info.messageId
-        };
-      } catch (err: any) {
-        console.error(`❌ [EmailService] Échec de l'envoi SMTP à ${recipient}:`, err);
-        return {
-          success: false,
-          recipient,
-          subject,
-          error: err.message || String(err)
-        };
+      if (sendRes.success) {
+        return { success: true, recipient, subject, messageId: sendRes.messageId };
       }
+      return { success: false, recipient, subject, error: sendRes.error };
     }
-
-    // Mode Simulation (dev ou identifiants en attente de configuration)
-    console.log(`📫 [EmailService SIMULATION] Rappel de départ préparé pour ${recipient}:`);
-    console.log(`   - Sujet: ${subject}`);
-    console.log(`   - Voyageur: ${passengerName} (${ticketId})`);
-    console.log(`   - Départ: ${travelDate} à ${departureTime} sur ${ship}`);
-    console.log(`   - Note: Configurez SMTP_USER et SMTP_PASS dans les paramètres pour un acheminement direct par Gmail.`);
 
     return {
       success: true,
       simulated: true,
       recipient,
       subject,
-      messageId: `sim-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`
+      messageId: `sim-reminder-${Date.now()}`
     };
   }
 
-  /**
-   * Envoi d'un email de test pour valider les paramètres SMTP
-   */
+  // =========================================================================
+  // 3. TEST DE CONNECTIVITÉ SMTP ENVOYÉ À L'ADMIN OU UTILISATEUR
+  // =========================================================================
   public async sendTestEmail(targetEmail: string): Promise<EmailSendResult> {
     const subject = "⚓ Test de Connectivité Email - AMR MUGOTE ET SES FRÈRES";
-    const from = process.env.EMAIL_FROM || (process.env.SMTP_USER ? `AMR MUGOTE <${process.env.SMTP_USER}>` : 'AMR MUGOTE ET SES FRÈRES <no-reply@amrmugote.com>');
+    const from = this.currentConfig.from || process.env.EMAIL_FROM || (this.currentConfig.user ? `AMR MUGOTE <${this.currentConfig.user}>` : 'AMR MUGOTE ET SES FRÈRES <no-reply@amrmugote.com>');
 
     const html = `
-      <div style="font-family: sans-serif; padding: 20px; background: #f8fafc; border-radius: 12px; border: 1px solid #cbd5e1;">
-        <h2 style="color: #001233;">⚓ Test de Connexion Email Réussi</h2>
-        <p>Ce message confirme que le service d'envoi d'emails et de rappels de départ de <strong>AMR MUGOTE ET SES FRÈRES</strong> fonctionne correctement.</p>
-        <p>Les voyageurs ayant renseigné leur Gmail recevront leurs rappels d'heure de départ à cette adresse.</p>
-        <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 15px 0;">
-        <small style="color: #64748b;">Horodatage : ${new Date().toLocaleString('fr-FR')}</small>
+      <div style="font-family: sans-serif; padding: 24px; background: #f8fafc; border-radius: 16px; border: 1px solid #cbd5e1; max-width: 550px; margin: 0 auto;">
+        <h2 style="color: #001233; margin-top: 0;">⚓ Test de Connexion Email Réussi !</h2>
+        <p style="color: #334155; line-height: 1.6;">
+          Ce message confirme que le service d'envoi d'emails et de confirmations de billets de <strong>AMR MUGOTE ET SES FRÈRES</strong> fonctionne correctement et délivre bien les emails dans votre boîte de réception.
+        </p>
+        <div style="background: #ecfdf5; border-left: 4px solid #10b981; padding: 12px 16px; margin: 16px 0; border-radius: 0 8px 8px 0; color: #065f46; font-size: 13px; font-weight: bold;">
+          ✓ Connexion SMTP validée (${this.currentConfig.host}:${this.currentConfig.port})
+        </div>
+        <p style="color: #64748b; font-size: 12px;">
+          Tous les voyageurs réservant un voyage sur le lac Kivu recevront désormais automatiquement leur billet officiel avec QR code à leur adresse email.
+        </p>
+        <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 16px 0;">
+        <small style="color: #94a3b8;">Horodatage : ${new Date().toLocaleString('fr-FR')}</small>
       </div>
     `;
 
-    if (this.isConfigured && this.transporter) {
-      try {
-        const info = await this.transporter.sendMail({
-          from,
-          to: targetEmail,
-          subject,
-          html,
-          text: "Test réussi pour AMR MUGOTE ET SES FRÈRES."
-        });
-        return {
-          success: true,
-          recipient: targetEmail,
-          subject,
-          messageId: info.messageId
-        };
-      } catch (err: any) {
-        return {
-          success: false,
-          recipient: targetEmail,
-          subject,
-          error: err.message || String(err)
-        };
+    if (this.isConfigured) {
+      const sendRes = await this.executeSendMail({
+        from,
+        to: targetEmail,
+        subject,
+        html,
+        text: "Test de connectivité email réussi pour AMR MUGOTE ET SES FRÈRES."
+      });
+
+      if (sendRes.success) {
+        return { success: true, recipient: targetEmail, subject, messageId: sendRes.messageId };
       }
+      return { success: false, recipient: targetEmail, subject, error: sendRes.error };
     }
 
     return {
@@ -337,9 +722,9 @@ class EmailService {
     };
   }
 
-  /**
-   * Confirmation d'inscription automatique à l'Agenda en temps réel du serveur pour les notifications bateau
-   */
+  // =========================================================================
+  // 4. INSCRIPTION AGENDA TEMPS RÉEL
+  // =========================================================================
   public async sendAgendaRegistrationConfirmation(agendaItem: {
     email: string;
     fullName: string;
@@ -361,8 +746,8 @@ class EmailService {
     }
 
     const recipient = agendaItem.email.trim();
-    const subject = `⚓ Billet ${agendaItem.ticketId} - Inscrit à l'Agenda & Alertes Bateau en Temps Réel [AMR MUGOTE]`;
-    const from = process.env.EMAIL_FROM || (process.env.SMTP_USER ? `AMR MUGOTE <${process.env.SMTP_USER}>` : 'AMR MUGOTE ET SES FRÈRES <no-reply@amrmugote.com>');
+    const subject = `⚓ Billet ${agendaItem.ticketId} - Inscrit à l'Agenda & Alertes Bateau [AMR MUGOTE]`;
+    const from = this.currentConfig.from || process.env.EMAIL_FROM || (this.currentConfig.user ? `AMR MUGOTE <${this.currentConfig.user}>` : 'AMR MUGOTE ET SES FRÈRES <no-reply@amrmugote.com>');
 
     const html = `
 <!DOCTYPE html>
@@ -371,108 +756,42 @@ class EmailService {
   <meta charset="utf-8">
   <title>${subject}</title>
   <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #0b192c; margin: 0; padding: 24px; color: #1e293b; }
-    .card { max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 18px; overflow: hidden; box-shadow: 0 12px 30px rgba(0,0,0,0.25); border: 1px solid #e2e8f0; }
-    .header { background: linear-gradient(135deg, #001233 0%, #032b69 100%); color: #ffffff; padding: 26px 30px; text-align: center; border-bottom: 4px solid #f59e0b; }
-    .header h1 { margin: 0; font-size: 20px; letter-spacing: 2px; text-transform: uppercase; color: #ffffff; }
-    .header p { margin: 6px 0 0 0; font-size: 11px; color: #f59e0b; letter-spacing: 1.5px; text-transform: uppercase; font-weight: 700; }
-    .body-content { padding: 28px 30px; }
-    .welcome { font-size: 15px; color: #0f172a; margin-bottom: 16px; line-height: 1.6; }
-    .status-badge { display: inline-flex; align-items: center; gap: 6px; background: #ecfdf5; border: 1px solid #10b981; color: #065f46; padding: 6px 14px; border-radius: 9999px; font-weight: 800; font-size: 11px; letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 20px; }
-    .agenda-box { background: #f8fafc; border: 2px solid #e2e8f0; border-radius: 14px; padding: 18px 20px; margin-bottom: 20px; }
-    .agenda-title { font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; color: #032b69; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
-    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-    .grid-item { background: #ffffff; border: 1px solid #cbd5e1; border-radius: 10px; padding: 10px 14px; }
-    .label { font-size: 9px; text-transform: uppercase; font-weight: 800; color: #64748b; letter-spacing: 0.5px; margin-bottom: 3px; }
-    .value { font-size: 13px; font-weight: 800; color: #0f172a; font-family: monospace; }
-    .value-highlight { font-size: 16px; font-weight: 900; color: #d97706; }
-    .realtime-callout { background: #eff6ff; border-left: 4px solid #3b82f6; padding: 14px 18px; border-radius: 0 12px 12px 0; margin-bottom: 20px; font-size: 12px; color: #1e40af; line-height: 1.5; }
-    .footer { background: #f1f5f9; padding: 16px 24px; text-align: center; font-size: 10px; color: #64748b; border-top: 1px solid #e2e8f0; }
+    body { font-family: sans-serif; background-color: #0b192c; margin: 0; padding: 20px; color: #1e293b; }
+    .card { max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 18px; overflow: hidden; border: 1px solid #e2e8f0; }
+    .header { background: #001233; color: #ffffff; padding: 24px; text-align: center; border-bottom: 4px solid #f59e0b; }
+    .body-content { padding: 26px; }
   </style>
 </head>
 <body>
   <div class="card">
     <div class="header">
-      <h1>AMR MUGOTE ET SES FRÈRES</h1>
-      <p>Agenda Serveur & Alertes Bateau en Temps Réel</p>
+      <h2 style="margin:0; text-transform:uppercase;">AMR MUGOTE ET SES FRÈRES</h2>
+      <p style="margin:6px 0 0 0; color:#f59e0b; font-size:12px;">Agenda Serveur & Alertes Bateau en Temps Réel</p>
     </div>
     <div class="body-content">
-      <div class="status-badge">
-        ✓ Enregistré dans l'Agenda en Temps Réel du Serveur
-      </div>
-      <p class="welcome">
-        Bonjour <strong>${agendaItem.fullName}</strong>,<br>
-        Votre adresse Gmail a été connectée avec succès au serveur central d'<strong>AMR MUGOTE</strong>. Le serveur surveillera en direct votre traversée sur le Lac Kivu et vous transmettra les alertes en temps réel.
-      </p>
-
-      <div class="agenda-box">
-        <div class="agenda-title">📅 Fiche de Traversée au Calendrier Serveur</div>
-        <div class="grid">
-          <div class="grid-item">
-            <div class="label">Bateau Assigné</div>
-            <div class="value">${agendaItem.ship}</div>
-          </div>
-          <div class="grid-item">
-            <div class="label">Trajet Prévu</div>
-            <div class="value">${agendaItem.itinerary}</div>
-          </div>
-          <div class="grid-item">
-            <div class="label">Date de Départ</div>
-            <div class="value">${agendaItem.travelDate}</div>
-          </div>
-          <div class="grid-item">
-            <div class="label">Heure de Départ</div>
-            <div class="value value-highlight">${agendaItem.departureTime}</div>
-          </div>
-          <div class="grid-item">
-            <div class="label">Embarquement Recommandé</div>
-            <div class="value">${agendaItem.boardingTime}</div>
-          </div>
-          <div class="grid-item">
-            <div class="label">N° de Billet</div>
-            <div class="value">${agendaItem.ticketId}</div>
-          </div>
-        </div>
-      </div>
-
-      <div class="realtime-callout">
-        🔔 <strong>Comment fonctionne la surveillance en temps réel ?</strong><br>
-        Le serveur central d'AMR Mugote met à jour les informations en continu (bateau à quai, ouverture des portes d'embarquement, début de largage des amarres, confirmation météo). Si une modification horaire ou un avis prioritaire survient, vous recevrez une notification instantanée à cette adresse Gmail.
-      </div>
-
-      <p style="font-size: 11px; color: #475569; margin-top: 14px;">
-        Pour toute assistance au port ou renseignement sur votre départ, notre équipe reste joignable au <strong>+243 994 102 673</strong> et <strong>+243 816 680 709</strong>.
-      </p>
-    </div>
-    <div class="footer">
-      © ${new Date().getFullYear()} AMR MUGOTE ET SES FRÈRES • Transport Lacustre Bukavu - Goma<br>
-      Notification automatique émise par le service d'agenda en temps réel du serveur.
+      <p>Bonjour <strong>${agendaItem.fullName}</strong>,</p>
+      <p>Votre voyage sur le bateau <strong>${agendaItem.ship}</strong> le <strong>${agendaItem.travelDate}</strong> à <strong>${agendaItem.departureTime}</strong> est bien surveillé en direct par le serveur central.</p>
+      <p>Billet: <strong>${agendaItem.ticketId}</strong> • Embarquement dès <strong>${agendaItem.boardingTime}</strong>.</p>
     </div>
   </div>
 </body>
 </html>
     `;
 
-    if (this.isConfigured && this.transporter) {
-      try {
-        const info = await this.transporter.sendMail({
-          from,
-          to: recipient,
-          subject,
-          html,
-          text: `Bonjour ${agendaItem.fullName},\n\nVotre traversée sur ${agendaItem.ship} (${agendaItem.itinerary}) le ${agendaItem.travelDate} à ${agendaItem.departureTime} est enregistrée dans l'agenda en temps réel du serveur AMR MUGOTE.\nBillet: ${agendaItem.ticketId}\nEmbarquement: dès ${agendaItem.boardingTime}.\n\nVous recevrez les notifications en direct concernant votre bateau.`
-        });
-        console.log(`✅ [EmailService] Confirmation d'agenda envoyée à ${recipient} (Message ID: ${info.messageId})`);
-        return { success: true, recipient, subject, messageId: info.messageId };
-      } catch (err: any) {
-        console.error(`❌ [EmailService] Erreur envoi confirmation agenda à ${recipient}:`, err);
-        return { success: false, recipient, subject, error: err.message || String(err) };
-      }
-    }
+    if (this.isConfigured) {
+      const sendRes = await this.executeSendMail({
+        from,
+        to: recipient,
+        subject,
+        html,
+        text: `Traversée ${agendaItem.ship} enregistrée à l'agenda en temps réel. Billet: ${agendaItem.ticketId}.`
+      });
 
-    console.log(`📫 [EmailService SIMULATION] Confirmation d'agenda pour ${recipient}:`);
-    console.log(`   - Bateau: ${agendaItem.ship} (${agendaItem.departureTime} le ${agendaItem.travelDate})`);
-    console.log(`   - Sujet: ${subject}`);
+      if (sendRes.success) {
+        return { success: true, recipient, subject, messageId: sendRes.messageId };
+      }
+      return { success: false, recipient, subject, error: sendRes.error };
+    }
 
     return {
       success: true,
@@ -483,9 +802,9 @@ class EmailService {
     };
   }
 
-  /**
-   * Envoi d'une alerte en temps réel concernant le bateau (retard, embarquement en cours, départ immédiat)
-   */
+  // =========================================================================
+  // 5. ALERTES EN DIRECT BATEAU
+  // =========================================================================
   public async sendBoatAlertNotification(params: {
     email: string;
     fullName: string;
@@ -508,66 +827,34 @@ class EmailService {
 
     const recipient = params.email.trim();
     const subject = `⚠️ ALERTE BATEAU [${params.ship}] - ${params.alertTitle} (Billet: ${params.ticketId})`;
-    const from = process.env.EMAIL_FROM || (process.env.SMTP_USER ? `AMR MUGOTE <${process.env.SMTP_USER}>` : 'AMR MUGOTE ET SES FRÈRES <no-reply@amrmugote.com>');
+    const from = this.currentConfig.from || process.env.EMAIL_FROM || (this.currentConfig.user ? `AMR MUGOTE <${this.currentConfig.user}>` : 'AMR MUGOTE ET SES FRÈRES <no-reply@amrmugote.com>');
 
     const html = `
-<!DOCTYPE html>
-<html lang="fr">
-<head>
-  <meta charset="utf-8">
-  <title>${subject}</title>
-  <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f1f5f9; padding: 20px; color: #1e293b; }
-    .container { max-width: 580px; margin: 0 auto; background: #ffffff; border-radius: 16px; overflow: hidden; border: 2px solid #e2e8f0; box-shadow: 0 8px 24px rgba(0,0,0,0.1); }
-    .banner { background: #d97706; color: #ffffff; padding: 20px 24px; text-align: center; }
-    .banner h2 { margin: 0; font-size: 18px; text-transform: uppercase; letter-spacing: 1px; }
-    .content { padding: 24px 28px; }
-    .alert-box { background: #fffbeb; border: 2px solid #fef3c7; border-left: 5px solid #d97706; border-radius: 8px; padding: 14px 18px; margin: 16px 0; font-size: 13px; line-height: 1.6; color: #78350f; }
-    .details { background: #f8fafc; border-radius: 10px; padding: 12px 16px; font-size: 12px; margin: 16px 0; }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <div class="banner">
-      <h2>AMR MUGOTE - Information Bateau en Direct</h2>
-    </div>
-    <div class="content">
-      <p>Bonjour <strong>${params.fullName}</strong>,</p>
-      <div class="alert-box">
-        <strong>${params.alertTitle}</strong><br>
-        ${params.alertMessage}
+      <div style="font-family: sans-serif; max-width: 580px; margin: 0 auto; background: #ffffff; border-radius: 14px; overflow: hidden; border: 2px solid #e2e8f0; padding: 20px;">
+        <h3 style="color: #d97706; margin-top: 0;">⚠️ Information Bateau en Direct - ${params.ship}</h3>
+        <p>Bonjour <strong>${params.fullName}</strong>,</p>
+        <div style="background: #fffbeb; border-left: 4px solid #d97706; padding: 14px; margin: 14px 0; color: #78350f;">
+          <strong>${params.alertTitle}</strong><br>${params.alertMessage}
+        </div>
+        <p style="font-size: 12px; color: #64748b;">Voyage: ${params.travelDate} à ${params.departureTime} • Billet N° ${params.ticketId}</p>
       </div>
-      <div class="details">
-        <p style="margin: 4px 0;"><strong>Bateau :</strong> ${params.ship}</p>
-        <p style="margin: 4px 0;"><strong>Date & Heure :</strong> ${params.travelDate} à ${params.departureTime}</p>
-        <p style="margin: 4px 0;"><strong>Statut Bateau :</strong> ${params.boatStatusText || 'Mise à jour en temps réel'}</p>
-        <p style="margin: 4px 0;"><strong>N° Billet :</strong> ${params.ticketId}</p>
-      </div>
-      <p style="font-size: 11px; color: #64748b;">
-        Cette notification a été émise automatiquement par le serveur central d'AMR Mugote à destination des passagers enregistrés à l'agenda de ce voyage.
-      </p>
-    </div>
-  </div>
-</body>
-</html>
     `;
 
-    if (this.isConfigured && this.transporter) {
-      try {
-        const info = await this.transporter.sendMail({
-          from,
-          to: recipient,
-          subject,
-          html,
-          text: `ALERTE BATEAU ${params.ship}: ${params.alertTitle}\n${params.alertMessage}\nDate: ${params.travelDate} - Heure: ${params.departureTime}\nBillet: ${params.ticketId}`
-        });
-        return { success: true, recipient, subject, messageId: info.messageId };
-      } catch (err: any) {
-        return { success: false, recipient, subject, error: err.message || String(err) };
+    if (this.isConfigured) {
+      const sendRes = await this.executeSendMail({
+        from,
+        to: recipient,
+        subject,
+        html,
+        text: `ALERTE ${params.ship}: ${params.alertTitle}\n${params.alertMessage}`
+      });
+
+      if (sendRes.success) {
+        return { success: true, recipient, subject, messageId: sendRes.messageId };
       }
+      return { success: false, recipient, subject, error: sendRes.error };
     }
 
-    console.log(`📫 [EmailService SIMULATION] Alerte Bateau temps réel pour ${recipient}: ${subject}`);
     return {
       success: true,
       simulated: true,
@@ -579,4 +866,3 @@ class EmailService {
 }
 
 export const emailService = new EmailService();
-

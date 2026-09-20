@@ -19,7 +19,11 @@ import {
   Users,
   ShieldCheck,
   Trash2,
-  Phone
+  Phone,
+  Key,
+  Lock,
+  Ticket,
+  ExternalLink
 } from 'lucide-react';
 import { mongoApi } from '../services/api';
 import { Reservation } from '../types';
@@ -40,6 +44,18 @@ export function AdminRemindersView({ reservations, onRefresh }: AdminRemindersVi
   const [testEmail, setTestEmail] = useState('birekeidea@gmail.com');
   const [sendingTest, setSendingTest] = useState(false);
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
+
+  // SMTP Configuration form state
+  const [smtpUser, setSmtpUser] = useState('birekeidea@gmail.com');
+  const [smtpPass, setSmtpPass] = useState('');
+  const [showSmtpPass, setShowSmtpPass] = useState(false);
+  const [smtpPort, setSmtpPort] = useState(465);
+  const [savingSmtp, setSavingSmtp] = useState(false);
+  const [verifyingSmtp, setVerifyingSmtp] = useState(false);
+  const [smtpFeedback, setSmtpFeedback] = useState<{ success: boolean; message: string } | null>(null);
+
+  // Confirmation email sending state
+  const [sendingConfirmId, setSendingConfirmId] = useState<string | null>(null);
   
   // Bulk reminders state
   const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().split('T')[0]);
@@ -161,6 +177,89 @@ export function AdminRemindersView({ reservations, onRefresh }: AdminRemindersVi
       });
     } finally {
       setSendingSingleId(null);
+    }
+  };
+
+  const handleSendSingleConfirmation = async (res: Reservation) => {
+    const targetId = res.ticketId || res.id || res._id;
+    if (!targetId) return;
+
+    try {
+      setSendingConfirmId(targetId);
+      setSingleResult(null);
+      const result = await mongoApi.sendBookingConfirmation(targetId, res.email);
+      setSingleResult({
+        id: targetId,
+        success: result.success,
+        message: result.message || "Billet officiel et confirmation de réservation envoyés !"
+      });
+      fetchStatus();
+      if (onRefresh) onRefresh();
+    } catch (err: any) {
+      setSingleResult({
+        id: targetId,
+        success: false,
+        message: err.message || "Erreur lors de l'envoi de la confirmation."
+      });
+    } finally {
+      setSendingConfirmId(null);
+    }
+  };
+
+  const handleSaveAndConnectSmtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!smtpUser || !smtpPass) {
+      setSmtpFeedback({
+        success: false,
+        message: "Veuillez renseigner votre adresse email Gmail et votre Mot de passe d'application Google."
+      });
+      return;
+    }
+
+    try {
+      setSavingSmtp(true);
+      setSmtpFeedback(null);
+      const res = await mongoApi.configureSmtp({
+        smtpUser: smtpUser.trim(),
+        smtpPass: smtpPass.trim().replace(/\s+/g, ''),
+        smtpHost: 'smtp.gmail.com',
+        smtpPort: Number(smtpPort),
+        smtpSecure: Number(smtpPort) === 465,
+        emailFrom: `AMR MUGOTE ET SES FRÈRES <${smtpUser.trim()}>`
+      });
+
+      setSmtpFeedback({
+        success: res.connected,
+        message: res.message
+      });
+      fetchStatus();
+    } catch (err: any) {
+      setSmtpFeedback({
+        success: false,
+        message: err.message || "Erreur lors de l'enregistrement des identifiants SMTP."
+      });
+    } finally {
+      setSavingSmtp(false);
+    }
+  };
+
+  const handleTestVerifyConnection = async () => {
+    try {
+      setVerifyingSmtp(true);
+      setSmtpFeedback(null);
+      const res = await mongoApi.verifySmtp();
+      setSmtpFeedback({
+        success: res.success,
+        message: res.message
+      });
+      fetchStatus();
+    } catch (err: any) {
+      setSmtpFeedback({
+        success: false,
+        message: err.message || "Erreur lors de la vérification de la connexion."
+      });
+    } finally {
+      setVerifyingSmtp(false);
     }
   };
 
@@ -795,6 +894,20 @@ export function AdminRemindersView({ reservations, onRefresh }: AdminRemindersVi
                               </button>
 
                               <button
+                                onClick={() => handleSendSingleConfirmation(res)}
+                                disabled={!hasEmail || sendingConfirmId === targetId}
+                                className="px-2.5 py-1.5 bg-amber-500 hover:bg-amber-600 disabled:opacity-30 text-white rounded-lg text-[10px] font-black uppercase tracking-wider transition-all flex items-center gap-1 cursor-pointer shadow-xs"
+                                title="Envoyer le Billet Officiel & Confirmation par email"
+                              >
+                                {sendingConfirmId === targetId ? (
+                                  <RefreshCw size={11} className="animate-spin" />
+                                ) : (
+                                  <Ticket size={11} />
+                                )}
+                                Billet Email
+                              </button>
+
+                              <button
                                 onClick={() => handleSendSingleReminder(res)}
                                 disabled={!hasEmail || isSending}
                                 className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-30 text-white rounded-lg text-[10px] font-black uppercase tracking-wider transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
@@ -820,23 +933,202 @@ export function AdminRemindersView({ reservations, onRefresh }: AdminRemindersVi
       )}
 
       {/* ============================================================ */}
-      {/* ONGLET 3 : DIAGNOSTIC & TEST GMAIL / SMTP                   */}
+      {/* ONGLET 3 : CONFIGURATION & TEST GMAIL / SMTP RÉEL            */}
       {/* ============================================================ */}
       {activeTab === 'test' && (
         <div className="space-y-6">
+          {/* CARTE 1 : STATUT EN DIRECT */}
+          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <div className="flex items-center gap-2.5 text-slate-800 font-black text-sm uppercase tracking-wider">
+                  <Mail size={18} className="text-blue-600" />
+                  Statut de l'Acheminement Email en Temps Réel
+                </div>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Surveillez l'état de la connexion avec les serveurs d'envoi SMTP / Gmail.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-black uppercase tracking-wider ${status?.configured ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' : 'bg-amber-100 text-amber-800 border border-amber-300'}`}>
+                  {status?.configured ? (
+                    <>
+                      <CheckCircle2 size={13} className="text-emerald-600" />
+                      Envoi Réel Opérationnel
+                    </>
+                  ) : (
+                    <>
+                      <Clock size={13} className="text-amber-600" />
+                      Mode Simulation (Attente Identifiants)
+                    </>
+                  )}
+                </span>
+
+                <button
+                  onClick={handleTestVerifyConnection}
+                  disabled={verifyingSmtp}
+                  className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer"
+                  title="Vérifier la négociation TLS / handshake avec le serveur"
+                >
+                  {verifyingSmtp ? <RefreshCw size={12} className="animate-spin" /> : <ShieldCheck size={12} />}
+                  Tester le Handshake
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 text-xs">
+              <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
+                <span className="text-[10px] font-black uppercase text-slate-400 block mb-0.5">Serveur Hôte</span>
+                <span className="font-mono font-bold text-slate-800">{status?.host || 'smtp.gmail.com'} : {status?.port || 465}</span>
+              </div>
+              <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
+                <span className="text-[10px] font-black uppercase text-slate-400 block mb-0.5">Compte Expéditeur</span>
+                <span className="font-mono font-bold text-blue-700 truncate block">{status?.user || 'Non configuré'}</span>
+              </div>
+              <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
+                <span className="text-[10px] font-black uppercase text-slate-400 block mb-0.5">Rappels Déjà Expédiés</span>
+                <span className="font-bold text-emerald-700">{status?.sentRemindersCount || 0} envoyé(s)</span>
+              </div>
+            </div>
+          </div>
+
+          {/* CARTE 2 : CONFIGURATION DES IDENTIFIANTS GMAIL EN BASE DE DONNÉES */}
+          <div className="bg-white p-6 rounded-2xl border border-blue-200 shadow-sm space-y-4">
+            <div className="flex items-center gap-2.5 text-slate-900 font-black text-sm uppercase tracking-wider">
+              <Key size={18} className="text-blue-600" />
+              Configurer vos Identifiants Gmail pour l'Envoi Réel
+            </div>
+            <p className="text-xs text-slate-600">
+              Renseignez votre adresse Gmail et votre <strong>Mot de passe d'application Google (16 caractères)</strong> pour que les confirmations et billets électroniques arrivent réellement dans les boîtes de réception des passagers.
+            </p>
+
+            <form onSubmit={handleSaveAndConnectSmtp} className="space-y-4 pt-1">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[10px] font-black uppercase tracking-wider text-slate-500 mb-1.5">
+                    Adresse Gmail de l'Armateur / Expéditeur
+                  </label>
+                  <input
+                    type="email"
+                    required
+                    value={smtpUser}
+                    onChange={e => setSmtpUser(e.target.value)}
+                    placeholder="birekeidea@gmail.com"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  <span className="text-[10px] text-slate-400 mt-1 block">
+                    Votre compte officiel pour l'émission des billets
+                  </span>
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="text-[10px] font-black uppercase tracking-wider text-slate-500">
+                      Mot de Passe d'Application (16 lettres)
+                    </label>
+                    <a
+                      href="https://myaccount.google.com/apppasswords"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[10px] text-blue-600 hover:underline flex items-center gap-1 font-bold"
+                    >
+                      Obtenir un code Google <ExternalLink size={10} />
+                    </a>
+                  </div>
+                  <div className="relative">
+                    <input
+                      type={showSmtpPass ? "text" : "password"}
+                      required
+                      value={smtpPass}
+                      onChange={e => setSmtpPass(e.target.value)}
+                      placeholder="Ex: abcd efgh ijkl mnop"
+                      className="w-full pl-3.5 pr-10 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-mono font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowSmtpPass(!showSmtpPass)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                    >
+                      {showSmtpPass ? <Eye size={14} /> : <Lock size={14} />}
+                    </button>
+                  </div>
+                  <span className="text-[10px] text-slate-400 mt-1 block">
+                    Généré en 30s depuis la sécurité de votre compte Google
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pt-2 border-t border-slate-100">
+                <div className="flex items-center gap-4 text-xs font-bold text-slate-600">
+                  <span>Port SMTP :</span>
+                  <label className="flex items-center gap-1.5 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="smtpPortChoice"
+                      checked={smtpPort === 465}
+                      onChange={() => setSmtpPort(465)}
+                      className="text-blue-600"
+                    />
+                    465 (SSL Sécurisé recommandé)
+                  </label>
+                  <label className="flex items-center gap-1.5 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="smtpPortChoice"
+                      checked={smtpPort === 587}
+                      onChange={() => setSmtpPort(587)}
+                      className="text-blue-600"
+                    />
+                    587 (TLS Standard)
+                  </label>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={savingSmtp}
+                  className="w-full sm:w-auto px-6 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-xs font-black uppercase tracking-wider rounded-xl transition-all shadow-md shadow-blue-600/20 flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  {savingSmtp ? (
+                    <>
+                      <RefreshCw size={14} className="animate-spin" />
+                      Enregistrement & Test...
+                    </>
+                  ) : (
+                    <>
+                      <ShieldCheck size={14} />
+                      Enregistrer & Activer l'Envoi Réel
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+
+            {smtpFeedback && (
+              <div className={`p-4 rounded-xl border text-xs ${smtpFeedback.success ? 'bg-emerald-50 border-emerald-200 text-emerald-900' : 'bg-rose-50 border-rose-200 text-rose-900'}`}>
+                <div className="flex items-center gap-2 font-black mb-1">
+                  {smtpFeedback.success ? <CheckCircle2 size={16} className="text-emerald-600" /> : <AlertCircle size={16} className="text-rose-600" />}
+                  {smtpFeedback.success ? 'Identifiants Validés avec Succès !' : 'Vérification de la Connexion Échouée'}
+                </div>
+                <p className="text-slate-700">{smtpFeedback.message}</p>
+              </div>
+            )}
+          </div>
+
+          {/* CARTE 3 : TEST D'ENVOI IMMÉDIAT DANS VOTRE BOÎTE DE RÉCEPTION */}
           <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
             <div className="flex items-center gap-2.5 text-slate-800 font-black text-sm uppercase tracking-wider">
-              <Mail size={16} className="text-emerald-600" />
-              Tester la Connectivité Gmail / SMTP
+              <Send size={16} className="text-emerald-600" />
+              Tester l'Envoi d'un Email Réel
             </div>
             <p className="text-xs text-slate-500">
-              Envoyez un email test pour vous assurer que les serveurs Gmail ou SMTP sont joignables et prêts à acheminer les rappels de départ.
+              Envoyez un email réel vers votre propre adresse pour vérifier immédiatement la réception, le format HTML et la rapidité de délivrance.
             </p>
 
             <form onSubmit={handleSendTestEmail} className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 pt-2">
               <div className="flex-1">
                 <label className="block text-[10px] font-black uppercase text-slate-400 mb-1">
-                  Adresse Email de Test
+                  Adresse Email Destinataire du Test
                 </label>
                 <input 
                   type="email"
@@ -857,7 +1149,7 @@ export function AdminRemindersView({ reservations, onRefresh }: AdminRemindersVi
                   {sendingTest ? (
                     <>
                       <RefreshCw size={14} className="animate-spin" />
-                      Envoi test...
+                      Envoi test en cours...
                     </>
                   ) : (
                     <>
@@ -873,31 +1165,12 @@ export function AdminRemindersView({ reservations, onRefresh }: AdminRemindersVi
               <div className={`p-4 rounded-xl border text-xs ${testResult.success ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-rose-50 border-rose-200 text-rose-800'}`}>
                 <div className="flex items-center gap-2 font-bold mb-1">
                   {testResult.success ? <Check size={14} /> : <AlertCircle size={14} />}
-                  {testResult.success ? 'Succès' : 'Échec'}
+                  {testResult.success ? 'Succès de l\'envoi' : 'Échec de l\'envoi'}
                 </div>
                 <p>{testResult.message}</p>
               </div>
             )}
           </div>
-
-          {/* Guide de Configuration Gmail */}
-          {!status?.configured && (
-            <div className="p-5 bg-amber-50/70 border border-amber-200 rounded-2xl flex items-start gap-3">
-              <Info size={20} className="text-amber-600 shrink-0 mt-0.5" />
-              <div className="space-y-1 text-xs text-amber-900">
-                <p className="font-bold">Configuration de l'envoi réel via votre compte Gmail :</p>
-                <p className="text-amber-800">
-                  Actuellement en mode simulation (tous les rappels sont enregistrés et simulés avec succès dans la console). Pour acheminer réellement les emails dans les boîtes de réception des passagers avec votre adresse Gmail (ex: <code>birekeidea@gmail.com</code>), configurez dans les variables d'environnement :
-                </p>
-                <ul className="list-disc pl-4 space-y-0.5 text-amber-800 font-mono text-[11px]">
-                  <li><strong>SMTP_HOST</strong> : smtp.gmail.com</li>
-                  <li><strong>SMTP_PORT</strong> : 465 (ou 587)</li>
-                  <li><strong>SMTP_USER</strong> : votre adresse Gmail</li>
-                  <li><strong>SMTP_PASS</strong> : un Mot de passe d'application Google (16 caractères généré depuis myaccount.google.com/apppasswords)</li>
-                </ul>
-              </div>
-            </div>
-          )}
         </div>
       )}
 

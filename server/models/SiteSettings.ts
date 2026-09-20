@@ -12,6 +12,12 @@ export interface ISiteSettings extends Document {
     '2ème Classe': number;
     '3ème Classe': number;
   };
+  smtpHost?: string;
+  smtpPort?: number;
+  smtpSecure?: boolean;
+  smtpUser?: string;
+  smtpPass?: string;
+  emailFrom?: string;
   updatedAt: Date;
 }
 
@@ -27,6 +33,12 @@ const SiteSettingsSchema = new Schema<ISiteSettings>({
     '2ème Classe': { type: Number, default: 17 },
     '3ème Classe': { type: Number, default: 10 },
   },
+  smtpHost: { type: String, default: 'smtp.gmail.com' },
+  smtpPort: { type: Number, default: 465 },
+  smtpSecure: { type: Boolean, default: true },
+  smtpUser: { type: String, default: '' },
+  smtpPass: { type: String, default: '' },
+  emailFrom: { type: String, default: '' },
   updatedAt: { type: Date, default: Date.now }
 }, {
   timestamps: true,

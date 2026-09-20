@@ -154,6 +154,23 @@ router.put('/settings', async (req: Request, res: Response) => {
       { $set: { ...updateData, updatedAt: new Date() } },
       { new: true, upsert: true }
     );
+
+    // Si des paramètres SMTP sont mis à jour, réinitialiser le service d'email en direct
+    if (updateData.smtpUser || updateData.smtpPass || updateData.smtpHost || updateData.smtpPort !== undefined) {
+      const user = (updateData.smtpUser ?? settings.smtpUser ?? '').trim();
+      const pass = (updateData.smtpPass ?? settings.smtpPass ?? '').trim();
+      if (user && pass) {
+        emailService.setupTransporter({
+          host: updateData.smtpHost ?? settings.smtpHost ?? 'smtp.gmail.com',
+          port: Number(updateData.smtpPort ?? settings.smtpPort ?? 465),
+          secure: typeof updateData.smtpSecure === 'boolean' ? updateData.smtpSecure : (settings.smtpSecure ?? true),
+          user,
+          pass,
+          from: updateData.emailFrom ?? settings.emailFrom ?? `AMR MUGOTE ET SES FRÈRES <${user}>`
+        }, 'database');
+      }
+    }
+
     res.json(settings);
   } catch (error: any) {
     console.error("Error updating settings in MongoDB:", error);
@@ -482,6 +499,30 @@ router.post('/reservations', optionalFirebaseAuth, async (req: Request, res: Res
             ).exec();
           }
         }).catch(err => console.warn("Auto agenda confirmation non-blocking notice:", err));
+
+        // Envoi automatique du Billet Électronique Officiel & Confirmation de Réservation
+        emailService.sendBookingConfirmation({
+          fullName: reservation.fullName,
+          lastName: reservation.lastName,
+          email: passengerEmail,
+          phone: reservation.phone,
+          ticketId: reservation.ticketId,
+          itinerary: reservation.itinerary,
+          ship: reservation.ship,
+          travelDate: reservation.travelDate,
+          departureTime: reservation.departureTime,
+          travelClass: reservation.travelClass,
+          passengersCount: reservation.passengersCount,
+          amount: reservation.amount,
+          status: reservation.status
+        }).then(async (cRes) => {
+          if (cRes.success) {
+            await Reservation.updateOne({ _id: reservation._id }, {
+              $set: { confirmationEmailSent: true, confirmationEmailSentAt: new Date() }
+            });
+            console.log(`✅ [MongoDB API] Billet et confirmation envoyés à ${passengerEmail}`);
+          }
+        }).catch(cErr => console.warn("Booking confirmation email notice:", cErr));
       } catch (agendaErr) {
         console.warn("Agenda registration non-fatal notice:", agendaErr);
       }
@@ -518,6 +559,32 @@ router.put('/reservations/:id', async (req: Request, res: Response) => {
 
     if (!reservation) {
       return res.status(404).json({ error: "Réservation introuvable." });
+    }
+
+    // Si le statut passe à VALIDATED, envoyer automatiquement la confirmation et le billet officiel par email
+    if (updateData.status === 'VALIDATED' && reservation.email && reservation.email.includes('@')) {
+      emailService.sendBookingConfirmation({
+        fullName: reservation.fullName,
+        lastName: reservation.lastName,
+        email: reservation.email,
+        phone: reservation.phone,
+        ticketId: reservation.ticketId || updateData.ticketId,
+        itinerary: reservation.itinerary,
+        ship: reservation.ship,
+        travelDate: reservation.travelDate,
+        departureTime: reservation.departureTime,
+        travelClass: reservation.travelClass,
+        passengersCount: reservation.passengersCount,
+        amount: reservation.amount,
+        status: 'VALIDATED'
+      }).then(async (cRes) => {
+        if (cRes.success) {
+          await Reservation.updateOne({ _id: reservation._id }, {
+            $set: { confirmationEmailSent: true, confirmationEmailSentAt: new Date() }
+          });
+          console.log(`✅ [MongoDB API] Billet électronique validé envoyé par email à ${reservation.email}`);
+        }
+      }).catch(err => console.warn("Validated reservation email notice:", err));
     }
 
     // Diffusion de l'événement Real-Time
@@ -1865,11 +1932,159 @@ router.post('/notifications/test-email', async (req: Request, res: Response) => 
       success: result.success,
       result,
       message: result.simulated 
-        ? `Test d'email simulé avec succès pour ${email}. Configurez SMTP_USER et SMTP_PASS pour activer l'envoi réel.`
-        : `Email de test envoyé avec succès à ${email}.`
+        ? `Test d'email simulé avec succès pour ${email}. Configurez votre adresse Gmail et Mot de passe d'application pour activer l'envoi réel.`
+        : `Email de test envoyé avec succès sur le compte ${email} ! Vérifiez votre boîte de réception.`
     });
   } catch (err: any) {
     res.status(500).json({ error: "Erreur lors du test d'envoi d'email", details: err?.message });
+  }
+});
+
+// Envoi manuel ou immédiat de la confirmation officielle et du billet par email
+router.post('/notifications/send-confirmation/:id', async (req: Request, res: Response) => {
+  try {
+    await connectMongoDB();
+    const { id } = req.params;
+    const { email: overrideEmail } = req.body || {};
+
+    let reservation = null;
+    if (mongoose.Types.ObjectId.isValid(id)) {
+      reservation = await Reservation.findById(id);
+    }
+    if (!reservation) {
+      reservation = await Reservation.findOne({
+        $or: [{ ticketId: id }, { firestoreId: id }]
+      });
+    }
+
+    if (!reservation) {
+      return res.status(404).json({ error: `Réservation introuvable pour ${id}` });
+    }
+
+    const targetEmail = (overrideEmail || reservation.email || '').trim();
+    if (!targetEmail || !targetEmail.includes('@')) {
+      return res.status(400).json({ error: "Aucune adresse email valide fournie pour l'envoi du billet." });
+    }
+
+    // Mise à jour de l'email si fourni en override
+    if (overrideEmail && overrideEmail !== reservation.email) {
+      reservation.email = targetEmail;
+    }
+
+    const sendRes = await emailService.sendBookingConfirmation({
+      fullName: reservation.fullName,
+      lastName: reservation.lastName,
+      email: targetEmail,
+      phone: reservation.phone,
+      ticketId: reservation.ticketId,
+      itinerary: reservation.itinerary,
+      ship: reservation.ship,
+      travelDate: reservation.travelDate,
+      departureTime: reservation.departureTime,
+      travelClass: reservation.travelClass,
+      passengersCount: reservation.passengersCount,
+      amount: reservation.amount,
+      status: reservation.status
+    });
+
+    if (sendRes.success) {
+      reservation.confirmationEmailSent = true;
+      reservation.confirmationEmailSentAt = new Date();
+      await reservation.save();
+
+      return res.json({
+        success: true,
+        message: sendRes.simulated
+          ? `Billet électronique simulé pour ${targetEmail} (service en attente d'identifiants réels).`
+          : `Billet électronique et confirmation officielle envoyés avec succès à ${targetEmail} !`,
+        sendRes,
+        reservation
+      });
+    } else {
+      return res.status(500).json({
+        error: `Échec de l'envoi : ${sendRes.error}`,
+        sendRes
+      });
+    }
+  } catch (err: any) {
+    console.error("Error sending booking confirmation email:", err);
+    res.status(500).json({ error: "Erreur interne lors de l'envoi de la confirmation", details: err?.message });
+  }
+});
+
+// Configuration directe des identifiants SMTP dans la base de données
+router.post('/notifications/configure-smtp', async (req: Request, res: Response) => {
+  try {
+    await connectMongoDB();
+    const { smtpUser, smtpPass, smtpHost, smtpPort, smtpSecure, emailFrom } = req.body;
+
+    if (!smtpUser || !smtpPass) {
+      return res.status(400).json({ error: "L'adresse email (smtpUser) et le mot de passe d'application (smtpPass) sont requis." });
+    }
+
+    const cleanUser = String(smtpUser).trim();
+    const cleanPass = String(smtpPass).trim().replace(/\s+/g, '');
+    const host = (smtpHost || 'smtp.gmail.com').trim();
+    const port = Number(smtpPort || (host === 'smtp.gmail.com' ? 465 : 587));
+    const secure = typeof smtpSecure === 'boolean' ? smtpSecure : port === 465;
+    const from = emailFrom || `AMR MUGOTE ET SES FRÈRES <${cleanUser}>`;
+
+    // Sauvegarde persistante dans SiteSettings
+    await SiteSettings.findOneAndUpdate(
+      { key: 'site' },
+      {
+        $set: {
+          smtpHost: host,
+          smtpPort: port,
+          smtpSecure: secure,
+          smtpUser: cleanUser,
+          smtpPass: cleanPass,
+          emailFrom: from,
+          updatedAt: new Date()
+        }
+      },
+      { upsert: true, new: true }
+    );
+
+    // Initialisation immédiate du transporteur
+    const configured = emailService.setupTransporter({
+      host,
+      port,
+      secure,
+      user: cleanUser,
+      pass: cleanPass,
+      from
+    }, 'database');
+
+    // Test de connexion automatique
+    const testCheck = await emailService.verifyConnection();
+
+    res.json({
+      success: configured,
+      connected: testCheck.ok,
+      message: testCheck.ok 
+        ? `Configuration SMTP enregistrée et validée ! Le service est opérationnel pour ${cleanUser}.`
+        : `Paramètres enregistrés, mais vérification échouée : ${testCheck.message}`,
+      status: emailService.getStatus()
+    });
+  } catch (err: any) {
+    console.error("Error configuring SMTP in database:", err);
+    res.status(500).json({ error: "Erreur lors de la configuration SMTP", details: err?.message });
+  }
+});
+
+// Test en direct du handshake SMTP (vérification des identifiants)
+router.post('/notifications/verify-smtp', async (req: Request, res: Response) => {
+  try {
+    const check = await emailService.verifyConnection();
+    res.json({
+      success: check.ok,
+      message: check.message,
+      code: check.code,
+      status: emailService.getStatus()
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: "Erreur lors du test de connexion", details: err?.message });
   }
 });
 

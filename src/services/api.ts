@@ -317,6 +317,42 @@ export const mongoApi = {
     body: JSON.stringify({ email })
   }),
 
+  sendBookingConfirmation: (ticketOrId: string, email?: string) => apiRequest<{
+    success: boolean;
+    message: string;
+    sendRes: any;
+    reservation: any;
+  }>(`/notifications/send-confirmation/${encodeURIComponent(ticketOrId)}`, {
+    method: 'POST',
+    body: JSON.stringify({ email })
+  }),
+
+  configureSmtp: (data: {
+    smtpUser: string;
+    smtpPass: string;
+    smtpHost?: string;
+    smtpPort?: number;
+    smtpSecure?: boolean;
+    emailFrom?: string;
+  }) => apiRequest<{
+    success: boolean;
+    connected: boolean;
+    message: string;
+    status: any;
+  }>('/notifications/configure-smtp', {
+    method: 'POST',
+    body: JSON.stringify(data)
+  }),
+
+  verifySmtp: () => apiRequest<{
+    success: boolean;
+    message: string;
+    code?: string;
+    status: any;
+  }>('/notifications/verify-smtp', {
+    method: 'POST'
+  }),
+
   // ==========================================
   // 🗓️ AGENDA SERVEUR & ALERTES BATEAU TEMPS RÉEL
   // ==========================================
