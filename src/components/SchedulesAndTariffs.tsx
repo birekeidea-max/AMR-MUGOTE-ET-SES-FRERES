@@ -23,16 +23,16 @@ const SchedulesAndTariffs: React.FC<SchedulesAndTariffsProps> = ({ siteSettings 
 
   const routes = [
     {
-      departure: "Bukavu (Port de Bukavu)",
-      destination: "Goma (Port de Goma)",
+      departure: "Bukavu (Beach Muhanzi)",
+      destination: "Goma (Port Public)",
       frequency: "Tous les jours",
-      schedules: ["07:30 (Mugote 1)", "11:00 (Mugote 2)", "14:30 (Mugote 3)"]
+      schedules: ["07:30 (Matin ➔ 12h30)", "18:00 (Soir ➔ 06h00 +1)"]
     },
     {
-      departure: "Goma (Port de Goma)",
-      destination: "Bukavu (Port de Bukavu)",
+      departure: "Goma (Port Public)",
+      destination: "Bukavu (Beach Muhanzi)",
       frequency: "Tous les jours",
-      schedules: ["07:30 (Mugote 2)", "11:00 (Mugote 3)", "14:30 (Mugote 1)"]
+      schedules: ["07:30 (Matin ➔ 12h30)", "18:00 (Soir ➔ 06h00 +1)"]
     }
   ];
 
@@ -44,17 +44,17 @@ const SchedulesAndTariffs: React.FC<SchedulesAndTariffsProps> = ({ siteSettings 
   ];
 
   return (
-    <section className="py-16 px-4 max-w-6xl mx-auto w-full" id="schedules-tariffs-section">
-      <div className="text-center mb-12">
-        <div className="inline-flex items-center gap-2 px-3 py-1 bg-maritime/5 rounded-full text-xs font-bold text-maritime uppercase tracking-widest mb-3">
+    <section className="py-8 px-4 max-w-6xl mx-auto w-full text-left" id="schedules-tariffs-section">
+      <div className="text-center mb-10">
+        <div className="inline-flex items-center gap-2 px-3.5 py-1.5 bg-gold/10 border border-gold/30 rounded-full text-xs font-black text-amber-400 uppercase tracking-widest mb-3">
           <Calendar className="w-3.5 h-3.5 text-gold" />
           <span>Planification & Grille Tarifaire</span>
         </div>
-        <h2 className="text-3xl font-extrabold text-maritime tracking-tight uppercase italic">
+        <h2 className="text-2xl sm:text-4xl font-extrabold text-white tracking-tight uppercase italic">
           Horaires & Tarifs Officiels
         </h2>
-        <p className="text-sm text-slate-500 mt-2 max-w-xl mx-auto font-medium">
-          Tarification unique et officielle pour chaque classe de voyage sur l'ensemble de nos navettes Lac Kivu.
+        <p className="text-sm text-slate-300 mt-2 max-w-xl mx-auto font-medium">
+          Tarification unique et officielle pour chaque classe de voyage sur l'ensemble de nos navettes Lac Kivu (Bukavu ⇄ Goma).
         </p>
       </div>
 
@@ -62,74 +62,74 @@ const SchedulesAndTariffs: React.FC<SchedulesAndTariffsProps> = ({ siteSettings 
         {routes.map((route, idx) => (
           <div 
             key={idx} 
-            className="bg-white border border-slate-100 rounded-3xl p-6 md:p-8 shadow-sm shadow-slate-100 hover:shadow-md hover:border-slate-200 transition-all duration-300 flex flex-col justify-between"
+            className="bg-[#0b1329] border border-white/10 rounded-3xl p-6 md:p-8 shadow-2xl flex flex-col justify-between text-left"
             id={`route-card-${idx}`}
           >
             <div>
               {/* Header de liaison */}
-              <div className="flex items-center gap-2 mb-4 pb-4 border-b border-slate-100">
-                <div className="w-10 h-10 rounded-full bg-[#001233]/5 flex items-center justify-center text-[#001233] shrink-0">
-                  <Ship className="w-5 h-5 text-gold" />
+              <div className="flex items-center gap-3 mb-6 pb-4 border-b border-white/10">
+                <div className="w-12 h-12 rounded-2xl bg-amber-400/10 border border-amber-400/20 flex items-center justify-center text-gold shrink-0 shadow-inner">
+                  <Ship className="w-6 h-6 text-gold" />
                 </div>
-                <div className="min-w-0">
-                  <span className="text-[10px] uppercase tracking-wider font-extrabold text-slate-400 block">Liaison maritime</span>
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    <span className="font-bold text-sm md:text-base text-maritime truncate">{route.departure.split(' ')[0]}</span>
-                    <ArrowRight className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                    <span className="font-bold text-sm md:text-base text-maritime truncate">{route.destination.split(' ')[0]}</span>
+                <div className="min-w-0 flex-1">
+                  <span className="text-[10px] uppercase tracking-widest font-black text-amber-400 block">Liaison Lacustre Quotidienne</span>
+                  <div className="flex items-center gap-2 flex-wrap mt-0.5">
+                    <span className="font-extrabold text-base md:text-lg text-white truncate">{route.departure.split(' ')[0]}</span>
+                    <ArrowRight className="w-4 h-4 text-amber-400 shrink-0" />
+                    <span className="font-extrabold text-base md:text-lg text-white truncate">{route.destination.split(' ')[0]}</span>
                   </div>
                 </div>
               </div>
 
               {/* Détails rapides */}
-              <div className="grid grid-cols-2 gap-4 mb-6">
-                <div className="bg-slate-50/70 p-3 rounded-2xl">
-                  <span className="text-[10px] uppercase font-bold text-slate-400 block mb-0.5">Fréquence</span>
-                  <span className="text-xs font-bold text-slate-700 flex items-center gap-1">
-                    <Calendar className="w-3.5 h-3.5 text-maritime" />
+              <div className="grid grid-cols-2 gap-3 mb-6">
+                <div className="bg-white/5 border border-white/10 p-3.5 rounded-2xl">
+                  <span className="text-[10px] uppercase font-black text-slate-400 block mb-1">Fréquence</span>
+                  <span className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
+                    <Calendar className="w-4 h-4 text-amber-400" />
                     {route.frequency}
                   </span>
                 </div>
-                <div className="bg-slate-50/70 p-3 rounded-2xl">
-                  <span className="text-[10px] uppercase font-bold text-slate-400 block mb-0.5">Voie de navigation</span>
-                  <span className="text-xs font-bold text-slate-700 flex items-center gap-1">
-                    <MapPin className="w-3.5 h-3.5 text-maritime" />
+                <div className="bg-white/5 border border-white/10 p-3.5 rounded-2xl">
+                  <span className="text-[10px] uppercase font-black text-slate-400 block mb-1">Voie de navigation</span>
+                  <span className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
+                    <MapPin className="w-4 h-4 text-amber-400" />
                     Lac Kivu (RDC)
                   </span>
                 </div>
               </div>
 
-              {/* Tableau HTML Sémantique pour le référencement et l'accessibilité */}
-              <div className="overflow-hidden border border-slate-100 rounded-2xl">
-                <table className="w-full text-left border-collapse bg-white text-xs">
+              {/* Tableau Sémantique */}
+              <div className="overflow-hidden border border-white/10 rounded-2xl">
+                <table className="w-full text-left border-collapse bg-[#070c1a] text-xs">
                   <thead>
-                    <tr className="bg-[#001233] text-white">
-                      <th className="py-3 px-4 font-bold uppercase tracking-wider">Classe Officielle</th>
-                      <th className="py-3 px-4 font-bold uppercase tracking-wider text-center">Départs</th>
-                      <th className="py-3 px-4 font-bold uppercase tracking-wider text-right">Tarif Unitaire</th>
+                    <tr className="bg-[#000814] text-white border-b border-white/10">
+                      <th className="py-3.5 px-4 font-black uppercase tracking-wider text-[10px]">Classe Officielle</th>
+                      <th className="py-3.5 px-4 font-black uppercase tracking-wider text-center text-[10px]">Départs</th>
+                      <th className="py-3.5 px-4 font-black uppercase tracking-wider text-right text-[10px]">Tarif Unitaire</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100">
+                  <tbody className="divide-y divide-white/5">
                     {classRows.map((cr, cIdx) => (
-                      <tr key={cIdx} className="hover:bg-slate-50/50 transition-colors">
-                        <td className="py-3 px-4 font-semibold text-slate-700">
-                          <div className="flex items-center gap-1.5">
-                            <span className="font-bold text-slate-900">{cr.name}</span>
+                      <tr key={cIdx} className="hover:bg-white/5 transition-colors">
+                        <td className="py-3.5 px-4 font-semibold text-slate-200">
+                          <div className="flex items-center gap-2">
+                            <span className="font-extrabold text-white text-sm">{cr.name}</span>
                             {cr.tag && (
-                              <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider ${cr.tagColor}`}>
+                              <span className={`text-[9px] px-2 py-0.5 rounded font-black uppercase tracking-wider ${cr.tagColor}`}>
                                 {cr.tag}
                               </span>
                             )}
                           </div>
-                          <span className="text-[10px] text-slate-400 font-medium block">{cr.subtitle}</span>
+                          <span className="text-[11px] text-slate-400 font-medium block mt-0.5">{cr.subtitle}</span>
                         </td>
-                        <td className="py-3 px-4 text-slate-600 font-medium text-center">
-                          <div className="inline-flex items-center gap-1 bg-slate-100 text-slate-700 px-2 py-0.5 rounded font-mono text-[10px] font-bold">
-                            <Clock className="w-2.5 h-2.5 text-maritime" /> 07:30 / 11:00 / 14:30
+                        <td className="py-3.5 px-4 text-center">
+                          <div className="inline-flex items-center gap-1.5 bg-white/10 border border-white/10 text-amber-300 px-2.5 py-1 rounded-lg font-mono text-[11px] font-bold">
+                            <Clock className="w-3 h-3 text-gold" /> 07:30 (Matin) / 18:00 (Soir)
                           </div>
                         </td>
-                        <td className="py-3 px-4 text-right font-black text-maritime text-sm font-mono whitespace-nowrap">
-                          {prices[cr.name]} USD
+                        <td className="py-3.5 px-4 text-right font-black text-amber-400 text-base font-mono whitespace-nowrap">
+                          {prices[cr.name]} $
                         </td>
                       </tr>
                     ))}
@@ -138,8 +138,9 @@ const SchedulesAndTariffs: React.FC<SchedulesAndTariffsProps> = ({ siteSettings 
               </div>
             </div>
             
-            <div className="mt-4 pt-3 text-[10px] text-slate-400 border-t border-slate-50 italic">
-              * Présentation au port d'embarquement au moins 45 minutes avant le départ.
+            <div className="mt-6 pt-3 text-xs text-slate-400 border-t border-white/10 flex items-center justify-between">
+              <span>* Embarquement 45 min avant l'horaire</span>
+              <span className="font-bold text-amber-400">Gilets de sauvetage certifiés inclus</span>
             </div>
           </div>
         ))}

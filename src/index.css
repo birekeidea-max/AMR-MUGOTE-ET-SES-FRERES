@@ -10,14 +10,15 @@
   --color-maritime-dark: #00040a;
   --color-maritime-light: #001b44;
   --color-gold: #FFC300;
-  --color-bg: #FFFFFF;
+  --color-bg: #030712;
+  --color-card-dark: #0a1122;
   --color-lacustre: #003049;
   --color-lake-shadow: #000814;
 }
 
 @layer base {
   body {
-    @apply bg-bg text-black antialiased font-sans text-center;
+    @apply bg-[#030712] text-slate-100 antialiased font-sans text-center selection:bg-amber-400 selection:text-black;
   }
 }
 

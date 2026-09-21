@@ -475,7 +475,7 @@ export function AdminRemindersView({ reservations, onRefresh }: AdminRemindersVi
           }`}
         >
           <Calendar size={15} />
-          Agenda Serveur & Passagers En direct ({agendaList.length})
+          1. Agenda Bateau & Passagers ({agendaList.length})
         </button>
 
         <button
@@ -487,7 +487,7 @@ export function AdminRemindersView({ reservations, onRefresh }: AdminRemindersVi
           }`}
         >
           <Send size={15} />
-          Rappels Départs Groupés
+          2. Rappels Départs & Billets
         </button>
 
         <button
@@ -498,8 +498,8 @@ export function AdminRemindersView({ reservations, onRefresh }: AdminRemindersVi
               : 'border-transparent text-slate-400 hover:text-slate-700'
           }`}
         >
-          <Mail size={15} />
-          Diagnostic & Test Gmail
+          <Key size={15} />
+          3. Configuration Gmail / SMTP & Tests
         </button>
       </div>
 

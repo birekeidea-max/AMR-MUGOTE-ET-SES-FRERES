@@ -9,6 +9,7 @@ import {
   LogIn, 
   LogOut,
   ChevronRight,
+  ChevronLeft,
   Lock,
   Phone,
   Mail,
@@ -32,6 +33,7 @@ import {
   ChevronRightCircle,
   Clock3,
   User,
+  Bell,
   MessageCircle,
   CheckCircle,
   XCircle,
@@ -65,12 +67,16 @@ import {
   Key,
   EyeOff,
   Info,
-  ShieldAlert
+  ShieldAlert,
+  Newspaper
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { MongoMigrationView } from './components/MongoMigrationView';
 import { AdminRemindersView } from './components/AdminRemindersView';
 import { DailyBoardingRecapTable } from './components/DailyBoardingRecapTable';
+import { FerryhopperBookingEngine } from './components/FerryhopperBookingEngine';
+import { HomeView } from './components/HomeView';
+import { PlatformAuthGate } from './components/PlatformAuthGate';
 import { mongoApi } from './services/api';
 import { auth, db, handleFirestoreError, OperationType, uploadToStorage } from './lib/firebase';
 import { 
@@ -156,7 +162,7 @@ try {
 const localStorage = safeLocalStorage;
 
 // --- Types ---
-type Page = 'home' | 'booking' | 'payment' | 'dashboard' | 'tickets' | 'news' | 'gallery' | 'users' | 'map';
+type Page = 'home' | 'booking' | 'payment' | 'dashboard' | 'tickets' | 'news' | 'gallery' | 'users' | 'map' | 'tarifs';
 
 // --- Constants ---
 const ADMIN_EMAIL_B64 = "YmlyZWtlaWRlYUBnbWFpbC5jb20=";
@@ -817,6 +823,18 @@ export default function App() {
     }
   }, [currentPage]);
   const [schedules, setSchedules] = useState<any[]>([]);
+  const [currency, setCurrency] = useState<'USD' | 'CDF'>('USD');
+
+  // Ref et défilement fluide de la barre de navigation
+  const navScrollRef = useRef<HTMLDivElement>(null);
+  const scrollNav = (direction: 'left' | 'right') => {
+    if (navScrollRef.current) {
+      navScrollRef.current.scrollBy({
+        left: direction === 'left' ? -280 : 280,
+        behavior: 'smooth'
+      });
+    }
+  };
 
   // MANDATORY: Test connection to Firestore on boot
   useEffect(() => {
@@ -1083,6 +1101,7 @@ export default function App() {
     localStorage.removeItem('mugote_admin_session');
     setIsAdmin(false);
     setIsAdminUnlocked(false);
+    setUser(null);
     signOut(auth);
   };
 
@@ -1100,151 +1119,181 @@ export default function App() {
     );
   }
 
-  if (!user && !verifyId) {
-    return (
-      <div className="min-h-screen bg-[#001233] flex flex-col justify-between font-sans relative overflow-hidden">
-        <JsonLdSchema />
-        {/* Subtle grid pattern first */}
-        <div className="absolute inset-0 grid-pattern pointer-events-none opacity-[0.05]"></div>
-        
-        {/* Centered content box */}
-        <div className="flex-1 flex items-center justify-center p-4 sm:p-8 relative z-10 w-full animate-fade-in">
-          <div className="w-full max-w-xl">
-            <LandingLogin 
-              siteSettings={siteSettings} 
-              onLoginSuccess={() => setCurrentPage('home')} 
-              setUser={setUser} 
-              setIsAdmin={setIsAdmin}
-              setIsAdminUnlocked={setIsAdminUnlocked}
-            />
-          </div>
-        </div>
-
-        {/* Minimal elegant footer for login screen */}
-        <div className="py-6 border-t border-white/5 relative z-10 text-center text-[10px] font-black tracking-widest text-slate-500 uppercase flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-4">
-          <span>Mugote Portage &copy; {new Date().getFullYear()} &bull; Tous droits réservés</span>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="min-h-screen bg-bg flex flex-col font-sans relative">
+    <div className="min-h-screen bg-[#edf0f5] flex flex-col font-sans relative text-slate-800">
       <JsonLdSchema />
-      <div className="absolute inset-0 grid-pattern pointer-events-none opacity-[0.05]"></div>
       
-      {/* HEADER + NAV WRAPPER (SCROLLABLE WITH PAGE) */}
-      <div className="relative z-[100] bg-white">
-        <header className="w-full bg-white relative">
-          <div className="w-full h-24 md:h-32 relative overflow-hidden">
-            <img 
-              src={siteSettings.homeBg || undefined} 
-              className="w-full h-full object-cover" 
-              alt="Mugote Fleet Background"
-              onError={(e) => {
-                (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1559139225-8216b8e8303e?q=80&w=2070&auto=format&fit=crop';
-              }}
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-white via-transparent to-black/30"></div>
-          </div>
-
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 flex items-center justify-between relative -mt-8 md:-mt-12 pb-4">
-            <div className="flex items-center gap-3 md:gap-4 cursor-pointer group" onClick={() => setCurrentPage('home')}>
-              <div className="w-16 h-16 md:w-24 md:h-24 rounded-full border-4 border-white shadow-xl overflow-hidden transition-all group-hover:scale-105 relative flex items-center justify-center bg-white">
-                <img 
-                  src={siteSettings.logo || siteSettings.homeDetail || "https://images.unsplash.com/photo-1544551763-46a013bb70d5?q=80&w=2070&auto=format&fit=crop"} 
-                  className="w-full h-full object-cover" 
-                  alt="Logo Mugote"
-                />
+      {/* HEADER SUPÉRIEUR GLASSMORPHISM MODERNE */}
+      <div className="sticky top-0 z-[100] bg-white/90 backdrop-blur-md border-b border-slate-200/80 shadow-xs">
+        <header className="w-full py-2.5 sm:py-3">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 flex items-center justify-between gap-4">
+            
+            {/* Logo compact "ETS AMR MUGOTE & FRÈRES" à gauche */}
+            <div className="flex items-center gap-2.5 cursor-pointer group shrink-0" onClick={() => setCurrentPage('home')}>
+              <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-blue-700 to-blue-500 text-white flex items-center justify-center shadow-md shadow-blue-600/25 group-hover:scale-105 transition">
+                <Ship size={20} className="text-white" />
               </div>
-              <div className="hidden sm:block">
-                <h1 className="text-sm md:text-xl font-black tracking-tighter italic uppercase text-maritime">
-                  ETS AMR MUGOTE <span className="text-gold">& FRÈRES</span>
+              <div className="text-left">
+                <h1 className="text-base sm:text-lg font-black tracking-tight uppercase text-blue-700 leading-tight">
+                  ETS AMR MUGOTE
                 </h1>
-                <p className="text-[8px] md:text-[10px] font-black tracking-widest text-slate-400 uppercase italic">VOYAGER EN TOUTE SÉCURITÉ</p>
+                <p className="text-[9px] font-black tracking-widest text-slate-400 uppercase">
+                  LAC KIVU • GOMA ⇄ BUKAVU
+                </p>
               </div>
             </div>
-            
-            <div className="flex items-center gap-2 sm:gap-3">
-               <button
-                 type="button"
-                 onClick={() => setIsTravelerScannerOpen(true)}
-                 className="flex items-center gap-1.5 px-3 py-2 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 rounded-xl text-[9px] font-black uppercase tracking-wider transition cursor-pointer shadow-sm"
-                 title="Scanner ou vérifier le statut d'un billet pour voir s'il peut embarquer"
-               >
-                 <QrCode size={14} className="text-amber-600" />
-                 <span className="hidden sm:inline">Vérifier Billet</span>
-                 <span className="sm:hidden">Statut</span>
-               </button>
 
-               {user && (
-                 <button onClick={() => setIsMenuOpen(true)} className="md:hidden p-3 bg-maritime text-white rounded-xl shadow-lg">
-                   <Menu size={18} />
-                 </button>
-               )}
+            {/* Actions à droite : Mon Compte / Déconnexion multi-client & Menu Mobile */}
+            <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+               {/* Profil / Mon compte avec Déconnexion facile pour changer de client */}
                {user ? (
-                 <div className="flex items-center gap-2 sm:gap-3">
-                   <div className="hidden md:block text-right">
-                     <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Connecté</p>
-                     <p className="text-xs font-black text-maritime">{user.displayName || user.email}</p>
+                 <div className="flex items-center gap-2 bg-slate-50 p-1.5 rounded-2xl border border-slate-200">
+                   <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white font-black text-xs flex items-center justify-center shadow-xs shrink-0">
+                     {(user.displayName || user.email || 'U')[0].toUpperCase()}
                    </div>
-                   <button onClick={logout} className="p-3 bg-slate-50 text-slate-400 hover:text-rose-600 rounded-xl transition-all border border-slate-100 shadow-sm" title="Déconnexion">
-                     <LogOut size={18} />
+                   <div className="hidden sm:block text-left px-1">
+                     <div className="flex items-center gap-1.5">
+                       <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                       <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider">
+                         {isAdmin ? "Admin" : "Connecté"}
+                       </p>
+                     </div>
+                     <p className="text-xs font-black text-slate-900 truncate max-w-[130px]">
+                       {user.displayName || user.email?.split('@')[0]}
+                     </p>
+                   </div>
+                   <button 
+                     onClick={logout} 
+                     className="flex items-center gap-1.5 px-3 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl text-xs font-black transition cursor-pointer shadow-xs active:scale-95"
+                     title="Déconnexion (permet à un autre voyageur ou client de se connecter)"
+                   >
+                     <LogOut size={15} />
+                     <span className="hidden sm:inline">Déconnexion</span>
                    </button>
                  </div>
                ) : (
                  <button 
                    onClick={() => setAuthModal({ isOpen: true, mode: 'user' })}
-                   className="hidden md:flex items-center gap-3 px-6 py-3 bg-maritime text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-xl shadow-maritime/20 hover:scale-105 active:scale-95 transition-all"
+                   className="flex items-center gap-2 px-3.5 sm:px-4 py-2 sm:py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs sm:text-sm font-black shadow-md shadow-blue-600/20 transition cursor-pointer active:scale-95 border border-blue-500"
+                   title="Se connecter pour accéder à vos billets"
                  >
-                   <LogIn size={14} />
-                   Connexion
+                   <User size={16} />
+                   <span>Connexion</span>
+                 </button>
+               )}
+
+               {/* Menu hamburger pour mobile */}
+               {user && (
+                 <button 
+                   onClick={() => setIsMenuOpen(true)} 
+                   className="lg:hidden p-2 text-slate-700 hover:bg-slate-100 rounded-xl border border-slate-200 flex items-center justify-center cursor-pointer shadow-xs"
+                   title="Menu complet"
+                 >
+                   <Menu size={22} />
                  </button>
                )}
             </div>
           </div>
-        </header>
 
-        <nav className="bg-[#001233] w-full border-b border-white/5">
-          <div className="max-w-7xl mx-auto px-2 sm:px-4 py-2 sm:py-3 overflow-x-auto no-scrollbar">
-            <div className="flex items-center justify-center gap-1.5 sm:gap-3">
-              {user ? [
-                { id: 'home', label: 'ACCUEIL' },
-                { id: 'booking', label: 'RÉSERVER' },
-                { id: 'tickets', label: 'BILLETS' },
-                { id: 'news', label: 'JOURNAL' },
-                { id: 'gallery', label: 'FLOTTE' },
-                { id: 'map', label: 'LOCALISATION' },
-                { id: 'dashboard', label: '⚙️ ADMINISTRATION COMITÉ', adminOnly: true }
-              ].map(item => {
-                if (item.adminOnly && !isAdmin) return null;
-                return (
-                  <button 
-                    key={item.id}
-                    onClick={() => setCurrentPage(item.id as Page)} 
-                    className={cn(
-                      "px-3 sm:px-5 py-2 sm:py-2.5 rounded-lg sm:rounded-xl font-black uppercase tracking-widest transition-all duration-300 text-[8px] sm:text-[10px]",
-                      currentPage === item.id 
-                        ? item.id === 'dashboard'
-                          ? "bg-emerald-600 text-white shadow-xl shadow-emerald-500/20 font-black"
-                          : "bg-gold text-maritime shadow-xl shadow-gold/20" 
-                        : item.id === 'dashboard'
-                          ? "text-emerald-400 border border-emerald-500/30 bg-emerald-950/40 hover:bg-emerald-900/40 font-black flex items-center gap-1"
-                          : "text-white/40 hover:text-white hover:bg-white/5"
-                    )}
-                  >
-                    {item.label}
-                  </button>
-                );
-              }) : (
-                <div className="flex items-center gap-2 py-2">
-                  <Lock size={12} className="text-gold" />
-                  <span className="text-[9px] font-black text-white/50 uppercase tracking-[0.4em]">Authentification Requise</span>
-                </div>
-              )}
+          {/* ========================================================= */}
+          {/* BARRE DE NAVIGATION PRINCIPALE DÉFILANTE & BIEN VISIBLE   */}
+          {/* S'adapte à tous les écrans, défilement fluide vers onglet */}
+          {/* Visible seulement si l'utilisateur est authentifié        */}
+          {/* ========================================================= */}
+          {user && (
+            <div className="w-full border-t border-slate-200/90 mt-2.5 pt-2 bg-slate-50/80">
+              <div className="max-w-7xl mx-auto px-2 sm:px-4 flex items-center gap-1 sm:gap-2">
+                {/* Bouton défilement vers la gauche */}
+                <button 
+                  type="button"
+                  onClick={() => scrollNav('left')}
+                  className="p-2 sm:p-2.5 rounded-xl bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 shadow-xs transition shrink-0 cursor-pointer active:scale-90"
+                  title="Défiler vers la gauche"
+                >
+                  <ChevronLeft size={18} className="stroke-[2.5]" />
+                </button>
+
+                {/* Conteneur défilant des onglets de grande taille */}
+                <nav 
+                  ref={navScrollRef}
+                  className="flex-1 overflow-x-auto scroll-smooth no-scrollbar touch-pan-x flex items-center gap-2.5 py-1 px-1"
+                >
+                  {[
+                    { id: 'home', label: 'ACCUEIL', icon: Anchor, sub: 'Goma ⇄ Bukavu' },
+                    { id: 'booking', label: 'RÉSERVER UN BILLET', icon: Ticket, highlight: true, sub: 'Sièges & Tarifs' },
+                    { id: 'tickets', label: 'MES BILLETS & QR', icon: QrCode, sub: 'Embarquement' },
+                    { id: 'tarifs', label: 'HORAIRES (07H30 & 18H00)', icon: Clock, sub: 'Matin & Soir' },
+                    { id: 'gallery', label: 'LA FLOTTE', icon: Ship, sub: 'Mugote 1, 2, 3' },
+                    { id: 'map', label: 'PORTS & LOCALISATION', icon: MapPin, sub: 'Goma • Beach Muhanzi' },
+                    { id: 'news', label: 'JOURNAL & AVIS', icon: Newspaper, sub: 'Actualités' },
+                    { id: 'dashboard', label: 'ADMINISTRATION', icon: Lock, adminOnly: true, sub: 'Console sécurisée' }
+                  ].map((item) => {
+                    const isDashboard = item.id === 'dashboard';
+                    const isActive = currentPage === item.id;
+                    const Icon = item.icon;
+
+                    return (
+                      <button
+                        key={item.id}
+                        onClick={(e) => {
+                          // Défilement fluide de l'onglet cliqué au centre de la barre
+                          e.currentTarget.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+                          if (isDashboard && !isAdminUnlocked) {
+                            setAuthModal({ isOpen: true, mode: 'admin' });
+                          } else {
+                            setCurrentPage(item.id as Page);
+                          }
+                        }}
+                        className={cn(
+                          "px-4 sm:px-5 py-2.5 sm:py-3 rounded-2xl font-black uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap flex items-center gap-2.5 border-2 shadow-sm shrink-0 active:scale-95",
+                          isActive
+                            ? "bg-blue-600 text-white border-blue-700 shadow-md shadow-blue-600/30 scale-102 ring-2 ring-blue-400/20"
+                            : item.highlight
+                            ? "bg-amber-400 hover:bg-amber-500 text-slate-950 border-amber-500 shadow-sm font-black"
+                            : isDashboard
+                            ? "bg-slate-900 text-amber-400 hover:bg-black border-slate-800"
+                            : "bg-white text-slate-800 hover:text-blue-700 hover:bg-blue-50/80 border-slate-300 hover:border-blue-400"
+                        )}
+                      >
+                        <div className={cn(
+                          "p-1.5 rounded-xl flex items-center justify-center shrink-0",
+                          isActive 
+                            ? "bg-white/20 text-white" 
+                            : item.highlight 
+                            ? "bg-slate-950 text-amber-400" 
+                            : isDashboard 
+                            ? "bg-slate-800 text-amber-400" 
+                            : "bg-blue-50 text-blue-700"
+                        )}>
+                          <Icon size={17} className="stroke-[2.5]" />
+                        </div>
+                        <div className="text-left">
+                          <div className="text-xs sm:text-sm font-black leading-tight">{item.label}</div>
+                          <div className={cn(
+                            "text-[9px] font-bold lowercase tracking-normal",
+                            isActive ? "text-blue-100" : item.highlight ? "text-slate-900" : isDashboard ? "text-slate-400" : "text-slate-400"
+                          )}>
+                            {item.sub}
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </nav>
+
+                {/* Bouton défilement vers la droite */}
+                <button 
+                  type="button"
+                  onClick={() => scrollNav('right')}
+                  className="p-2 sm:p-2.5 rounded-xl bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 shadow-xs transition shrink-0 cursor-pointer active:scale-90"
+                  title="Défiler vers la droite"
+                >
+                  <ChevronRight size={18} className="stroke-[2.5]" />
+                </button>
+              </div>
             </div>
-          </div>
-        </nav>
+          )}
+        </header>
       </div>
 
       {/* Mobile Menu */}
@@ -1254,97 +1303,76 @@ export default function App() {
             initial={{ opacity: 0, x: '100%' }}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: '100%' }}
-            className="fixed inset-0 z-[100] bg-[#001233] flex flex-col p-8 md:hidden"
+            className="fixed inset-0 z-[100] bg-black flex flex-col p-6 sm:p-8 lg:hidden border-l border-white/20"
           >
-            <div className="flex justify-between items-center mb-12">
+            <div className="flex justify-between items-center mb-8 pb-4 border-b border-white/20">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-white/10 rounded-xl overflow-hidden border border-white/20 flex items-center justify-center">
-                  {siteSettings.logo || siteSettings.homeDetail ? (
-                    <img 
-                      src={siteSettings.logo || siteSettings.homeDetail || undefined} 
-                      className="w-full h-full object-cover" 
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1559139225-8216b8e8303e?q=80&w=2070&auto=format&fit=crop";
-                      }}
-                    />
-                  ) : (
-                    <Ship className="text-gold" size={20} />
-                  )}
+                  <Ship className="text-white" size={22} />
                 </div>
-                <span className="font-extrabold text-white tracking-tighter text-xl uppercase italic">AMR MUGOTE</span>
+                <div>
+                  <span className="font-black text-white tracking-tight text-base uppercase">ETS AMR MUGOTE</span>
+                  <span className="text-[10px] text-neutral-400 font-bold block">Bukavu ⇄ Goma</span>
+                </div>
               </div>
-              <button onClick={() => setIsMenuOpen(false)} className="p-3 bg-white/10 rounded-xl text-white hover:bg-white/20 transition-all">
-                <X size={24} />
+              <button onClick={() => setIsMenuOpen(false)} className="p-2.5 bg-white/10 rounded-xl text-white hover:bg-white/20 transition-all cursor-pointer border border-white/20">
+                <X size={22} />
               </button>
             </div>
             
-            <div className="flex-1 space-y-4 overflow-y-auto no-scrollbar">
-              {user ? [
-                { id: 'home', label: 'ACCUEIL' },
-                { id: 'booking', label: 'RÉSERVER' },
-                { id: 'tickets', label: 'MES BILLETS' },
-                { id: 'map', label: 'LOCALISATION' },
-                { id: 'news', label: 'JOURNAL', anchor: 'news-feed' },
-                { id: 'gallery', label: 'FLOTTE', anchor: 'fleet-gallery' },
-                { id: 'tarifs', label: 'TARIFS', anchor: 'prices' },
-                { id: 'horaires', label: 'HORAIRES', anchor: 'routes' },
-                { id: 'dashboard', label: 'ADMINISTRATION', adminOnly: true }
+            <div className="flex-1 space-y-2.5 overflow-y-auto no-scrollbar">
+              {[
+                { id: 'home', label: 'ACCUEIL', icon: Anchor },
+                { id: 'booking', label: 'RÉSERVER UN BILLET', icon: Ticket },
+                { id: 'tickets', label: 'MES BILLETS', icon: QrCode },
+                { id: 'tarifs', label: 'HORAIRES & TARIFS', icon: Clock },
+                { id: 'gallery', label: 'NOTRE FLOTTE', icon: Ship },
+                { id: 'map', label: 'PORTS & LOCALISATION', icon: MapPin },
+                { id: 'news', label: 'JOURNAL & AVIS', icon: Newspaper },
+                { id: 'dashboard', label: 'ADMINISTRATION', icon: Lock, adminOnly: true }
               ].map(item => {
-                if (item.adminOnly && !isAdmin) return null;
-                
                 const isDashboard = item.id === 'dashboard';
-
+                const Icon = item.icon;
+                const isActive = currentPage === item.id;
                 return (
                   <button 
                     key={item.id}
                     onClick={() => {
                       setIsMenuOpen(false);
-                      if (item.anchor) {
-                        setCurrentPage('home');
-                        setTimeout(() => {
-                          document.getElementById(item.anchor!)?.scrollIntoView({ behavior: 'smooth' });
-                        }, 100);
+                      if (isDashboard && !isAdminUnlocked) {
+                        setAuthModal({ isOpen: true, mode: 'admin' });
                       } else {
                         setCurrentPage(item.id as Page);
                       }
                     }}
                     className={cn(
-                      "w-full px-8 rounded-2xl text-left font-black uppercase tracking-widest transition-all duration-300 relative overflow-hidden",
-                      isDashboard ? "py-6 text-2xl border-2 border-emerald-500/30" : "py-5 text-xl",
-                      currentPage === item.id 
-                        ? isDashboard
-                          ? "bg-emerald-600 text-white shadow-2xl shadow-emerald-500/40 scale-[1.02]"
-                          : "bg-gold text-maritime shadow-2xl shadow-gold/20" 
+                      "w-full px-5 py-4 rounded-2xl text-left font-black uppercase tracking-wider transition-all duration-200 relative overflow-hidden flex items-center justify-between cursor-pointer border",
+                      isActive 
+                        ? "bg-white text-black border-white shadow-xl shadow-white/20"
                         : isDashboard
-                          ? "bg-emerald-950/50 text-emerald-400 border-emerald-500/20 shadow-lg shadow-emerald-900/10"
-                          : "text-white/70 hover:text-white hover:bg-white/5"
+                        ? "text-amber-400 hover:text-white hover:bg-white/10 border-amber-500/30 bg-[#121212]"
+                        : "text-neutral-200 hover:text-white hover:bg-white/10 border-white/20 bg-[#0d0d0d]"
                     )}
                   >
-                    <span className="relative z-10">{item.label}</span>
+                    <div className="flex items-center gap-3 relative z-10">
+                      {Icon && <Icon size={18} className={isActive ? "text-black" : isDashboard ? "text-amber-400" : "text-white"} />}
+                      <span>{item.label}</span>
+                    </div>
+                    {isDashboard && <Lock size={16} className={isActive ? "text-black" : "text-amber-400"} />}
                   </button>
                 );
-              }) : (
-                <div className="flex flex-col items-center justify-center h-full gap-6 px-8 text-center">
-                  <div className="w-20 h-20 bg-white/5 rounded-full flex items-center justify-center border border-white/10 mb-4">
-                    <Lock size={32} className="text-gold" />
-                  </div>
-                  <h3 className="text-xl font-black text-white italic uppercase tracking-tighter">Accès Restreint</h3>
-                  <p className="text-white/40 text-xs font-bold uppercase tracking-widest leading-relaxed">
-                    Veuillez vous authentifier sur la page d'accueil pour accéder aux services.
-                  </p>
-                </div>
-              )}
+              })}
             </div>
 
-            <div className="pt-12 space-y-6">
+            <div className="pt-8 space-y-4">
               {user && (
-                <div className="p-6 bg-white/5 rounded-2xl flex items-center justify-between border border-white/10">
+                <div className="p-4 bg-white/5 rounded-2xl flex items-center justify-between border border-white/10">
                   <div>
-                    <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest mb-1">{isAdmin ? "PROFIL ADMIN" : "PROFIL PASSAGER"}</p>
-                    <p className="font-bold text-white text-lg">{user.displayName || "Passager"}</p>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">{isAdmin ? "PROFIL ADMIN" : "PROFIL PASSAGER"}</p>
+                    <p className="font-bold text-white text-sm">{user.displayName || user.email}</p>
                   </div>
-                  <button onClick={() => { setIsMenuOpen(false); logout(); }} className="p-4 text-rose-400 bg-rose-400/10 rounded-xl hover:bg-rose-400/20 transition-all">
-                    <LogOut size={24} />
+                  <button onClick={() => { setIsMenuOpen(false); logout(); }} className="p-3 text-rose-400 bg-rose-500/10 rounded-xl hover:bg-rose-500/20 transition-all cursor-pointer">
+                    <LogOut size={20} />
                   </button>
                 </div>
               )}
@@ -1353,32 +1381,59 @@ export default function App() {
         )}
       </AnimatePresence>
 
-      <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-8 py-4 sm:py-6 relative z-10 text-center">
+      <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 py-6 relative z-10 text-center">
         <AnimatePresence mode="wait">
           {verifyId ? (
             <VerificationView id={verifyId} onClose={() => { setVerifyId(null); window.history.pushState({}, '', '/'); }} isAdmin={isAdmin} siteSettings={siteSettings} />
           ) : !user ? (
-            <LandingLogin 
-              siteSettings={siteSettings} 
-              onLoginSuccess={() => setCurrentPage('home')} 
-              setUser={setUser} 
+            <PlatformAuthGate 
+              onSuccess={() => {
+                setCurrentPage('home');
+              }}
+              setUser={setUser}
               setIsAdmin={setIsAdmin}
               setIsAdminUnlocked={setIsAdminUnlocked}
+              siteSettings={siteSettings}
             />
           ) : (
             <>
-              {currentPage === 'home' && <Home onBook={() => setCurrentPage('booking')} onNavigate={(p) => setCurrentPage(p as Page)} siteSettings={siteSettings} schedules={schedules} />}
-              {currentPage === 'booking' && (
-                <Booking 
-                  onReserved={(res) => { setCurrentReservation(res); setCurrentPage('payment'); }} 
-                  user={user} 
+              {currentPage === 'home' && (
+                <HomeView 
+                  onBook={() => setCurrentPage('booking')} 
+                  onNavigate={(p) => setCurrentPage(p as Page)} 
+                  siteSettings={siteSettings} 
+                  schedules={schedules} 
+                  user={user}
                   onLoginRequest={() => setAuthModal({ isOpen: true, mode: 'user' })}
-                  siteSettings={siteSettings}
+                  onLogout={logout}
+                  onOpenScanner={() => setIsTravelerScannerOpen(true)}
                 />
               )}
+              {currentPage === 'booking' && (
+                <div className="py-2 text-left">
+                  <FerryhopperBookingEngine 
+                    user={user} 
+                    siteSettings={siteSettings} 
+                    onLoginRequest={() => setAuthModal({ isOpen: true, mode: 'user' })}
+                    onTicketGenerated={(res) => { setCurrentReservation(res); }}
+                    onViewAllTickets={() => setCurrentPage('tickets')}
+                  />
+                </div>
+              )}
               {currentPage === 'payment' && <Payment reservation={currentReservation} onComplete={() => setCurrentPage('tickets')} siteSettings={siteSettings} />}
-              {currentPage === 'dashboard' && <Dashboard siteSettings={siteSettings} onNavigate={(p) => setCurrentPage(p as Page)} schedules={schedules} isAdmin={isAdmin} isAdminUnlocked={isAdminUnlocked} setIsAdminUnlocked={setIsAdminUnlocked} setUser={setUser} />}
-              {currentPage === 'tickets' && <MyTickets user={user} siteSettings={siteSettings} onOpenScanner={() => setIsTravelerScannerOpen(true)} />}
+              {currentPage === 'dashboard' && (
+                <Dashboard 
+                  siteSettings={siteSettings} 
+                  onNavigate={(p) => setCurrentPage(p as Page)} 
+                  schedules={schedules} 
+                  isAdmin={isAdmin} 
+                  isAdminUnlocked={isAdminUnlocked} 
+                  setIsAdminUnlocked={setIsAdminUnlocked} 
+                  setUser={setUser}
+                />
+              )}
+              {currentPage === 'tickets' && <MyTickets user={user} siteSettings={siteSettings} onOpenScanner={() => setIsTravelerScannerOpen(true)} onLoginRequest={() => setAuthModal({ isOpen: true, mode: 'user' })} />}
+              {currentPage === 'tarifs' && <SchedulesAndTariffs siteSettings={siteSettings} />}
               {currentPage === 'news' && <NewsView />}
               {currentPage === 'gallery' && <GalleryView siteSettings={siteSettings} />}
               {currentPage === 'users' && <UsersListView />}
@@ -1389,76 +1444,186 @@ export default function App() {
         </AnimatePresence>
       </main>
 
-      <footer className="relative py-20 px-8 mt-12 w-full text-center overflow-hidden group">
-        {/* Background Image with Overlay */}
-        <div className="absolute inset-0 z-0">
-          <img 
-            src={siteSettings.homeDetail} 
-            className="w-full h-full object-cover transition-transform duration-[10s] group-hover:scale-110" 
-            alt="Footer Background"
-            onError={(e) => {
-              (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1544551763-46a013bb70d5?q=80&w=2070&auto=format&fit=crop";
-            }}
-          />
-          {/* Background Image fully visible */}
-        </div>
-
-        <div className="max-w-7xl mx-auto flex flex-col items-center text-center space-y-16 relative z-10">
-          <div className="space-y-4">
-            <h5 className="text-4xl font-serif italic text-white leading-none tracking-tighter uppercase">
-              AMR MUGOTE <br/>& SES FRERES
-            </h5>
-            <p className="text-[11px] font-black tracking-[0.5em] text-gold italic uppercase">
-              Voyager en toute sécurité
-            </p>
-          </div>
+      {/* FOOTER STYLE CHEAPOAIR ROYAL BLUE & MODERN */}
+      <footer className="relative bg-[#003594] text-white pt-12 pb-8 px-4 sm:px-6 mt-16 border-t-4 border-blue-400" id="platform-footer">
+        <div className="max-w-7xl mx-auto">
           
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-16 w-full pt-16 border-t border-white/10 items-start">
-            <div className="space-y-6">
-              <h6 className="text-[10px] font-black uppercase tracking-[0.4em] text-white italic underline underline-offset-8 decoration-gold/50">Contact & Support</h6>
-              <ul className="space-y-4 text-white/60 text-[10px] font-bold uppercase tracking-[0.2em]">
-                <li className="flex items-center justify-center gap-3 hover:text-white transition-colors font-mono font-bold"> 
-                  <span className="w-1.5 h-1.5 bg-gold rounded-full" /> {CONTACT_NUMBERS.join(' / ')}
-                </li>
-                <li className="flex items-center justify-center gap-3 hover:text-white transition-colors"> 
-                  <span className="w-1.5 h-1.5 bg-gold rounded-full" /> contact@amrmugote.com
-                </li>
-                <li className="flex items-center justify-center gap-3 hover:text-white transition-colors"> 
-                  <span className="w-1.5 h-1.5 bg-gold rounded-full" /> Port de Bukavu / Goma
-                </li>
-              </ul>
+          {/* BANNIÈRE D'APPEL / SUPPORT CHEAPOAIR */}
+          <div className="bg-[#00256c] rounded-2xl p-4 sm:p-6 mb-12 flex flex-col md:flex-row items-center justify-between gap-4 border border-blue-400/30 shadow-lg shadow-blue-950/40">
+            <div className="flex items-center gap-4 text-left">
+              <div className="w-12 h-12 rounded-full bg-amber-400 text-blue-950 font-black flex items-center justify-center shrink-0 shadow-md">
+                <PhoneCall size={22} className="text-blue-950" />
+              </div>
+              <div>
+                <span className="text-[10px] font-black uppercase tracking-wider text-amber-300 bg-amber-400/20 px-2 py-0.5 rounded-md">
+                  Assistance Directe & Réservations
+                </span>
+                <h4 className="text-base sm:text-lg font-black text-white mt-0.5">
+                  Besoin d'un renseignement ou réservation téléphonique ?
+                </h4>
+                <p className="text-xs text-blue-200">
+                  Notre équipe de capitainerie est disponible 7j/7 pour vous assister à Bukavu et Goma.
+                </p>
+              </div>
             </div>
-            <div className="space-y-6">
-              <h6 className="text-[10px] font-black uppercase tracking-[0.4em] text-white italic underline underline-offset-8 decoration-gold/50">Navigation</h6>
-              <ul className="space-y-4 text-white/60 text-[10px] font-bold uppercase tracking-[0.2em]">
-                <li><button onClick={() => setCurrentPage('home')} className="hover:text-gold transition-colors cursor-pointer uppercase">Accueil</button></li>
-                <li><button onClick={() => setCurrentPage('booking')} className="hover:text-gold transition-colors cursor-pointer uppercase">Réservations</button></li>
-                <li><button onClick={() => setCurrentPage('news')} className="hover:text-gold transition-colors cursor-pointer uppercase">Journal de Bord</button></li>
-              </ul>
-            </div>
-            <div className="space-y-6">
-              <h6 className="text-[10px] font-black uppercase tracking-[0.4em] text-white italic underline underline-offset-8 decoration-gold/50">Flotte Officielle</h6>
-              <ul className="space-y-4 text-white/60 text-[10px] font-bold uppercase tracking-[0.2em]">
-                <li className="italic hover:text-white transition-colors">M/V MUGOTE 1</li>
-                <li className="italic hover:text-white transition-colors">M/V MUGOTE 2</li>
-                <li className="italic hover:text-white transition-colors">M/V MUGOTE 3</li>
-              </ul>
+
+            <div className="flex items-center gap-3 shrink-0">
+              <a 
+                href="tel:+243994102673" 
+                className="px-5 py-2.5 bg-amber-400 hover:bg-amber-300 text-blue-950 font-black rounded-xl text-xs flex items-center gap-2 shadow-md transition-all cursor-pointer"
+              >
+                <PhoneCall size={15} />
+                <span>+243 994 102 673</span>
+              </a>
+              <a 
+                href="https://wa.me/243994102673" 
+                target="_blank" 
+                rel="noreferrer"
+                className="px-4 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white font-black rounded-xl text-xs flex items-center gap-1.5 shadow-md transition cursor-pointer"
+              >
+                <span>WhatsApp</span>
+              </a>
             </div>
           </div>
 
-          <div className="pt-16 border-t border-white/5 w-full flex flex-col items-center gap-4">
-            {isAdmin && (
-              <button 
-                onClick={() => setAuthModal({ isOpen: true, mode: 'admin' })}
-                className="text-[9px] font-bold text-[#d4af37] uppercase tracking-[0.6em] hover:text-white transition-colors mb-2 cursor-pointer"
-              >
-                ADMINISTRATION
-              </button>
-            )}
-            <p className="text-[9px] font-bold text-white/30 uppercase tracking-[0.6em]">
-              © {new Date().getFullYear()} ETS AMR MUGOTE ET SES FRERES • NAVIGATION LACUSTRE
-            </p>
+          {/* 5 COLONNES STYLE CHEAPOAIR */}
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-8 pb-12 border-b border-blue-800/80 text-xs">
+            
+            {/* Colonne 1: Liens Rapides */}
+            <div className="space-y-3">
+              <div className="inline-flex items-center gap-1 bg-white/10 hover:bg-white/15 px-2.5 py-1 rounded-full text-[11px] font-black uppercase tracking-wider text-blue-200 cursor-pointer">
+                <span>Quick Links</span>
+                <span className="text-amber-300">&gt;</span>
+              </div>
+              <h5 className="font-black text-white text-sm">Trajets Populaires</h5>
+              <ul className="space-y-2 text-blue-200 font-medium">
+                <li><button onClick={() => setCurrentPage('booking')} className="hover:text-amber-300 transition text-left cursor-pointer">Bukavu ⇄ Goma Direct</button></li>
+                <li><button onClick={() => setCurrentPage('booking')} className="hover:text-amber-300 transition text-left cursor-pointer">Goma ⇄ Bukavu Matin</button></li>
+                <li><button onClick={() => setCurrentPage('tarifs')} className="hover:text-amber-300 transition text-left cursor-pointer">Traversée Express 2h45</button></li>
+                <li><button onClick={() => setCurrentPage('tarifs')} className="hover:text-amber-300 transition text-left cursor-pointer">Liaison Île d'Idjwi</button></li>
+                <li><button onClick={() => setCurrentPage('map')} className="hover:text-amber-300 transition text-left cursor-pointer">Port de Bukavu (SNCC)</button></li>
+                <li><button onClick={() => setCurrentPage('map')} className="hover:text-amber-300 transition text-left cursor-pointer">Port Public de Goma</button></li>
+              </ul>
+            </div>
+
+            {/* Colonne 2: Book / Réserver */}
+            <div className="space-y-3">
+              <h5 className="font-black text-white text-sm uppercase tracking-wide">Réserver</h5>
+              <ul className="space-y-2 text-blue-200 font-medium">
+                <li><button onClick={() => setCurrentPage('booking')} className="hover:text-amber-300 transition text-left cursor-pointer">Billets de Bateau</button></li>
+                <li><button onClick={() => setCurrentPage('booking')} className="hover:text-amber-300 transition text-left cursor-pointer">Classe VIP Panoramique</button></li>
+                <li><button onClick={() => setCurrentPage('booking')} className="hover:text-amber-300 transition text-left cursor-pointer">1ère Classe Confort</button></li>
+                <li><button onClick={() => setCurrentPage('booking')} className="hover:text-amber-300 transition text-left cursor-pointer">2ème & 3ème Classe Éco</button></li>
+                <li><button onClick={() => setCurrentPage('booking')} className="hover:text-amber-300 transition text-left cursor-pointer">Réservation de Groupe</button></li>
+                <li><button onClick={() => setCurrentPage('booking')} className="hover:text-amber-300 transition text-left cursor-pointer">Transport Colis & Fret</button></li>
+              </ul>
+            </div>
+
+            {/* Colonne 3: Traveler Tools / Outils Passagers */}
+            <div className="space-y-3">
+              <h5 className="font-black text-white text-sm uppercase tracking-wide">Outils Passagers</h5>
+              <ul className="space-y-2 text-blue-200 font-medium">
+                <li><button onClick={() => setIsTravelerScannerOpen(true)} className="hover:text-amber-300 transition text-left cursor-pointer font-bold text-amber-200">Vérifier mon Billet (QR)</button></li>
+                <li><button onClick={() => setCurrentPage('tickets')} className="hover:text-amber-300 transition text-left cursor-pointer">Télécharger mon E-Billet</button></li>
+                <li><button onClick={() => setCurrentPage('tarifs')} className="hover:text-amber-300 transition text-left cursor-pointer">Horaires & Fréquences</button></li>
+                <li><button onClick={() => setCurrentPage('map')} className="hover:text-amber-300 transition text-left cursor-pointer">Localisation des Ports</button></li>
+                <li><button onClick={() => alert("Bagages autorisés : 20 kg par passager standard, 35 kg en VIP.")} className="hover:text-amber-300 transition text-left cursor-pointer">Règles sur les Bagages</button></li>
+                <li><button onClick={() => setCurrentPage('news')} className="hover:text-amber-300 transition text-left cursor-pointer">Météo & État du Lac Kivu</button></li>
+              </ul>
+            </div>
+
+            {/* Colonne 4: About AMR Mugote */}
+            <div className="space-y-3">
+              <h5 className="font-black text-white text-sm uppercase tracking-wide">À Propos d'AMR Mugote</h5>
+              <ul className="space-y-2 text-blue-200 font-medium">
+                <li><button onClick={() => setCurrentPage('gallery')} className="hover:text-amber-300 transition text-left cursor-pointer">Notre Flotte Officielle</button></li>
+                <li><button onClick={() => setCurrentPage('home')} className="hover:text-amber-300 transition text-left cursor-pointer">Histoire de la Compagnie</button></li>
+                <li><button onClick={() => setCurrentPage('gallery')} className="hover:text-amber-300 transition text-left cursor-pointer">Normes de Sécurité</button></li>
+                <li><button onClick={() => setCurrentPage('news')} className="hover:text-amber-300 transition text-left cursor-pointer">Journal & Actualités</button></li>
+                <li><button onClick={() => alert("Rejoignez les équipes d'ETS AMR MUGOTE. Envoyez votre CV à contact@amrmugote.com")} className="hover:text-amber-300 transition text-left cursor-pointer">Carrières & Équipage</button></li>
+                <li><button onClick={() => alert("Notre engagement : navigation 100% sécurisée avec gilets homologués pour chaque passager.")} className="hover:text-amber-300 transition text-left cursor-pointer">Engagement Qualité</button></li>
+              </ul>
+            </div>
+
+            {/* Colonne 5: Legal & Console */}
+            <div className="space-y-3">
+              <h5 className="font-black text-white text-sm uppercase tracking-wide">Légal & Console</h5>
+              <ul className="space-y-2 text-blue-200 font-medium">
+                <li><button onClick={() => alert("Conditions Générales : Billet valable pour le jour et l'heure indiqués. Présentation d'une pièce d'identité obligatoire.")} className="hover:text-amber-300 transition text-left cursor-pointer">Conditions Générales</button></li>
+                <li><button onClick={() => alert("Protection des données personnelles assurée conformément aux lois en vigueur en RDC.")} className="hover:text-amber-300 transition text-left cursor-pointer">Politique de Confidentialité</button></li>
+                <li><button onClick={() => alert("Taxes portuaires et d'embarquement incluses dans les tarifs affichés.")} className="hover:text-amber-300 transition text-left cursor-pointer">Taxes Portuaires RDC</button></li>
+                <li><button onClick={() => alert("Assurance maritime incluse pour tous les passagers à bord de notre flotte.")} className="hover:text-amber-300 transition text-left cursor-pointer">Assurance Maritime</button></li>
+                <li className="pt-2">
+                  <button 
+                    onClick={() => {
+                      if (isAdmin) {
+                        setCurrentPage('dashboard');
+                      } else {
+                        setAuthModal({ isOpen: true, mode: 'admin' });
+                      }
+                    }} 
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white font-black text-[11px] border border-white/20 transition cursor-pointer"
+                  >
+                    <Lock size={12} className="text-amber-400" />
+                    <span>Console Admin</span>
+                  </button>
+                </li>
+              </ul>
+            </div>
+
           </div>
+
+          {/* BADGES DE CONFIANCE & MOYENS DE PAIEMENT SÉCURISÉS */}
+          <div className="py-8 flex flex-col md:flex-row items-center justify-between gap-6 border-b border-blue-800/80">
+            <div className="flex flex-wrap items-center justify-center md:justify-start gap-2 sm:gap-3 text-white">
+              <span className="text-[10px] font-black uppercase tracking-wider text-blue-300 mr-1">
+                Paiements Sécurisés :
+              </span>
+              <div className="px-2.5 py-1 bg-white rounded-md text-[#eb001b] font-black text-[10px] shadow-xs flex items-center gap-1">
+                <span className="w-2.5 h-2.5 rounded-full bg-[#eb001b] inline-block" />
+                <span>Mastercard</span>
+              </div>
+              <div className="px-2.5 py-1 bg-white rounded-md text-[#1a1f71] font-black text-[10px] shadow-xs">
+                VISA
+              </div>
+              <div className="px-2.5 py-1 bg-[#e60000] text-white rounded-md font-black text-[10px] shadow-xs">
+                Vodacom M-Pesa
+              </div>
+              <div className="px-2.5 py-1 bg-[#ff0000] text-white rounded-md font-black text-[10px] shadow-xs">
+                Airtel Money
+              </div>
+              <div className="px-2.5 py-1 bg-[#ff7900] text-white rounded-md font-black text-[10px] shadow-xs">
+                Orange Money
+              </div>
+              <div className="px-2.5 py-1 bg-white text-blue-800 rounded-md font-black text-[10px] shadow-xs">
+                FlexPay DRC
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3 text-xs font-bold text-blue-200">
+              <div className="flex items-center gap-1 bg-white/10 px-3 py-1.5 rounded-lg border border-white/15">
+                <ShieldCheck size={16} className="text-emerald-400" />
+                <span className="text-[11px]">Norton Secured</span>
+              </div>
+              <div className="flex items-center gap-1 bg-white/10 px-3 py-1.5 rounded-lg border border-white/15">
+                <Anchor size={16} className="text-sky-300" />
+                <span className="text-[11px]">Flotte Homologuée RDC</span>
+              </div>
+            </div>
+          </div>
+
+          {/* MENTION LÉGALE & COPYRIGHT */}
+          <div className="pt-6 text-center md:text-left flex flex-col md:flex-row items-center justify-between gap-4 text-blue-300 text-[11px]">
+            <p>
+              © 2006–{new Date().getFullYear()} ETS AMR MUGOTE & FRÈRES. Tous droits réservés. Navigation autorisée sur le Lac Kivu par le Ministère des Transports et Voies de Communication de la RDC.
+            </p>
+            <div className="flex items-center gap-4 text-[10px] font-bold text-blue-200 uppercase tracking-wider">
+              <span>Goma • Bukavu • Lac Kivu</span>
+              <span>•</span>
+              <span>RDC</span>
+            </div>
+          </div>
+
         </div>
       </footer>
       <AuthModal 
@@ -3157,7 +3322,21 @@ function ChatWidget({ user, onNavigate, siteSettings }: { user: FirebaseUser | n
 
 // --- Page Components ---
 
-function Home({ onBook, onNavigate, siteSettings, schedules }: { onBook: () => void, onNavigate: (page: string) => void, siteSettings?: any, schedules: any[] }) {
+function Home({ 
+  onBook, 
+  onNavigate, 
+  siteSettings, 
+  schedules,
+  user,
+  onLoginRequest
+}: { 
+  onBook: () => void, 
+  onNavigate: (page: string) => void, 
+  siteSettings?: any, 
+  schedules: any[],
+  user?: any,
+  onLoginRequest?: () => void
+}) {
   const [media, setMedia] = useState<any[]>([]);
   const [galleryImages, setGalleryImages] = useState<any[]>([]);
 
@@ -3259,12 +3438,22 @@ function Home({ onBook, onNavigate, siteSettings, schedules }: { onBook: () => v
             
             <div className="flex flex-wrap gap-4 pt-2 justify-center">
               <button 
-                onClick={onBook}
-                className="px-8 py-4 bg-white text-black font-extrabold text-[9px] uppercase tracking-[0.3em] shadow-2xl hover:bg-slate-200 transition-all flex items-center gap-3 group"
+                onClick={() => {
+                  const el = document.getElementById('ferry-booking-engine');
+                  if (el) {
+                    el.scrollIntoView({ behavior: 'smooth' });
+                  } else {
+                    onBook();
+                  }
+                }}
+                className="px-8 py-4 bg-white text-black font-extrabold text-[9px] uppercase tracking-[0.3em] shadow-2xl hover:bg-slate-200 transition-all flex items-center gap-3 group cursor-pointer"
               >
                 Réserver mon trajet <ChevronRight size={16} className="group-hover:translate-x-1 transition-transform" />
               </button>
-              <button className="px-8 py-4 bg-white/10 backdrop-blur-md border border-white/20 text-white font-extrabold text-[9px] uppercase tracking-[0.3em] hover:bg-white/20 transition-all">
+              <button 
+                onClick={() => onNavigate('gallery')}
+                className="px-8 py-4 bg-white/10 backdrop-blur-md border border-white/20 text-white font-extrabold text-[9px] uppercase tracking-[0.3em] hover:bg-white/20 transition-all cursor-pointer"
+              >
                 Nos Navires
               </button>
             </div>
@@ -3289,6 +3478,16 @@ function Home({ onBook, onNavigate, siteSettings, schedules }: { onBook: () => v
             />
           </motion.div>
         </div>
+      </section>
+
+      {/* Modern Ferryhopper & Cheapoair Booking Engine Integrated on Home */}
+      <section id="ferry-booking-engine" className="max-w-7xl mx-auto px-2 sm:px-6 relative z-30 -mt-16 sm:-mt-24 mb-6 text-left">
+        <FerryhopperBookingEngine 
+          user={user}
+          siteSettings={siteSettings}
+          onLoginRequest={onLoginRequest || (() => {})}
+          onViewAllTickets={() => onNavigate('tickets')}
+        />
       </section>
 
       {/* Trust Marks */}
@@ -4137,8 +4336,8 @@ function Booking({ onReserved, user, onLoginRequest, siteSettings }: { onReserve
                         onChange={e => setFormData({ ...formData, departureTime: e.target.value })}
                         className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-4 focus:ring-gold/10 focus:border-gold transition-all font-mono font-black text-[10px] lg:text-sm cursor-pointer"
                       >
-                        <option value="07:30">MATIN (07:30)</option>
-                        <option value="18:00">SOIR (18:00)</option>
+                        <option value="07:30">MATIN (07:30 ➔ 12:30)</option>
+                        <option value="18:00">SOIR (18:00 ➔ 06:00 lendemain)</option>
                       </select>
                     </div>
                   </div>
@@ -5674,7 +5873,7 @@ function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlock
               {[
                 { id: 'recap', label: 'Embarquement / Jour', icon: Calendar },
                 { id: 'reservations', label: 'Réservations', icon: Ticket },
-                { id: 'reminders', label: 'Rappels Gmail', icon: Mail },
+                { id: 'reminders', label: 'Notifications & Agenda', icon: Mail },
                 { id: 'tarifs', label: 'Tarifs & Classes', icon: DollarSign },
                 { id: 'scanner', label: 'Scanner Port', icon: Camera },
                 { id: 'users', label: 'Utilisateurs', icon: Users },
@@ -7393,12 +7592,28 @@ function NewsView() {
   );
 }
 
-function MyTickets({ user, siteSettings, onOpenScanner }: { user: FirebaseUser | null, siteSettings: { homeBg: string, homeDetail?: string }, onOpenScanner?: () => void }) {
+function MyTickets({ 
+  user, 
+  siteSettings, 
+  onOpenScanner, 
+  onLoginRequest 
+}: { 
+  user: FirebaseUser | null, 
+  siteSettings: { homeBg: string, homeDetail?: string }, 
+  onOpenScanner?: () => void,
+  onLoginRequest?: () => void 
+}) {
   const [tickets, setTickets] = useState<Reservation[]>([]);
   const [loading, setLoading] = useState(true);
+  const [searchRef, setSearchRef] = useState('');
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user) {
+      setLoading(false);
+      return;
+    }
     const q = query(
       collection(db, 'reservations'), 
       where('userId', '==', user.uid),
@@ -7413,6 +7628,45 @@ function MyTickets({ user, siteSettings, onOpenScanner }: { user: FirebaseUser |
     });
     return unsubscribe;
   }, [user]);
+
+  const handleGuestSearch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const clean = searchRef.trim();
+    if (!clean) return;
+    setIsSearching(true);
+    setSearchError(null);
+    try {
+      const qTicket = query(collection(db, 'reservations'), where('ticketId', '==', clean));
+      const snapTicket = await getDocs(qTicket);
+      if (!snapTicket.empty) {
+        setTickets(snapTicket.docs.map(d => ({ ...d.data() as Reservation, id: d.id })));
+        setIsSearching(false);
+        return;
+      }
+
+      const qPhone = query(collection(db, 'reservations'), where('phone', '==', clean));
+      const snapPhone = await getDocs(qPhone);
+      if (!snapPhone.empty) {
+        setTickets(snapPhone.docs.map(d => ({ ...d.data() as Reservation, id: d.id })));
+        setIsSearching(false);
+        return;
+      }
+
+      const docRef = doc(db, 'reservations', clean);
+      const docSnap = await getDoc(docRef);
+      if (docSnap.exists()) {
+        setTickets([{ ...docSnap.data() as Reservation, id: docSnap.id }]);
+        setIsSearching(false);
+        return;
+      }
+
+      setSearchError("Aucun billet trouvé pour cette référence ou ce numéro de téléphone.");
+    } catch (err) {
+      setSearchError("Une erreur est survenue lors de la recherche du billet.");
+    } finally {
+      setIsSearching(false);
+    }
+  };
 
   const generateTicketPDF = async (res: Reservation) => {
     generateTicket(res, siteSettings);
@@ -7432,8 +7686,6 @@ function MyTickets({ user, siteSettings, onOpenScanner }: { user: FirebaseUser |
       handleFirestoreError(err, OperationType.UPDATE, 'reservations');
     }
   };
-
-  if (!user) return <div className="p-10 sm:p-20 text-center text-slate-400 font-bold uppercase tracking-widest text-[10px] sm:text-xs">Connectez-vous pour voir vos billets.</div>;
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6 sm:space-y-8">
@@ -7455,6 +7707,52 @@ function MyTickets({ user, siteSettings, onOpenScanner }: { user: FirebaseUser |
           </button>
         )}
       </div>
+
+      {!user && (
+        <div className="bg-gradient-to-r from-[#001233] to-[#0a2540] text-white p-6 sm:p-8 rounded-3xl shadow-xl text-left">
+          <div className="max-w-2xl">
+            <span className="text-[10px] font-black uppercase tracking-widest text-amber-400">Recherche Rapide Passager</span>
+            <h3 className="text-xl sm:text-2xl font-black uppercase tracking-tight mt-1 mb-2">Retrouvez votre réservation</h3>
+            <p className="text-xs text-slate-300 leading-relaxed mb-6">
+              Saisissez la référence de votre billet (ex: <span className="text-amber-300 font-mono">MUG-2026...</span>) ou votre numéro de téléphone pour afficher vos billets et télécharger vos PDF.
+            </p>
+
+            <form onSubmit={handleGuestSearch} className="flex flex-col sm:flex-row gap-3">
+              <input
+                type="text"
+                value={searchRef}
+                onChange={(e) => setSearchRef(e.target.value)}
+                placeholder="Référence billet ou Téléphone (+243...)"
+                className="flex-1 px-4 py-3 bg-white/10 border border-white/20 rounded-2xl text-white placeholder-slate-400 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+              />
+              <button
+                type="submit"
+                disabled={isSearching}
+                className="px-6 py-3 bg-gold hover:bg-amber-400 text-maritime font-black uppercase tracking-wider text-xs rounded-2xl transition-all shadow-lg active:scale-95 disabled:opacity-50 cursor-pointer"
+              >
+                {isSearching ? 'Recherche...' : 'Rechercher mon billet'}
+              </button>
+            </form>
+
+            {searchError && (
+              <p className="text-xs text-rose-400 font-bold mt-3">{searchError}</p>
+            )}
+
+            {onLoginRequest && (
+              <div className="mt-6 pt-4 border-t border-white/10 flex items-center justify-between">
+                <span className="text-xs text-slate-400">Vous possédez un compte ?</span>
+                <button
+                  type="button"
+                  onClick={onLoginRequest}
+                  className="text-xs font-black text-amber-400 hover:text-white uppercase tracking-wider underline cursor-pointer"
+                >
+                  Se connecter à mon compte
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Strict Administrative Separation Notice */}
       <div className="bg-sky-50/80 border border-sky-200/80 rounded-2xl p-4 flex items-start gap-3 text-left">
