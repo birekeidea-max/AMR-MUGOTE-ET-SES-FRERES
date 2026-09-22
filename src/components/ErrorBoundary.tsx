@@ -29,7 +29,7 @@ export class ErrorBoundary extends React.Component<Props, State> {
     if (this.state.hasError) {
       return (
         <div className="w-full bg-slate-900 border border-white/10 rounded-3xl p-6 text-white text-center space-y-3">
-          <AlertCircle className="mx-auto text-gold" size={28} />
+          <AlertCircle className="mx-auto text-white" size={28} />
           <h4 className="text-sm font-bold uppercase tracking-wider text-white">
             {this.props.fallbackTitle || "Module temporairement indisponible"}
           </h4>

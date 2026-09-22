@@ -188,7 +188,7 @@ export function PlatformAuthGate({
       <div className="w-full max-w-lg bg-[#0b132b] text-slate-100 rounded-3xl border border-slate-700/60 shadow-2xl overflow-hidden backdrop-blur-xl">
         {/* En-tête épuré avec insigne maritime */}
         <div className="p-8 text-center border-b border-slate-700/60 bg-[#070d1e]">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-blue-900/60 border border-blue-500/40 text-blue-300 mb-4 shadow-lg">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-white/10 border border-white/20 text-white mb-4 shadow-lg">
             <Ship size={32} />
           </div>
           <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight uppercase">
@@ -220,7 +220,7 @@ export function PlatformAuthGate({
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
                 placeholder="Ex: Patient Mugabo ou Bireke Idea"
-                className="w-full pl-11 pr-4 py-3.5 bg-slate-900/80 border border-slate-700 rounded-xl text-sm font-semibold text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
+                className="w-full pl-11 pr-4 py-3.5 bg-slate-900/80 border border-slate-700 rounded-xl text-sm font-semibold text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-white/40 focus:border-white transition"
               />
               <User size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
             </div>
@@ -238,7 +238,7 @@ export function PlatformAuthGate({
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="Ex: birekeidea@gmail.com ou voyageur@gmail.com"
-                className="w-full pl-11 pr-4 py-3.5 bg-slate-900/80 border border-slate-700 rounded-xl text-sm font-semibold text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
+                className="w-full pl-11 pr-4 py-3.5 bg-slate-900/80 border border-slate-700 rounded-xl text-sm font-semibold text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-white/40 focus:border-white transition"
               />
               <Mail size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
             </div>
@@ -256,7 +256,7 @@ export function PlatformAuthGate({
                 value={phoneNumber}
                 onChange={(e) => setPhoneNumber(e.target.value)}
                 placeholder="Ex: 0994286469 ou 099..."
-                className="w-full pl-11 pr-4 py-3.5 bg-slate-900/80 border border-slate-700 rounded-xl text-sm font-semibold text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
+                className="w-full pl-11 pr-4 py-3.5 bg-slate-900/80 border border-slate-700 rounded-xl text-sm font-semibold text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-white/40 focus:border-white transition"
               />
               <Phone size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
             </div>
@@ -270,7 +270,7 @@ export function PlatformAuthGate({
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-4 px-6 bg-blue-900 hover:bg-blue-800 active:scale-[0.99] text-white font-black text-sm uppercase tracking-wider rounded-xl shadow-lg border border-blue-700/50 transition cursor-pointer flex items-center justify-center gap-2"
+              className="w-full py-4 px-6 bg-white hover:bg-slate-200 active:scale-[0.99] text-black font-black text-sm uppercase tracking-wider rounded-xl shadow-lg border border-white/20 transition cursor-pointer flex items-center justify-center gap-2"
             >
               {loading ? (
                 <span>Vérification et connexion...</span>

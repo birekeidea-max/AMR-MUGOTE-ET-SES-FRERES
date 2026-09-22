@@ -8,23 +8,27 @@
   
   --color-maritime: #002b49;
   --color-maritime-dark: #001f35;
-  --color-maritime-light: #003e66;
+  --color-maritime-light: #0b132b;
   --color-midnight: #070d1e;
+  --color-nightblue: #0b132b;
+  --color-nightblue-dark: #070d1e;
   --color-card-dark: #0b132b;
   --color-bg: #070d1e;
   --color-lacustre: #002b49;
   --color-lake-shadow: #040814;
+  --color-gold: #ffffff;
+  --color-gold-light: #f8fafc;
 }
 
 @layer base {
   body {
-    @apply bg-[#070d1e] text-slate-100 antialiased font-sans text-center selection:bg-blue-900 selection:text-white;
+    @apply bg-[#070d1e] text-slate-100 antialiased font-sans text-center selection:bg-slate-800 selection:text-white;
   }
 }
 
 @layer components {
   .grid-pattern {
-    background-image: radial-gradient(#003566 0.5px, transparent 0.5px);
+    background-image: radial-gradient(#1e293b 0.5px, transparent 0.5px);
     background-size: 32px 32px;
   }
 
@@ -37,7 +41,7 @@
   }
 
   .maritime-gradient {
-    @apply bg-gradient-to-br from-maritime to-maritime-light;
+    @apply bg-gradient-to-br from-[#070d1e] to-[#0b132b];
   }
 
   .no-scrollbar::-webkit-scrollbar {

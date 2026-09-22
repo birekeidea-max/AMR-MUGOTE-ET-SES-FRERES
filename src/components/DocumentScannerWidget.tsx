@@ -418,8 +418,8 @@ export default function DocumentScannerWidget() {
     <div className="w-full bg-slate-900 border border-white/5 rounded-[40px] p-6 lg:p-10 text-white shadow-2xl relative overflow-hidden" id="scanner-doc-module">
       
       {/* Background radial soft light gradient */}
-      <div className="absolute top-0 right-0 w-80 h-80 bg-gold/5 blur-[120px] rounded-full pointer-events-none" />
-      <div className="absolute bottom-0 left-0 w-80 h-80 bg-emerald-500/5 blur-[120px] rounded-full pointer-events-none" />
+      <div className="absolute top-0 right-0 w-80 h-80 bg-white/5 blur-[120px] rounded-full pointer-events-none" />
+      <div className="absolute bottom-0 left-0 w-80 h-80 bg-slate-800/20 blur-[120px] rounded-full pointer-events-none" />
 
       {/* Grid structure for rich split content */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start relative z-10">
@@ -427,19 +427,19 @@ export default function DocumentScannerWidget() {
         {/* Left column: Controls and inputs */}
         <div className="lg:col-span-5 space-y-6">
           <div className="space-y-2">
-            <div className="inline-flex items-center gap-2 px-3 py-1 bg-white/5 border border-white/10 rounded-full text-[9px] font-black tracking-widest text-gold uppercase">
-              <Sparkles size={10} className="text-gold animate-spin" /> Numérisation Intelligente
+            <div className="inline-flex items-center gap-2 px-3 py-1 bg-white/5 border border-white/10 rounded-full text-[9px] font-black tracking-widest text-white uppercase">
+              <Sparkles size={10} className="text-white animate-spin" /> Numérisation Intelligente
             </div>
             <h3 className="text-2xl font-black uppercase tracking-tighter leading-none italic text-white">Scanner d'embarquement</h3>
             <p className="text-slate-400 text-xs leading-relaxed max-w-sm">
-              Numérisez instantanément vos documents d'identité (Passport, ID) ou saisissez votre code billet de voyage <span className="text-gold font-bold">AMR-XXXXX</span> pour valider votre embarquement sur le Lac Kivu.
+              Numérisez instantanément vos documents d'identité (Passport, ID) ou saisissez votre code billet de voyage <span className="text-white font-bold underline">AMR-XXXXX</span> pour valider votre embarquement sur le Lac Kivu.
             </p>
           </div>
 
           {/* Quick Ticket Look-up bar */}
           <form onSubmit={handleTicketLookup} className="bg-white/5 border border-white/10 p-4 rounded-3xl space-y-3">
             <h4 className="text-[9px] font-black uppercase tracking-widest text-slate-400 flex items-center gap-1.5">
-              <QrCode size={11} className="text-gold" /> Validation rapide par code ticket
+              <QrCode size={11} className="text-white" /> Validation rapide par code ticket
             </h4>
             <div className="flex gap-2">
               <input 
@@ -447,12 +447,12 @@ export default function DocumentScannerWidget() {
                 placeholder="Ex: AMR-7482" 
                 value={ticketIdInput}
                 onChange={e => setTicketIdInput(e.target.value.toUpperCase())}
-                className="flex-1 bg-slate-950 border border-white/10 px-4 py-3 rounded-xl text-xs font-mono font-bold tracking-wider placeholder:text-slate-600 focus:outline-none focus:border-gold text-white"
+                className="flex-1 bg-slate-950 border border-white/10 px-4 py-3 rounded-xl text-xs font-mono font-bold tracking-wider placeholder:text-slate-600 focus:outline-none focus:border-white text-white"
               />
               <button 
                 type="submit"
                 disabled={isScanning || !ticketIdInput.trim()}
-                className="bg-gold hover:bg-gold/90 disabled:bg-slate-800 disabled:text-slate-500 font-extrabold text-[9px] uppercase tracking-widest text-black px-4 rounded-xl transition-all flex items-center gap-1.5"
+                className="bg-white hover:bg-slate-200 disabled:bg-slate-800 disabled:text-slate-500 font-extrabold text-[9px] uppercase tracking-widest text-black px-4 rounded-xl transition-all flex items-center gap-1.5"
               >
                 Vérifier <ArrowRight size={12} />
               </button>
@@ -484,13 +484,13 @@ export default function DocumentScannerWidget() {
                 <button
                   key={tmpl.id}
                   onClick={() => handleTemplateSelect(tmpl)}
-                  className={`p-3.5 text-left border rounded-2xl transition-all cursor-pointer flex justify-between items-center ${selectedTemplate?.id === tmpl.id ? 'bg-gold/10 border-gold/40' : 'bg-white/5 hover:bg-white/10 border-white/5'}`}
+                  className={`p-3.5 text-left border rounded-2xl transition-all cursor-pointer flex justify-between items-center ${selectedTemplate?.id === tmpl.id ? 'bg-white/10 border-white/40' : 'bg-white/5 hover:bg-white/10 border-white/5'}`}
                 >
                   <div className="space-y-0.5">
                     <span className="block font-black uppercase text-[10px] tracking-tight text-white">{tmpl.label}</span>
                     <span className="block text-[8px] font-medium text-slate-400">{tmpl.desc}</span>
                   </div>
-                  <FileText size={16} className={selectedTemplate?.id === tmpl.id ? "text-gold" : "text-white/20"} />
+                  <FileText size={16} className={selectedTemplate?.id === tmpl.id ? "text-white" : "text-white/20"} />
                 </button>
               ))}
             </div>
@@ -510,10 +510,10 @@ export default function DocumentScannerWidget() {
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -10 }}
                   className={`w-full max-w-md p-4 rounded-2xl mb-4 flex items-center gap-3 text-xs font-bold leading-normal ${
-                    alertMessage.type === 'success' ? 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-400' : 'bg-rose-500/10 border border-rose-500/20 text-rose-400'
+                    alertMessage.type === 'success' ? 'bg-white/10 border border-white/20 text-white' : 'bg-rose-500/10 border border-rose-500/20 text-rose-400'
                   }`}
                 >
-                  {alertMessage.type === 'success' ? <CheckCircle2 size={16} className="shrink-0" /> : <AlertCircle size={16} className="shrink-0" />}
+                  {alertMessage.type === 'success' ? <CheckCircle2 size={16} className="shrink-0 text-white" /> : <AlertCircle size={16} className="shrink-0" />}
                   <span>{alertMessage.text}</span>
                 </motion.div>
               )}
@@ -523,22 +523,22 @@ export default function DocumentScannerWidget() {
             {isScanning ? (
               <div className="w-full max-w-sm aspect-[4/3] bg-slate-900 border border-white/10 rounded-2xl flex flex-col justify-center items-center p-8 relative overflow-hidden shadow-2xl">
                 {/* Laser scan line effect */}
-                <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-gold to-transparent shadow-[0_0_12px_#ffb703] animate-bounce-laser" style={{animationDuration: '2.5s'}} />
+                <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-white to-transparent shadow-[0_0_12px_#ffffff] animate-bounce-laser" style={{animationDuration: '2.5s'}} />
                 
                 {/* Visual grid ticks */}
                 <div className="absolute inset-4 border border-dashed border-white/5 pointer-events-none rounded-lg" />
-                <div className="absolute top-6 left-6 w-4 h-4 border-t-2 border-l-2 border-gold/40" />
-                <div className="absolute top-6 right-6 w-4 h-4 border-t-2 border-r-2 border-gold/40" />
-                <div className="absolute bottom-6 left-6 w-4 h-4 border-b-2 border-l-2 border-gold/40" />
-                <div className="absolute bottom-6 right-6 w-4 h-4 border-b-2 border-r-2 border-gold/40" />
+                <div className="absolute top-6 left-6 w-4 h-4 border-t-2 border-l-2 border-white/40" />
+                <div className="absolute top-6 right-6 w-4 h-4 border-t-2 border-r-2 border-white/40" />
+                <div className="absolute bottom-6 left-6 w-4 h-4 border-b-2 border-l-2 border-white/40" />
+                <div className="absolute bottom-6 right-6 w-4 h-4 border-b-2 border-r-2 border-white/40" />
 
-                <RefreshCw size={40} className="text-gold/80 animate-spin mb-4" />
+                <RefreshCw size={40} className="text-white/80 animate-spin mb-4" />
                 
                 <span className="text-[11px] font-black uppercase tracking-[0.3em] text-white italic mb-1.5">Numérisation active...</span>
                 
                 {/* Progress slider bar */}
                 <div className="w-48 h-1.5 bg-white/5 border border-white/10 rounded-full overflow-hidden mt-3 mb-1.5">
-                  <div className="h-full bg-gold transition-all duration-150" style={{ width: `${scanProgress}%` }} />
+                  <div className="h-full bg-white transition-all duration-150" style={{ width: `${scanProgress}%` }} />
                 </div>
                 
                 <span className="text-slate-400 text-[9px] font-mono font-medium lowercase tracking-wide">{scanStatusLog} ({scanProgress}%)</span>
@@ -553,8 +553,8 @@ export default function DocumentScannerWidget() {
               >
                 {/* Header of extracted document */}
                 <div className="p-4 bg-white/5 border-b border-white/5 flex justify-between items-center">
-                  <span className="text-[9px] font-black uppercase tracking-widest text-gold flex items-center gap-1.5">
-                    <ShieldCheck size={12} className="text-emerald-400" /> PASS ACCRÉDITÉ
+                  <span className="text-[9px] font-black uppercase tracking-widest text-white flex items-center gap-1.5">
+                    <ShieldCheck size={12} className="text-white" /> PASS ACCRÉDITÉ
                   </span>
                   <span className="text-[9px] font-mono text-slate-500 font-medium">HASH: {scannedResult.securityHash}</span>
                 </div>
@@ -567,7 +567,7 @@ export default function DocumentScannerWidget() {
                     </div>
                     <div className="space-y-1">
                       <span className="block text-[8px] font-black uppercase tracking-widest text-slate-500">Numéro de Document</span>
-                      <span className="block text-xs font-mono font-bold text-gold">{scannedResult.documentNumber}</span>
+                      <span className="block text-xs font-mono font-bold text-white">{scannedResult.documentNumber}</span>
                     </div>
                   </div>
 
@@ -593,12 +593,12 @@ export default function DocumentScannerWidget() {
 
                   {/* If corresponding destination/reservation was linked */}
                   {scannedResult.matchingReservation && (
-                    <div className="bg-[#001233]/40 border border-blue-500/10 p-4 rounded-xl space-y-3 mt-4">
-                      <div className="flex justify-between items-center border-b border-blue-500/5 pb-2">
-                        <span className="text-[9px] font-black tracking-widest uppercase text-sky-400 flex items-center gap-1">
-                          <Ship size={12} className="text-gold" /> Infos de Traversée Lacustre
+                    <div className="bg-[#0b132b]/80 border border-white/10 p-4 rounded-xl space-y-3 mt-4">
+                      <div className="flex justify-between items-center border-b border-white/5 pb-2">
+                        <span className="text-[9px] font-black tracking-widest uppercase text-white flex items-center gap-1">
+                          <Ship size={12} className="text-white" /> Infos de Traversée Lacustre
                         </span>
-                        <span className={`px-2 py-0.5 rounded text-[8px] font-black uppercase ${scannedResult.matchingReservation.status === 'VALIDATED' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-amber-500/10 text-amber-500'}`}>
+                        <span className={`px-2 py-0.5 rounded text-[8px] font-black uppercase ${scannedResult.matchingReservation.status === 'VALIDATED' ? 'bg-white/10 text-white' : 'bg-white/5 text-slate-300'}`}>
                           {scannedResult.matchingReservation.status === 'VALIDATED' ? 'Réservé & Payé' : 'En Attente'}
                         </span>
                       </div>
@@ -606,7 +606,7 @@ export default function DocumentScannerWidget() {
                         <div>
                           <span className="block text-slate-500 text-[8px] font-black uppercase tracking-widest">ITINÉRAIRE</span>
                           <span className="font-extrabold text-white flex items-center gap-1 mt-0.5">
-                            <MapPin size={11} className="text-gold" /> {scannedResult.matchingReservation.from} → {scannedResult.matchingReservation.to}
+                            <MapPin size={11} className="text-white" /> {scannedResult.matchingReservation.from} → {scannedResult.matchingReservation.to}
                           </span>
                         </div>
                         <div>
@@ -641,9 +641,9 @@ export default function DocumentScannerWidget() {
                       canvas.height = 400;
                       const ctx = canvas.getContext('2d');
                       if (ctx) {
-                        ctx.fillStyle = '#1e293b';
+                        ctx.fillStyle = '#0b132b';
                         ctx.fillRect(0, 0, 600, 400);
-                        ctx.fillStyle = '#ffb703';
+                        ctx.fillStyle = '#ffffff';
                         ctx.font = 'bold 20px monospace';
                         ctx.fillText('AMR MUGOTE & FRERES - CERTIFICATE', 50, 50);
                         ctx.fillStyle = '#ffffff';
@@ -655,7 +655,7 @@ export default function DocumentScannerWidget() {
                         if (scannedResult.matchingReservation) {
                           ctx.fillText(`ITINERAIRE: ${scannedResult.matchingReservation.from} -> ${scannedResult.matchingReservation.to}`, 50, 260);
                         }
-                        ctx.fillStyle = '#ffb703';
+                        ctx.fillStyle = '#cbd5e1';
                         ctx.font = '11px sans-serif';
                         ctx.fillText('DOCUMENT CERTIFIÉ PAR NUMÉRISATION INTELLIGENTE MUGOTE', 50, 360);
                         const link = document.createElement('a');
@@ -664,7 +664,7 @@ export default function DocumentScannerWidget() {
                         link.click();
                       }
                     }}
-                    className="flex-1 py-3 bg-gold hover:bg-gold/95 text-black font-black text-[9px] uppercase tracking-wider rounded-xl transition-all flex items-center justify-center gap-1.5"
+                    className="flex-1 py-3 bg-white hover:bg-slate-200 text-black font-black text-[9px] uppercase tracking-wider rounded-xl transition-all flex items-center justify-center gap-1.5"
                   >
                     <Download size={12} /> Télécharger
                   </button>
@@ -684,16 +684,16 @@ export default function DocumentScannerWidget() {
                     />
                     {/* Viewfinder Target Framing */}
                     <div className="absolute inset-8 border-2 border-dashed border-white/20 rounded-xl flex items-center justify-center pointer-events-none">
-                      <div className="w-12 h-12 border-t-4 border-l-4 border-gold absolute top-0 left-0" />
-                      <div className="w-12 h-12 border-t-4 border-r-4 border-gold absolute top-0 right-0" />
-                      <div className="w-12 h-12 border-b-4 border-l-4 border-gold absolute bottom-0 left-0" />
-                      <div className="w-12 h-12 border-b-4 border-r-4 border-gold absolute bottom-0 right-0" />
+                      <div className="w-12 h-12 border-t-4 border-l-4 border-white absolute top-0 left-0" />
+                      <div className="w-12 h-12 border-t-4 border-r-4 border-white absolute top-0 right-0" />
+                      <div className="w-12 h-12 border-b-4 border-l-4 border-white absolute bottom-0 left-0" />
+                      <div className="w-12 h-12 border-b-4 border-r-4 border-white absolute bottom-0 right-0" />
                     </div>
 
                     <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-3 bg-slate-950/90 border border-white/10 px-4 py-2.5 rounded-full z-20">
                       <button 
                         onClick={triggerLiveSnapshot} 
-                        className="bg-gold hover:bg-gold/90 text-black px-4 py-1.5 text-[9px] font-black uppercase tracking-widest rounded-full transition-all shrink-0 flex items-center gap-1"
+                        className="bg-white hover:bg-slate-200 text-black px-4 py-1.5 text-[9px] font-black uppercase tracking-widest rounded-full transition-all shrink-0 flex items-center gap-1"
                       >
                         <Camera size={12} /> Capturer & Analyser
                       </button>
@@ -712,7 +712,7 @@ export default function DocumentScannerWidget() {
                     )}
                     <button 
                       onClick={startCamera}
-                      className="px-5 py-2.5 bg-gold text-black hover:bg-gold/90 transition-all font-black text-[9px] uppercase tracking-widest rounded-xl"
+                      className="px-5 py-2.5 bg-white text-black hover:bg-slate-200 transition-all font-black text-[9px] uppercase tracking-widest rounded-xl"
                     >
                       Démarrer la WebCam
                     </button>
@@ -722,10 +722,10 @@ export default function DocumentScannerWidget() {
             ) : (
               
               /* Fine Manual Upload layout viewport */
-              <div className="w-full max-w-sm aspect-[4/3] bg-slate-900/50 border border-dashed border-white/15 rounded-3xl flex flex-col justify-center items-center p-8 transition-colors hover:border-gold/30">
+              <div className="w-full max-w-sm aspect-[4/3] bg-slate-900/50 border border-dashed border-white/15 rounded-3xl flex flex-col justify-center items-center p-8 transition-colors hover:border-white/30">
                 <label className="cursor-pointer text-center space-y-4 flex flex-col items-center group w-full">
-                  <div className="w-16 h-16 bg-white/5 border border-white/10 rounded-2xl flex items-center justify-center group-hover:border-gold/30 transition-all">
-                    <Upload size={24} className="text-slate-400 group-hover:text-gold transition-colors" />
+                  <div className="w-16 h-16 bg-white/5 border border-white/10 rounded-2xl flex items-center justify-center group-hover:border-white/30 transition-all">
+                    <Upload size={24} className="text-slate-400 group-hover:text-white transition-colors" />
                   </div>
                   <div className="space-y-1">
                     <span className="block text-[10px] font-black uppercase tracking-wider text-white">Sélectionner un fichier</span>

@@ -187,29 +187,29 @@ export function CompactBookingForm({
     <div className={`bg-white rounded-3xl border border-slate-200/90 shadow-xl overflow-hidden text-slate-800 transition-all ${isModal ? 'max-h-[92vh] flex flex-col' : ''}`}>
       
       {/* 1. TITRE DU FORMULAIRE (STYLE AIRBNB / DRIBBLE ÉPURÉ) */}
-      <div className="px-5 sm:px-7 py-4 bg-gradient-to-r from-blue-700 via-blue-600 to-indigo-700 text-white flex items-center justify-between gap-3 shrink-0">
+      <div className="px-5 sm:px-7 py-4 bg-[#0b132b] text-white flex items-center justify-between gap-3 shrink-0">
         <div className="text-left">
           <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-amber-400 text-slate-900 flex items-center justify-center font-black shadow-xs">
+            <div className="w-7 h-7 rounded-lg bg-white text-black flex items-center justify-center font-black shadow-xs">
               <Ship size={16} />
             </div>
             <h2 className="text-base sm:text-lg font-black tracking-tight text-white leading-snug">
               Formulaire de Réservation
             </h2>
           </div>
-          <p className="text-[11px] sm:text-xs text-blue-100 font-medium mt-0.5">
+          <p className="text-[11px] sm:text-xs text-slate-300 font-medium mt-0.5">
             Remplissez vos informations pour réserver votre traversée sur le Lac Kivu
           </p>
         </div>
 
         <div className="flex items-center gap-2.5">
           {/* Sélecteur de Devise USD / CDF DANS LE FORMULAIRE DE RÉSERVATION */}
-          <div className="flex items-center bg-black/25 p-1 rounded-xl border border-white/20 text-[10px] font-black">
+          <div className="flex items-center bg-white/10 p-1 rounded-xl border border-white/20 text-[10px] font-black">
             <button
               type="button"
               onClick={() => setFormCurrency('USD')}
               className={`px-2.5 py-1 rounded-lg transition cursor-pointer ${
-                formCurrency === 'USD' ? 'bg-white text-blue-700 shadow-xs font-black' : 'text-blue-100 hover:text-white'
+                formCurrency === 'USD' ? 'bg-white text-black shadow-xs font-black' : 'text-slate-300 hover:text-white'
               }`}
             >
               USD ($)
@@ -218,7 +218,7 @@ export function CompactBookingForm({
               type="button"
               onClick={() => setFormCurrency('CDF')}
               className={`px-2.5 py-1 rounded-lg transition cursor-pointer ${
-                formCurrency === 'CDF' ? 'bg-white text-blue-700 shadow-xs font-black' : 'text-blue-100 hover:text-white'
+                formCurrency === 'CDF' ? 'bg-white text-black shadow-xs font-black' : 'text-slate-300 hover:text-white'
               }`}
             >
               CDF (FC)
@@ -258,7 +258,7 @@ export function CompactBookingForm({
               <p className="text-slate-600"><strong>Trajet :</strong> {createdReservation.itinerary}</p>
               <p className="text-slate-600"><strong>Date :</strong> {createdReservation.travelDate} | <strong>Navire :</strong> {createdReservation.ship}</p>
               <p className="text-slate-600"><strong>Passagers :</strong> {createdReservation.passengerCount} ({createdReservation.travelClass})</p>
-              <p className="text-blue-700 font-black">
+              <p className="text-black font-black">
                 <strong>Total :</strong> ${createdReservation.totalPrice} USD ({createdReservation.totalPriceCDF.toLocaleString()} FC) via {createdReservation.paymentMethod.toUpperCase()}
               </p>
             </div>
@@ -278,7 +278,7 @@ export function CompactBookingForm({
                 <button
                   type="button"
                   onClick={onClose}
-                  className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-black rounded-xl shadow-xs transition cursor-pointer"
+                  className="px-5 py-2 bg-[#0b132b] hover:bg-[#111c3d] text-white text-xs font-black rounded-xl shadow-xs transition cursor-pointer"
                 >
                   Fermer
                 </button>
@@ -299,7 +299,7 @@ export function CompactBookingForm({
             {/* ================================================================ */}
             <div className="bg-slate-50/70 p-3.5 sm:p-4 rounded-2xl border border-slate-200/80 space-y-3">
               <div className="flex items-center gap-2 pb-1.5 border-b border-slate-200/80">
-                <div className="w-5 h-5 rounded-md bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-[10px]">
+                <div className="w-5 h-5 rounded-md bg-slate-200 text-slate-900 flex items-center justify-center font-bold text-[10px]">
                   1
                 </div>
                 <h3 className="text-xs font-black uppercase tracking-wider text-slate-800">
@@ -322,7 +322,7 @@ export function CompactBookingForm({
                       value={nom}
                       onChange={(e) => setNom(e.target.value)}
                       placeholder="Ex: Kabila"
-                      className="w-full pl-9 pr-3 py-2 bg-white border border-slate-300 rounded-xl text-xs text-slate-800 font-medium focus:ring-2 focus:ring-blue-500 focus:outline-none transition shadow-2xs"
+                      className="w-full pl-9 pr-3 py-2 bg-white border border-slate-300 rounded-xl text-xs text-slate-800 font-medium focus:ring-2 focus:ring-slate-800 focus:outline-none transition shadow-2xs"
                     />
                   </div>
                 </div>
@@ -338,7 +338,7 @@ export function CompactBookingForm({
                     value={prenom}
                     onChange={(e) => setPrenom(e.target.value)}
                     placeholder="Ex: Jean-Luc"
-                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs text-slate-800 font-medium focus:ring-2 focus:ring-blue-500 focus:outline-none transition shadow-2xs"
+                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs text-slate-800 font-medium focus:ring-2 focus:ring-slate-800 focus:outline-none transition shadow-2xs"
                   />
                 </div>
 
@@ -355,7 +355,7 @@ export function CompactBookingForm({
                       value={telephone}
                       onChange={(e) => setTelephone(e.target.value)}
                       placeholder="+243 994 102 673"
-                      className="w-full pl-9 pr-3 py-2 bg-white border border-slate-300 rounded-xl text-xs text-slate-800 font-medium focus:ring-2 focus:ring-blue-500 focus:outline-none transition shadow-2xs"
+                      className="w-full pl-9 pr-3 py-2 bg-white border border-slate-300 rounded-xl text-xs text-slate-800 font-medium focus:ring-2 focus:ring-slate-800 focus:outline-none transition shadow-2xs"
                     />
                   </div>
                 </div>
@@ -366,7 +366,7 @@ export function CompactBookingForm({
                     <label className="text-[11px] font-bold text-slate-700">
                       Adresse Email <span className="text-rose-500">*</span>
                     </label>
-                    <span className="text-[10px] text-blue-600 font-bold">
+                    <span className="text-[10px] text-slate-500 font-bold">
                       Pour recevoir votre billet
                     </span>
                   </div>
@@ -378,7 +378,7 @@ export function CompactBookingForm({
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       placeholder="nom@exemple.com"
-                      className="w-full pl-9 pr-3 py-2 bg-white border border-slate-300 rounded-xl text-xs text-slate-800 font-medium focus:ring-2 focus:ring-blue-500 focus:outline-none transition shadow-2xs"
+                      className="w-full pl-9 pr-3 py-2 bg-white border border-slate-300 rounded-xl text-xs text-slate-800 font-medium focus:ring-2 focus:ring-slate-800 focus:outline-none transition shadow-2xs"
                     />
                   </div>
                 </div>
@@ -390,7 +390,7 @@ export function CompactBookingForm({
             {/* ================================================================ */}
             <div className="bg-slate-50/70 p-3.5 sm:p-4 rounded-2xl border border-slate-200/80 space-y-3">
               <div className="flex items-center gap-2 pb-1.5 border-b border-slate-200/80">
-                <div className="w-5 h-5 rounded-md bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-[10px]">
+                <div className="w-5 h-5 rounded-md bg-slate-200 text-slate-900 flex items-center justify-center font-bold text-[10px]">
                   2
                 </div>
                 <h3 className="text-xs font-black uppercase tracking-wider text-slate-800">
@@ -410,7 +410,7 @@ export function CompactBookingForm({
                     <select
                       value={trajet}
                       onChange={(e) => setTrajet(e.target.value)}
-                      className="w-full pl-9 pr-3 py-2 bg-white border border-slate-300 rounded-xl text-xs text-slate-800 font-bold focus:ring-2 focus:ring-blue-500 focus:outline-none cursor-pointer shadow-2xs"
+                      className="w-full pl-9 pr-3 py-2 bg-white border border-slate-300 rounded-xl text-xs text-slate-800 font-bold focus:ring-2 focus:ring-slate-800 focus:outline-none cursor-pointer shadow-2xs"
                     >
                       <option value="Goma Port Public ➔ Bukavu Ihusi">Goma Port Public ➔ Bukavu Ihusi</option>
                       <option value="Bukavu Ihusi ➔ Goma Port Public">Bukavu Ihusi ➔ Goma Port Public</option>
@@ -435,7 +435,7 @@ export function CompactBookingForm({
                       value={travelDate}
                       min={new Date().toISOString().split('T')[0]}
                       onChange={(e) => setTravelDate(e.target.value)}
-                      className="w-full pl-9 pr-3 py-2 bg-white border border-slate-300 rounded-xl text-xs text-slate-800 font-bold focus:ring-2 focus:ring-blue-500 focus:outline-none cursor-pointer shadow-2xs"
+                      className="w-full pl-9 pr-3 py-2 bg-white border border-slate-300 rounded-xl text-xs text-slate-800 font-bold focus:ring-2 focus:ring-slate-800 focus:outline-none cursor-pointer shadow-2xs"
                     />
                   </div>
                 </div>
@@ -455,11 +455,11 @@ export function CompactBookingForm({
                           onClick={() => setBoat(b)}
                           className={`py-1.5 px-2 rounded-xl border text-center transition cursor-pointer flex items-center justify-center gap-1.5 text-xs font-black ${
                             isSelected
-                              ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
+                              ? 'bg-[#0b132b] text-white border-[#0b132b] shadow-xs'
                               : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
                           }`}
                         >
-                          <Ship size={13} className={isSelected ? 'text-amber-300' : 'text-blue-600'} />
+                          <Ship size={13} className={isSelected ? 'text-white' : 'text-slate-700'} />
                           <span>{b}</span>
                         </button>
                       );
@@ -475,7 +475,7 @@ export function CompactBookingForm({
                   <select
                     value={travelClass}
                     onChange={(e) => setTravelClass(e.target.value as any)}
-                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs text-slate-800 font-bold focus:ring-2 focus:ring-blue-500 focus:outline-none cursor-pointer shadow-2xs"
+                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs text-slate-800 font-bold focus:ring-2 focus:ring-slate-800 focus:outline-none cursor-pointer shadow-2xs"
                   >
                     <option value="standard">Standard - 15$</option>
                     <option value="business">Business - 20$</option>
@@ -524,7 +524,7 @@ export function CompactBookingForm({
             {/* ================================================================ */}
             <div className="bg-slate-50/70 p-3.5 sm:p-4 rounded-2xl border border-slate-200/80 space-y-3">
               <div className="flex items-center gap-2 pb-1.5 border-b border-slate-200/80">
-                <div className="w-5 h-5 rounded-md bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-[10px]">
+                <div className="w-5 h-5 rounded-md bg-slate-200 text-slate-900 flex items-center justify-center font-bold text-[10px]">
                   3
                 </div>
                 <h3 className="text-xs font-black uppercase tracking-wider text-slate-800">
@@ -552,12 +552,12 @@ export function CompactBookingForm({
                         onClick={() => setPaymentMethod(p.id as any)}
                         className={`py-2 px-2 rounded-xl border text-center transition cursor-pointer flex flex-col items-center gap-0.5 ${
                           isSelected
-                            ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
+                            ? 'bg-[#0b132b] text-white border-[#0b132b] shadow-xs'
                             : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
                         }`}
                       >
                         <span className="text-[11px] font-black">{p.label}</span>
-                        <span className={`text-[9px] ${isSelected ? 'text-blue-100' : 'text-slate-400'}`}>
+                        <span className={`text-[9px] ${isSelected ? 'text-slate-300' : 'text-slate-400'}`}>
                           {p.badge}
                         </span>
                       </button>
@@ -574,7 +574,7 @@ export function CompactBookingForm({
                   </span>
                   <div className="text-xs font-semibold text-slate-700 mt-0.5">
                     {passengerCount} passager{passengerCount > 1 ? 's' : ''} × {classPricing[travelClass].label} ({formCurrency === 'USD' ? `$${unitPrice}` : `${(unitPrice * exchangeRate).toLocaleString()} FC`}) ={' '}
-                    <span className="text-base font-black text-blue-700">
+                    <span className="text-base font-black text-black">
                       Total : {formCurrency === 'USD' ? `$${totalPriceUSD}` : `${totalPriceCDF.toLocaleString()} FC`}
                     </span>
                     <span className="text-[11px] font-medium text-slate-500 ml-1">
@@ -583,11 +583,11 @@ export function CompactBookingForm({
                   </div>
                 </div>
 
-                {/* Grand bouton compact Jaune/Ambre */}
+                {/* Grand bouton compact Monochrome / Noir */}
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="w-full sm:w-auto px-6 py-2.5 bg-amber-400 hover:bg-amber-500 text-slate-900 font-bold text-xs uppercase tracking-wider rounded-xl shadow-md shadow-amber-400/20 active:scale-95 transition cursor-pointer flex items-center justify-center gap-2"
+                  className="w-full sm:w-auto px-6 py-2.5 bg-black hover:bg-slate-900 text-white font-black text-xs uppercase tracking-wider rounded-xl shadow-lg border border-white/10 active:scale-95 transition cursor-pointer flex items-center justify-center gap-2"
                 >
                   <CreditCard size={16} />
                   <span>{isSubmitting ? 'Validation en cours...' : 'RÉSERVER ET PAYER'}</span>

@@ -123,7 +123,7 @@ export function ReservationDashboard({
       classe: 'Economique',
       amount: '$15',
       status: 'En attente guichet',
-      statusColor: 'bg-amber-500/15 text-amber-600 border-amber-500/30'
+      statusColor: 'bg-slate-700/60 text-slate-300 border-slate-600'
     },
     {
       id: 'MUG-894160',
@@ -134,7 +134,7 @@ export function ReservationDashboard({
       classe: 'VIP',
       amount: '$54',
       status: 'Confirmé',
-      statusColor: 'bg-emerald-500/15 text-emerald-600 border-emerald-500/30'
+      statusColor: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
     }
   ]);
 
@@ -209,8 +209,8 @@ export function ReservationDashboard({
         amount: `$${totalAmountUSD}`,
         status: paymentMethod === 'cash' ? 'En attente guichet' : 'Confirmé',
         statusColor: paymentMethod === 'cash' 
-          ? 'bg-amber-500/15 text-amber-600 border-amber-500/30' 
-          : 'bg-emerald-500/15 text-emerald-600 border-emerald-500/30'
+          ? 'bg-slate-700/60 text-slate-300 border-slate-600' 
+          : 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
       },
       ...prev
     ]);
@@ -248,14 +248,14 @@ export function ReservationDashboard({
           {/* Logo & Slogan */}
           <div className="p-5 sm:p-6 border-b border-slate-800/80">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-700 flex items-center justify-center text-white shadow-lg shadow-blue-600/30 border border-blue-400/30 shrink-0">
+              <div className="w-10 h-10 rounded-2xl bg-[#0b132b] flex items-center justify-center text-white shadow-lg border border-white/20 shrink-0">
                 <Ship size={22} className="text-white" />
               </div>
               <div className="text-left">
                 <h1 className="text-xs sm:text-sm font-black text-white tracking-tight uppercase leading-snug">
                   ETS AMR MUGOTE & FRÈRES
                 </h1>
-                <p className="text-[10px] text-amber-400 font-bold tracking-wider uppercase">
+                <p className="text-[10px] text-slate-300 font-bold tracking-wider uppercase">
                   Voyager en toute sécurité
                 </p>
               </div>
@@ -267,9 +267,9 @@ export function ReservationDashboard({
               onClick={() => {
                 if (onOpenScanner) onOpenScanner();
               }}
-              className="mt-4 w-full py-2.5 px-3 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-500 hover:to-blue-600 text-white font-black text-xs uppercase tracking-wider rounded-xl shadow-md shadow-blue-700/30 border border-blue-400/30 flex items-center justify-center gap-2 transition cursor-pointer active:scale-98"
+              className="mt-4 w-full py-2.5 px-3 bg-black hover:bg-slate-900 text-white font-black text-xs uppercase tracking-wider rounded-xl shadow-md border border-white/10 flex items-center justify-center gap-2 transition cursor-pointer active:scale-98"
             >
-              <QrCode size={16} className="text-amber-300 animate-pulse" />
+              <QrCode size={16} className="text-white animate-pulse" />
               <span>VÉRIFIER BILLET (QR Code)</span>
             </button>
           </div>
@@ -277,7 +277,7 @@ export function ReservationDashboard({
           {/* Profil connecté : "Administrateur Mugote" */}
           <div className="px-5 py-3.5 mx-4 mt-4 bg-slate-800/60 rounded-2xl border border-slate-700/60 flex items-center gap-3">
             <div className="relative">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-amber-400 to-amber-200 text-slate-900 font-black text-sm flex items-center justify-center shadow-inner">
+              <div className="w-10 h-10 rounded-xl bg-white text-black font-black text-sm flex items-center justify-center shadow-inner">
                 AM
               </div>
               <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 border-2 border-slate-900 rounded-full" />
@@ -325,15 +325,15 @@ export function ReservationDashboard({
                   }}
                   className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-bold transition cursor-pointer ${
                     isActive
-                      ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20 font-black'
+                      ? 'bg-[#0b132b] text-white shadow-lg border border-white/10 font-black'
                       : 'text-slate-400 hover:text-white hover:bg-slate-800/80'
                   }`}
                 >
                   <div className="flex items-center gap-3">
-                    <Icon size={17} className={isActive ? 'text-amber-300' : 'text-slate-400'} />
+                    <Icon size={17} className={isActive ? 'text-white' : 'text-slate-400'} />
                     <span>{item.label}</span>
                   </div>
-                  {isActive && <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />}
+                  {isActive && <span className="w-1.5 h-1.5 rounded-full bg-white" />}
                 </button>
               );
             })}
@@ -344,7 +344,7 @@ export function ReservationDashboard({
         <div className="p-4 border-t border-slate-800/80">
           <div className="bg-gradient-to-r from-slate-800 to-slate-800/70 p-3 rounded-2xl border border-slate-700/60 flex items-center justify-between">
             <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-xl bg-amber-400/20 text-amber-400 flex items-center justify-center">
+              <div className="w-8 h-8 rounded-xl bg-white/10 text-white flex items-center justify-center">
                 <Sun size={18} className="animate-spin-slow" />
               </div>
               <div className="text-left">
@@ -373,8 +373,8 @@ export function ReservationDashboard({
             <h2 className="text-base sm:text-lg font-black text-white tracking-tight">
               Tableau de bord
             </h2>
-            <span className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-0.5 bg-blue-500/10 text-blue-400 border border-blue-500/20 rounded-full text-[10px] font-bold">
-              <Sparkles size={11} className="text-amber-400" />
+            <span className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-0.5 bg-white/10 text-slate-200 border border-white/20 rounded-full text-[10px] font-bold">
+              <Sparkles size={11} className="text-white" />
               ETS AMR MUGOTE
             </span>
           </div>
@@ -389,7 +389,7 @@ export function ReservationDashboard({
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Rechercher billet, client..."
-                className="w-full pl-8 pr-3 py-1.5 bg-slate-800 border border-slate-700/80 rounded-xl text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition"
+                className="w-full pl-8 pr-3 py-1.5 bg-slate-800 border border-slate-700/80 rounded-xl text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-slate-500 focus:ring-1 focus:ring-slate-500 transition"
               />
             </div>
 
@@ -427,7 +427,7 @@ export function ReservationDashboard({
                     <span className="text-xs font-black text-white uppercase tracking-wider">
                       Alertes & Notifications
                     </span>
-                    <span className="text-[10px] text-blue-400 font-bold">Lac Kivu</span>
+                    <span className="text-[10px] text-white font-bold">Lac Kivu</span>
                   </div>
                   <div className="divide-y divide-slate-700/60 text-xs mt-1">
                     <div className="py-2">
@@ -450,7 +450,7 @@ export function ReservationDashboard({
             {/* Photo de profil */}
             <div className="flex items-center gap-2 pl-2 border-l border-slate-800">
               <div className="relative cursor-pointer">
-                <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 border border-blue-400/40 flex items-center justify-center font-black text-white text-xs shadow-md">
+                <div className="w-9 h-9 rounded-xl bg-[#0b132b] border border-white/20 flex items-center justify-center font-black text-white text-xs shadow-md">
                   AM
                 </div>
                 <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 border border-slate-900 rounded-full" />
@@ -472,24 +472,24 @@ export function ReservationDashboard({
         {/* ===================================================================== */}
         <div className="p-4 sm:p-6 lg:p-8 space-y-8 overflow-y-auto">
           
-          {/* GRAND CONTENEUR BLEU ROYAL ARRONDI (bg-blue-600 rounded-3xl p-6 text-white) */}
-          <section className="relative bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800 rounded-3xl p-5 sm:p-7 text-white shadow-xl shadow-blue-900/30 overflow-hidden border border-blue-500/30 text-left">
+          {/* GRAND CONTENEUR BLEU DE NUIT ARRONDI */}
+          <section className="relative bg-[#0b132b] rounded-3xl p-5 sm:p-7 text-white shadow-xl overflow-hidden border border-white/10 text-left">
             
             {/* Décoration de fond moderne */}
             <div className="absolute top-0 right-0 w-96 h-96 bg-white/5 rounded-full blur-3xl pointer-events-none" />
-            <div className="absolute bottom-0 left-1/3 w-64 h-64 bg-amber-400/10 rounded-full blur-2xl pointer-events-none" />
+            <div className="absolute bottom-0 left-1/3 w-64 h-64 bg-white/5 rounded-full blur-2xl pointer-events-none" />
 
             {/* En-tête Hero : Titre + Illustration/Icône de navire rapide à droite */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 relative z-10">
               <div className="max-w-2xl">
-                <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-white/10 backdrop-blur-md rounded-full text-[11px] font-bold text-blue-100 mb-2 border border-white/15">
-                  <ShieldCheck size={13} className="text-amber-300" />
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-white/10 backdrop-blur-md rounded-full text-[11px] font-bold text-slate-200 mb-2 border border-white/15">
+                  <ShieldCheck size={13} className="text-white" />
                   <span>Flotte Navale Mugote • Sécurité & Confort Supérieur</span>
                 </div>
                 <h2 className="text-xl sm:text-2xl lg:text-3xl font-black tracking-tight leading-tight">
                   Réservez votre traversée du lac Kivu. Voyage sûr et sécurisé entre Goma et Bukavu
                 </h2>
-                <p className="text-xs sm:text-sm text-blue-100/90 font-medium mt-1.5">
+                <p className="text-xs sm:text-sm text-slate-300 font-medium mt-1.5">
                   Billetterie officielle directe avec confirmation instantanée par QR Code et SMS.
                 </p>
               </div>
@@ -498,12 +498,12 @@ export function ReservationDashboard({
               <div className="shrink-0 flex items-center justify-center self-start md:self-center">
                 <div className="relative group">
                   <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl bg-white/10 backdrop-blur-md border border-white/25 flex flex-col items-center justify-center p-2 shadow-inner transition-transform group-hover:scale-105">
-                    <Ship size={40} className="text-amber-300 drop-shadow-md animate-pulse" />
+                    <Ship size={40} className="text-white drop-shadow-md animate-pulse" />
                     <span className="text-[10px] font-black tracking-wider uppercase text-white mt-1">
                       Fast Ferry
                     </span>
                   </div>
-                  <div className="absolute -bottom-1 left-2 right-2 h-1.5 bg-amber-400/80 rounded-full blur-xs" />
+                  <div className="absolute -bottom-1 left-2 right-2 h-1.5 bg-white/30 rounded-full blur-xs" />
                 </div>
               </div>
             </div>
@@ -516,14 +516,14 @@ export function ReservationDashboard({
             >
               <div className="flex items-center justify-between pb-3 mb-4 border-b border-slate-100">
                 <div className="flex items-center gap-2">
-                  <div className="w-6 h-6 rounded-lg bg-blue-600 text-white flex items-center justify-center font-bold text-xs">
+                  <div className="w-6 h-6 rounded-lg bg-[#0b132b] text-white flex items-center justify-center font-bold text-xs">
                     <Calendar size={14} />
                   </div>
                   <h3 className="text-sm font-black uppercase tracking-wider text-slate-800">
                     Formulaire de Réservation Rapide
                   </h3>
                 </div>
-                <span className="text-[11px] font-bold text-blue-600 bg-blue-50 px-2.5 py-1 rounded-lg">
+                <span className="text-[11px] font-bold text-slate-900 bg-slate-100 px-2.5 py-1 rounded-lg">
                   1-2 min • Billet immédiat
                 </span>
               </div>
@@ -546,14 +546,14 @@ export function ReservationDashboard({
                     <p><strong>Trajet :</strong> {successTicket.itinerary} ({successTicket.ship})</p>
                     <p><strong>Date :</strong> {successTicket.travelDate} à {successTicket.departureTime}</p>
                     <p><strong>Classe :</strong> {successTicket.travelClass} ({successTicket.passengersCount} billet(s))</p>
-                    <p className="text-blue-700 font-bold">
+                    <p className="text-black font-black">
                       <strong>Total :</strong> ${successTicket.totalAmountUSD} ({successTicket.totalAmountCDF.toLocaleString()} FC)
                     </p>
                   </div>
                   <button
                     type="button"
                     onClick={() => setSuccessTicket(null)}
-                    className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition cursor-pointer"
+                    className="px-5 py-2 bg-[#0b132b] hover:bg-[#111c3d] text-white text-xs font-bold rounded-xl transition cursor-pointer"
                   >
                     Faire une nouvelle réservation
                   </button>
@@ -570,7 +570,7 @@ export function ReservationDashboard({
                   {/* 1. COORDONNÉES PASSAGER PRINCIPAL : Nom | Prénom | Téléphone | Email */}
                   <div>
                     <div className="text-[11px] font-black uppercase tracking-wider text-slate-500 mb-2 flex items-center gap-1.5">
-                      <span className="w-4 h-4 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-[9px] font-bold">1</span>
+                      <span className="w-4 h-4 rounded-full bg-slate-200 text-slate-900 flex items-center justify-center text-[9px] font-bold">1</span>
                       <span>Coordonnées Passager Principal</span>
                     </div>
 
@@ -586,7 +586,7 @@ export function ReservationDashboard({
                           value={nom}
                           onChange={(e) => setNom(e.target.value)}
                           placeholder="Nom de famille"
-                          className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none transition shadow-2xs"
+                          className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:bg-white focus:ring-2 focus:ring-slate-800 focus:outline-none transition shadow-2xs"
                         />
                       </div>
 
@@ -601,7 +601,7 @@ export function ReservationDashboard({
                           value={prenom}
                           onChange={(e) => setPrenom(e.target.value)}
                           placeholder="Prénom"
-                          className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none transition shadow-2xs"
+                          className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:bg-white focus:ring-2 focus:ring-slate-800 focus:outline-none transition shadow-2xs"
                         />
                       </div>
 
@@ -618,7 +618,7 @@ export function ReservationDashboard({
                             value={telephone}
                             onChange={(e) => setTelephone(e.target.value)}
                             placeholder="+243 994 102 673"
-                            className="w-full pl-8 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none transition shadow-2xs"
+                            className="w-full pl-8 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:bg-white focus:ring-2 focus:ring-slate-800 focus:outline-none transition shadow-2xs"
                           />
                         </div>
                       </div>
@@ -636,7 +636,7 @@ export function ReservationDashboard({
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}
                             placeholder="billet@exemple.com"
-                            className="w-full pl-8 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none transition shadow-2xs"
+                            className="w-full pl-8 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:bg-white focus:ring-2 focus:ring-slate-800 focus:outline-none transition shadow-2xs"
                           />
                         </div>
                       </div>
@@ -646,7 +646,7 @@ export function ReservationDashboard({
                   {/* 2. DÉTAILS DE LA TRAVERSÉE : Trajet / Date / Bateau / Classe & Prix / Nombre / Paiement */}
                   <div className="pt-2 border-t border-slate-100">
                     <div className="text-[11px] font-black uppercase tracking-wider text-slate-500 mb-2 flex items-center gap-1.5">
-                      <span className="w-4 h-4 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-[9px] font-bold">2</span>
+                      <span className="w-4 h-4 rounded-full bg-slate-200 text-slate-900 flex items-center justify-center text-[9px] font-bold">2</span>
                       <span>Détails de la Traversée & Paiement</span>
                     </div>
 
@@ -661,7 +661,7 @@ export function ReservationDashboard({
                           <select
                             value={trajet}
                             onChange={(e) => setTrajet(e.target.value)}
-                            className="w-full pl-8 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none cursor-pointer shadow-2xs"
+                            className="w-full pl-8 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:bg-white focus:ring-2 focus:ring-slate-800 focus:outline-none cursor-pointer shadow-2xs"
                           >
                             <option value="Goma ➔ Bukavu">Goma ➔ Bukavu (Port Public ➔ Ihusi)</option>
                             <option value="Bukavu ➔ Goma">Bukavu ➔ Goma (Ihusi ➔ Port Public)</option>
@@ -682,7 +682,7 @@ export function ReservationDashboard({
                           value={travelDate}
                           min={new Date().toISOString().split('T')[0]}
                           onChange={(e) => setTravelDate(e.target.value)}
-                          className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none cursor-pointer shadow-2xs"
+                          className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:bg-white focus:ring-2 focus:ring-slate-800 focus:outline-none cursor-pointer shadow-2xs"
                         />
                       </div>
 
@@ -694,7 +694,7 @@ export function ReservationDashboard({
                         <select
                           value={boat}
                           onChange={(e) => setBoat(e.target.value)}
-                          className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none cursor-pointer shadow-2xs"
+                          className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:bg-white focus:ring-2 focus:ring-slate-800 focus:outline-none cursor-pointer shadow-2xs"
                         >
                           <option value="Mugote 1">Mugote 1 (Rapide)</option>
                           <option value="Mugote 2">Mugote 2 (Confort)</option>
@@ -710,7 +710,7 @@ export function ReservationDashboard({
                         <select
                           value={travelClass}
                           onChange={(e) => setTravelClass(e.target.value as any)}
-                          className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-black text-slate-800 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none cursor-pointer shadow-2xs"
+                          className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-black text-slate-800 focus:bg-white focus:ring-2 focus:ring-slate-800 focus:outline-none cursor-pointer shadow-2xs"
                         >
                           <option value="economique">Économique - 15$</option>
                           <option value="standard">Standard - 20$</option>
@@ -768,7 +768,7 @@ export function ReservationDashboard({
                                 onClick={() => setPaymentMethod(p.id as any)}
                                 className={`px-3 py-1.5 rounded-xl text-[11px] font-black border transition cursor-pointer ${
                                   isSelected
-                                    ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
+                                    ? 'bg-[#0b132b] text-white border-[#0b132b] shadow-xs'
                                     : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
                                 }`}
                               >
@@ -785,7 +785,7 @@ export function ReservationDashboard({
                           Total à régler :
                         </span>
                         <div className="flex items-baseline md:justify-end gap-1.5">
-                          <span className="text-xl font-black text-blue-700">${totalAmountUSD}</span>
+                          <span className="text-xl font-black text-black">${totalAmountUSD}</span>
                           <span className="text-xs font-semibold text-slate-500">
                             ({totalAmountCDF.toLocaleString()} FC)
                           </span>
@@ -794,13 +794,12 @@ export function ReservationDashboard({
                     </div>
                   </div>
 
-                  {/* 3. BOUTON D'ACTION : Bouton Ambre/Jaune compact */}
-                  {/* (bg-amber-400 hover:bg-amber-500 text-slate-900 font-bold py-3 rounded-xl w-full : "RÉSERVER MAINTENANT") */}
+                  {/* 3. BOUTON D'ACTION : Bouton Monochrome Noir compact */}
                   <div className="pt-2">
                     <button
                       type="submit"
                       disabled={isSubmitting}
-                      className="bg-amber-400 hover:bg-amber-500 text-slate-900 font-bold py-3 rounded-xl w-full text-sm uppercase tracking-wider shadow-lg shadow-amber-400/20 active:scale-98 transition cursor-pointer flex items-center justify-center gap-2"
+                      className="bg-black hover:bg-slate-900 text-white font-black py-3 rounded-xl w-full text-sm uppercase tracking-wider shadow-lg border border-white/10 active:scale-98 transition cursor-pointer flex items-center justify-center gap-2"
                     >
                       <CreditCard size={18} />
                       <span>{isSubmitting ? 'EN COURS DE VALIDATION...' : 'RÉSERVER MAINTENANT'}</span>
@@ -821,7 +820,7 @@ export function ReservationDashboard({
               <div>
                 <div className="flex items-center justify-between pb-3 border-b border-slate-700">
                   <div className="flex items-center gap-2">
-                    <div className="w-7 h-7 rounded-lg bg-blue-500/20 text-blue-400 flex items-center justify-center">
+                    <div className="w-7 h-7 rounded-lg bg-white/10 text-white flex items-center justify-center">
                       <Clock size={15} />
                     </div>
                     <h4 className="text-xs font-black uppercase tracking-wider text-white">
@@ -844,7 +843,7 @@ export function ReservationDashboard({
                         </p>
                       </div>
                       <div className="text-right shrink-0">
-                        <span className="text-xs font-black text-amber-400 block">{item.amount}</span>
+                        <span className="text-xs font-black text-white block">{item.amount}</span>
                         <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${item.statusColor}`}>
                           {item.status}
                         </span>
@@ -862,7 +861,7 @@ export function ReservationDashboard({
 
             {/* CARD 2 : Prochain voyage (Carte récapitulative du prochain départ Goma ➔ Bukavu) */}
             <div className="bg-slate-800/80 rounded-2xl p-5 border border-slate-700/80 flex flex-col justify-between shadow-lg relative overflow-hidden">
-              <div className="absolute -right-6 -bottom-6 w-24 h-24 bg-blue-500/10 rounded-full blur-xl pointer-events-none" />
+              <div className="absolute -right-6 -bottom-6 w-24 h-24 bg-white/5 rounded-full blur-xl pointer-events-none" />
 
               <div>
                 <div className="flex items-center justify-between pb-3 border-b border-slate-700">
@@ -882,17 +881,17 @@ export function ReservationDashboard({
                 <div className="mt-3 p-3 bg-gradient-to-br from-slate-900 to-slate-900/90 rounded-xl border border-slate-800 space-y-2">
                   <div className="flex items-center justify-between text-xs font-black text-white">
                     <span>Goma (Port Public)</span>
-                    <ArrowRight size={13} className="text-amber-400" />
+                    <ArrowRight size={13} className="text-slate-400" />
                     <span>Bukavu (Ihusi)</span>
                   </div>
 
                   <div className="flex items-center justify-between text-[11px] text-slate-300 font-semibold pt-1 border-t border-slate-800">
                     <div className="flex items-center gap-1.5">
-                      <Clock size={12} className="text-blue-400" />
+                      <Clock size={12} className="text-slate-400" />
                       <span>07h30 du matin</span>
                     </div>
                     <div className="flex items-center gap-1.5">
-                      <Ship size={12} className="text-amber-400" />
+                      <Ship size={12} className="text-slate-300" />
                       <span>Mugote 1</span>
                     </div>
                   </div>
@@ -905,7 +904,7 @@ export function ReservationDashboard({
                   </div>
                   <div className="flex justify-between text-slate-400">
                     <span>Places VIP restantes :</span>
-                    <span className="font-bold text-amber-400">8 sièges</span>
+                    <span className="font-bold text-white">8 sièges</span>
                   </div>
                 </div>
               </div>
@@ -933,7 +932,7 @@ export function ReservationDashboard({
               <div>
                 <div className="flex items-center justify-between pb-3 border-b border-slate-700">
                   <div className="flex items-center gap-2">
-                    <div className="w-7 h-7 rounded-lg bg-amber-500/20 text-amber-400 flex items-center justify-center">
+                    <div className="w-7 h-7 rounded-lg bg-white/10 text-white flex items-center justify-center">
                       <TrendingUp size={15} />
                     </div>
                     <h4 className="text-xs font-black uppercase tracking-wider text-white">
@@ -977,7 +976,7 @@ export function ReservationDashboard({
                         <span className="text-xs font-black text-white block">{it.route}</span>
                         <span className="text-[10px] text-slate-400 font-medium">{it.freq}</span>
                       </div>
-                      <span className="text-xs font-bold text-amber-400 bg-amber-400/10 px-2 py-0.5 rounded-lg border border-amber-400/20">
+                      <span className="text-xs font-bold text-white bg-white/10 px-2 py-0.5 rounded-lg border border-white/20">
                         {it.fare}
                       </span>
                     </div>
@@ -995,21 +994,21 @@ export function ReservationDashboard({
               <div>
                 <div className="flex items-center justify-between pb-3 border-b border-slate-700">
                   <div className="flex items-center gap-2">
-                    <div className="w-7 h-7 rounded-lg bg-indigo-500/20 text-indigo-400 flex items-center justify-center">
+                    <div className="w-7 h-7 rounded-lg bg-white/10 text-white flex items-center justify-center">
                       <Bell size={15} />
                     </div>
                     <h4 className="text-xs font-black uppercase tracking-wider text-white">
                       Annonces officielles
                     </h4>
                   </div>
-                  <span className="text-[9px] px-1.5 py-0.5 bg-blue-500/20 text-blue-300 font-bold rounded">
+                  <span className="text-[9px] px-1.5 py-0.5 bg-white/10 text-slate-300 font-bold rounded">
                     Direction
                   </span>
                 </div>
 
                 <div className="mt-3 space-y-2.5 text-xs text-slate-300">
                   <div className="p-2.5 bg-slate-900/60 rounded-xl border border-slate-800">
-                    <span className="text-[9px] font-black uppercase text-amber-400 tracking-wider block mb-0.5">
+                    <span className="text-[9px] font-black uppercase text-white tracking-wider block mb-0.5">
                       Gilets de sauvetage 100% conformes
                     </span>
                     <p className="text-[11px] text-slate-400 leading-snug">
@@ -1030,7 +1029,7 @@ export function ReservationDashboard({
 
               <div className="pt-3 mt-3 border-t border-slate-700/60 flex items-center justify-between text-[11px]">
                 <span className="text-slate-400">Capitainerie Goma-Bukavu</span>
-                <span className="text-blue-400 font-bold">Actif 24/7</span>
+                <span className="text-white font-bold">Actif 24/7</span>
               </div>
             </div>
 
@@ -1047,7 +1046,7 @@ export function ReservationDashboard({
           <div className="bg-slate-900 border border-slate-700 rounded-3xl p-6 max-w-md w-full text-left space-y-4 shadow-2xl">
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <div className="flex items-center gap-2">
-                <Zap size={18} className="text-amber-400" />
+                <Zap size={18} className="text-white" />
                 <h3 className="text-base font-black text-white">Sélection en un clic</h3>
               </div>
               <button
@@ -1075,7 +1074,7 @@ export function ReservationDashboard({
                   className="w-full p-3 bg-slate-800 hover:bg-slate-700 rounded-2xl border border-slate-700 flex items-center justify-between text-xs font-bold transition cursor-pointer text-left"
                 >
                   <span className="text-white">{p.label}</span>
-                  <span className="text-amber-400 font-black">{p.price}</span>
+                  <span className="text-white font-black">{p.price}</span>
                 </button>
               ))}
             </div>
@@ -1106,13 +1105,13 @@ export function ReservationDashboard({
               Découvrez les nouveaux aménagements de tentes d'ombrage panoramiques et salons ventilés sur les ponts supérieurs de la flotte <strong>ETS AMR MUGOTE & FRÈRES</strong> pour les traversées touristiques et d'affaires du Lac Kivu.
             </p>
             <div className="p-3 bg-slate-800/80 rounded-2xl border border-slate-700 space-y-1.5 text-xs">
-              <p className="font-bold text-amber-400">☀️ Pont Supérieur Panoramique</p>
+              <p className="font-bold text-white">☀️ Pont Supérieur Panoramique</p>
               <p className="text-slate-400 text-[11px]">Idéal pour contempler les volcans des Virunga et les collines verdoyantes d'Idjwi à l'abri du soleil.</p>
             </div>
             <button
               type="button"
               onClick={() => setShowTentsModal(false)}
-              className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl transition"
+              className="w-full py-2.5 bg-[#0b132b] hover:bg-[#111c3d] text-white font-bold text-xs rounded-xl transition"
             >
               Fermer
             </button>

@@ -326,7 +326,7 @@ export function FerryhopperBookingEngine({
               <button
                 type="button"
                 onClick={() => window.print()}
-                className="flex-1 py-3 px-4 bg-blue-900 hover:bg-blue-800 text-white rounded-xl text-xs font-bold uppercase tracking-wider transition flex items-center justify-center gap-2 cursor-pointer"
+                className="flex-1 py-3 px-4 bg-white hover:bg-slate-200 text-black font-black rounded-xl text-xs uppercase tracking-wider transition flex items-center justify-center gap-2 cursor-pointer shadow-lg"
               >
                 <Printer size={16} />
                 <span>Imprimer le Billet</span>
@@ -335,7 +335,7 @@ export function FerryhopperBookingEngine({
                 <button
                   type="button"
                   onClick={onViewAllTickets}
-                  className="py-3 px-5 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-bold uppercase tracking-wider transition flex items-center justify-center gap-2 cursor-pointer"
+                  className="py-3 px-5 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-bold uppercase tracking-wider transition flex items-center justify-center gap-2 cursor-pointer border border-white/10"
                 >
                   <Ticket size={16} />
                   <span>Tous mes Billets</span>
@@ -355,8 +355,8 @@ export function FerryhopperBookingEngine({
       <div className="bg-[#0b132b] text-slate-100 rounded-3xl border border-slate-700/60 p-6 sm:p-8 shadow-2xl backdrop-blur-xl">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-700/60 pb-6">
           <div>
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-950 border border-blue-700/50 text-blue-300 text-xs font-bold uppercase tracking-wider mb-2">
-              <Ship size={14} className="text-blue-400" />
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#070d1e] border border-white/20 text-slate-200 text-xs font-bold uppercase tracking-wider mb-2">
+              <Ship size={14} className="text-white" />
               <span>ETS AMR MUGOTE • FORMULAIRE DE RÉSERVATION UNIQUE</span>
             </div>
             <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
@@ -394,7 +394,7 @@ export function FerryhopperBookingEngine({
           {/* LIGNE 1 DU TABLEAU : ITINÉRAIRE */}
           <div className="p-5 rounded-2xl bg-[#070d1e] border border-slate-800 space-y-3">
             <div className="flex items-center gap-2 text-slate-300">
-              <MapPin size={18} className="text-blue-400" />
+              <MapPin size={18} className="text-white" />
               <label className="text-xs sm:text-sm font-black uppercase tracking-wider">
                 1. Itinéraire & Sens de Traversée <span className="text-rose-400">*</span>
               </label>
@@ -406,7 +406,7 @@ export function FerryhopperBookingEngine({
                 className={cn(
                   "p-4 rounded-xl border text-left font-bold transition cursor-pointer flex items-center justify-between",
                   itinerary === 'Goma-Bukavu'
-                    ? "bg-blue-900 text-white border-blue-500 shadow-md"
+                    ? "bg-[#0b132b] text-white border-white shadow-lg ring-1 ring-white/30"
                     : "bg-slate-900/60 text-slate-300 border-slate-800 hover:border-slate-700"
                 )}
               >
@@ -424,7 +424,7 @@ export function FerryhopperBookingEngine({
                 className={cn(
                   "p-4 rounded-xl border text-left font-bold transition cursor-pointer flex items-center justify-between",
                   itinerary === 'Bukavu-Goma'
-                    ? "bg-blue-900 text-white border-blue-500 shadow-md"
+                    ? "bg-[#0b132b] text-white border-white shadow-lg ring-1 ring-white/30"
                     : "bg-slate-900/60 text-slate-300 border-slate-800 hover:border-slate-700"
                 )}
               >
@@ -441,7 +441,7 @@ export function FerryhopperBookingEngine({
           {/* LIGNE 2 DU TABLEAU : DATE ET HEURE DE DÉPART */}
           <div className="p-5 rounded-2xl bg-[#070d1e] border border-slate-800 space-y-4">
             <div className="flex items-center gap-2 text-slate-300">
-              <Calendar size={18} className="text-blue-400" />
+              <Calendar size={18} className="text-white" />
               <label className="text-xs sm:text-sm font-black uppercase tracking-wider">
                 2. Date du Voyage & Heure de Départ <span className="text-rose-400">*</span>
               </label>
@@ -458,7 +458,7 @@ export function FerryhopperBookingEngine({
                   value={departureDate}
                   min={new Date().toISOString().split('T')[0]}
                   onChange={(e) => setDepartureDate(e.target.value)}
-                  className="w-full px-4 py-3 bg-slate-900 border border-slate-700 rounded-xl text-sm font-bold text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-4 py-3 bg-slate-900 border border-slate-700 rounded-xl text-sm font-bold text-white focus:outline-none focus:ring-2 focus:ring-white/40 focus:border-white"
                 />
               </div>
 
@@ -473,7 +473,7 @@ export function FerryhopperBookingEngine({
                     className={cn(
                       "py-3 px-3 rounded-xl border text-center font-bold text-xs transition cursor-pointer",
                       departureTime === '07:30'
-                        ? "bg-blue-900 text-white border-blue-500 shadow-sm"
+                        ? "bg-[#0b132b] text-white border-white shadow-sm ring-1 ring-white/30"
                         : "bg-slate-900 text-slate-300 border-slate-800 hover:border-slate-700"
                     )}
                   >
@@ -487,7 +487,7 @@ export function FerryhopperBookingEngine({
                     className={cn(
                       "py-3 px-3 rounded-xl border text-center font-bold text-xs transition cursor-pointer",
                       departureTime === '18:00'
-                        ? "bg-blue-900 text-white border-blue-500 shadow-sm"
+                        ? "bg-[#0b132b] text-white border-white shadow-sm ring-1 ring-white/30"
                         : "bg-slate-900 text-slate-300 border-slate-800 hover:border-slate-700"
                     )}
                   >
@@ -502,7 +502,7 @@ export function FerryhopperBookingEngine({
           {/* LIGNE 3 DU TABLEAU : SÉLECTION DU BATEAU */}
           <div className="p-5 rounded-2xl bg-[#070d1e] border border-slate-800 space-y-3">
             <div className="flex items-center gap-2 text-slate-300">
-              <Ship size={18} className="text-blue-400" />
+              <Ship size={18} className="text-white" />
               <label className="text-xs sm:text-sm font-black uppercase tracking-wider">
                 3. Choix du Bateau de la Flotte <span className="text-rose-400">*</span>
               </label>
@@ -521,7 +521,7 @@ export function FerryhopperBookingEngine({
                   className={cn(
                     "p-3.5 rounded-xl border text-left transition cursor-pointer",
                     ship === s.name
-                      ? "bg-blue-900 text-white border-blue-500 shadow-md"
+                      ? "bg-[#0b132b] text-white border-white shadow-md ring-1 ring-white/30"
                       : "bg-slate-900/60 text-slate-300 border-slate-800 hover:border-slate-700"
                   )}
                 >
@@ -537,7 +537,7 @@ export function FerryhopperBookingEngine({
           <div className="p-5 rounded-2xl bg-[#070d1e] border border-slate-800 space-y-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 text-slate-300">
-                <Ticket size={18} className="text-blue-400" />
+                <Ticket size={18} className="text-white" />
                 <label className="text-xs sm:text-sm font-black uppercase tracking-wider">
                   4. Classe de Voyage & Nombre de Passagers <span className="text-rose-400">*</span>
                 </label>
@@ -550,7 +550,7 @@ export function FerryhopperBookingEngine({
                   onClick={() => setCurrency('USD')}
                   className={cn(
                     "px-2.5 py-1 text-xs font-bold rounded-lg transition cursor-pointer",
-                    currency === 'USD' ? "bg-blue-900 text-white" : "text-slate-400 hover:text-white"
+                    currency === 'USD' ? "bg-white text-black font-black" : "text-slate-400 hover:text-white"
                   )}
                 >
                   USD ($)
@@ -560,7 +560,7 @@ export function FerryhopperBookingEngine({
                   onClick={() => setCurrency('CDF')}
                   className={cn(
                     "px-2.5 py-1 text-xs font-bold rounded-lg transition cursor-pointer",
-                    currency === 'CDF' ? "bg-blue-900 text-white" : "text-slate-400 hover:text-white"
+                    currency === 'CDF' ? "bg-white text-black font-black" : "text-slate-400 hover:text-white"
                   )}
                 >
                   CDF (FC)
@@ -580,7 +580,7 @@ export function FerryhopperBookingEngine({
                     className={cn(
                       "p-3.5 rounded-xl border text-left transition cursor-pointer",
                       travelClass === cls
-                        ? "bg-blue-900 text-white border-blue-500 shadow-md"
+                        ? "bg-[#0b132b] text-white border-white shadow-md ring-1 ring-white/30"
                         : "bg-slate-900/60 text-slate-300 border-slate-800 hover:border-slate-700"
                     )}
                   >
@@ -607,7 +607,7 @@ export function FerryhopperBookingEngine({
                     className={cn(
                       "w-12 h-11 rounded-xl font-black text-sm transition border cursor-pointer flex items-center justify-center",
                       passengersCount === num
-                        ? "bg-blue-900 text-white border-blue-500 shadow-md"
+                        ? "bg-white text-black font-black border-white shadow-md"
                         : "bg-slate-900 text-slate-300 border-slate-800 hover:border-slate-700"
                     )}
                   >
@@ -624,7 +624,7 @@ export function FerryhopperBookingEngine({
           {/* LIGNE 5 DU TABLEAU : INFORMATIONS DU PASSAGER */}
           <div className="p-5 rounded-2xl bg-[#070d1e] border border-slate-800 space-y-4">
             <div className="flex items-center gap-2 text-slate-300">
-              <User size={18} className="text-blue-400" />
+              <User size={18} className="text-white" />
               <label className="text-xs sm:text-sm font-black uppercase tracking-wider">
                 5. Informations du Passager Principal <span className="text-rose-400">*</span>
               </label>
@@ -641,7 +641,7 @@ export function FerryhopperBookingEngine({
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
                   placeholder="Ex: Patient Mugabo"
-                  className="w-full px-4 py-3 bg-slate-900 border border-slate-700 rounded-xl text-sm font-semibold text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-4 py-3 bg-slate-900 border border-slate-700 rounded-xl text-sm font-semibold text-white focus:outline-none focus:ring-2 focus:ring-white/40 focus:border-white"
                 />
               </div>
 
@@ -655,7 +655,7 @@ export function FerryhopperBookingEngine({
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
                   placeholder="Ex: 0994102673"
-                  className="w-full px-4 py-3 bg-slate-900 border border-slate-700 rounded-xl text-sm font-semibold text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-4 py-3 bg-slate-900 border border-slate-700 rounded-xl text-sm font-semibold text-white focus:outline-none focus:ring-2 focus:ring-white/40 focus:border-white"
                 />
               </div>
 
@@ -669,7 +669,7 @@ export function FerryhopperBookingEngine({
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="Ex: voyageur@gmail.com"
-                  className="w-full px-4 py-3 bg-slate-900 border border-slate-700 rounded-xl text-sm font-semibold text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-4 py-3 bg-slate-900 border border-slate-700 rounded-xl text-sm font-semibold text-white focus:outline-none focus:ring-2 focus:ring-white/40 focus:border-white"
                 />
               </div>
 
@@ -682,7 +682,7 @@ export function FerryhopperBookingEngine({
                   value={identityNum}
                   onChange={(e) => setIdentityNum(e.target.value)}
                   placeholder="Ex: N° carte d'électeur ou passeport"
-                  className="w-full px-4 py-3 bg-slate-900 border border-slate-700 rounded-xl text-sm font-semibold text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-4 py-3 bg-slate-900 border border-slate-700 rounded-xl text-sm font-semibold text-white focus:outline-none focus:ring-2 focus:ring-white/40 focus:border-white"
                 />
               </div>
             </div>
@@ -691,7 +691,7 @@ export function FerryhopperBookingEngine({
           {/* LIGNE 6 DU TABLEAU : BAGAGES */}
           <div className="p-5 rounded-2xl bg-[#070d1e] border border-slate-800 space-y-3">
             <div className="flex items-center gap-2 text-slate-300">
-              <Luggage size={18} className="text-blue-400" />
+              <Luggage size={18} className="text-white" />
               <label className="text-xs sm:text-sm font-black uppercase tracking-wider">
                 6. Franchise Bagages & Fret
               </label>
@@ -710,7 +710,7 @@ export function FerryhopperBookingEngine({
                   className={cn(
                     "p-3 rounded-xl border text-left transition cursor-pointer",
                     luggageOption === opt.id
-                      ? "bg-blue-900 text-white border-blue-500 shadow-md"
+                      ? "bg-[#0b132b] text-white border-white shadow-md ring-1 ring-white/30"
                       : "bg-slate-900/60 text-slate-300 border-slate-800 hover:border-slate-700"
                   )}
                 >
@@ -724,7 +724,7 @@ export function FerryhopperBookingEngine({
           {/* LIGNE 7 DU TABLEAU : PAIEMENT */}
           <div className="p-5 rounded-2xl bg-[#070d1e] border border-slate-800 space-y-4">
             <div className="flex items-center gap-2 text-slate-300">
-              <CreditCard size={18} className="text-blue-400" />
+              <CreditCard size={18} className="text-white" />
               <label className="text-xs sm:text-sm font-black uppercase tracking-wider">
                 7. Mode de Paiement Sécurisé <span className="text-rose-400">*</span>
               </label>
@@ -739,7 +739,7 @@ export function FerryhopperBookingEngine({
                   className={cn(
                     "p-3 rounded-xl border text-center transition cursor-pointer",
                     paymentMethod === method
-                      ? "bg-blue-900 text-white border-blue-500 shadow-md"
+                      ? "bg-[#0b132b] text-white border-white shadow-md ring-1 ring-white/30"
                       : "bg-slate-900/60 text-slate-300 border-slate-800 hover:border-slate-700"
                   )}
                 >
@@ -758,14 +758,14 @@ export function FerryhopperBookingEngine({
                   value={paymentPhone || phone}
                   onChange={(e) => setPaymentPhone(e.target.value)}
                   placeholder="099... ou 081..."
-                  className="w-full px-4 py-3 bg-slate-900 border border-slate-700 rounded-xl text-sm font-semibold text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-4 py-3 bg-slate-900 border border-slate-700 rounded-xl text-sm font-semibold text-white focus:outline-none focus:ring-2 focus:ring-white/40 focus:border-white"
                 />
               </div>
             ) : null}
           </div>
 
           {/* LIGNE 8 DU TABLEAU : SYNTHÈSE DU CALCUL ET BOUTON RÉSERVER ET PAYER */}
-          <div className="p-6 rounded-2xl bg-[#070d1e] border-2 border-blue-700/60 flex flex-col sm:flex-row items-center justify-between gap-6 shadow-xl">
+          <div className="p-6 rounded-2xl bg-[#070d1e] border border-white/20 flex flex-col sm:flex-row items-center justify-between gap-6 shadow-xl">
             <div>
               <span className="text-xs uppercase font-extrabold tracking-wider text-slate-400 block">
                 Total à Régler ({passengersCount} passager{passengersCount > 1 ? 's' : ''})
@@ -781,7 +781,7 @@ export function FerryhopperBookingEngine({
             <button
               type="submit"
               disabled={submitting}
-              className="w-full sm:w-auto px-8 py-4 bg-blue-900 hover:bg-blue-800 active:scale-[0.98] text-white font-black text-sm uppercase tracking-wider rounded-xl shadow-xl border border-blue-600 transition cursor-pointer flex items-center justify-center gap-3"
+              className="w-full sm:w-auto px-8 py-4 bg-white hover:bg-slate-200 active:scale-[0.98] text-black font-black text-sm uppercase tracking-wider rounded-xl shadow-xl border border-white/20 transition cursor-pointer flex items-center justify-center gap-3"
             >
               {submitting ? (
                 <span>Validation en cours...</span>
@@ -811,7 +811,7 @@ export function FerryhopperBookingEngine({
             >
               <div className="flex items-center justify-between border-b border-slate-700 pb-3">
                 <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-lg bg-blue-900 text-white flex items-center justify-center">
+                  <div className="w-8 h-8 rounded-lg bg-white/10 text-white flex items-center justify-center border border-white/20">
                     <Search size={18} />
                   </div>
                   <h3 className="text-base font-extrabold text-white">Retrouver ma Réservation</h3>
@@ -836,12 +836,12 @@ export function FerryhopperBookingEngine({
                     value={lookupQuery}
                     onChange={(e) => setLookupQuery(e.target.value)}
                     placeholder="MUG-XXXX ou 099..."
-                    className="flex-1 px-4 py-3 bg-slate-900 border border-slate-700 rounded-xl text-sm font-semibold text-white focus:outline-none focus:border-blue-500"
+                    className="flex-1 px-4 py-3 bg-slate-900 border border-slate-700 rounded-xl text-sm font-semibold text-white focus:outline-none focus:border-white"
                   />
                   <button
                     type="submit"
                     disabled={lookupLoading}
-                    className="px-5 py-3 bg-blue-900 hover:bg-blue-800 text-white font-bold text-xs uppercase tracking-wider rounded-xl transition cursor-pointer disabled:opacity-50"
+                    className="px-5 py-3 bg-white hover:bg-slate-200 text-black font-black text-xs uppercase tracking-wider rounded-xl transition cursor-pointer disabled:opacity-50"
                   >
                     {lookupLoading ? "Recherche..." : "Vérifier"}
                   </button>
@@ -861,7 +861,7 @@ export function FerryhopperBookingEngine({
                       <span className="text-[10px] font-bold text-slate-400 uppercase block">Passager</span>
                       <p className="text-sm font-black text-white">{lookupResult.fullName}</p>
                     </div>
-                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-950 text-emerald-300 border border-emerald-800">
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-white/10 text-white border border-white/20">
                       {lookupResult.status}
                     </span>
                   </div>
@@ -881,7 +881,7 @@ export function FerryhopperBookingEngine({
                     </div>
                     <div>
                       <span className="text-slate-400 block text-[10px]">N° Billet :</span>
-                      <span className="font-mono font-bold text-blue-300">#{lookupResult.ticketId}</span>
+                      <span className="font-mono font-bold text-white">#{lookupResult.ticketId}</span>
                     </div>
                   </div>
 
@@ -891,7 +891,7 @@ export function FerryhopperBookingEngine({
                       setConfirmedReservation(lookupResult);
                       setShowLookupModal(false);
                     }}
-                    className="w-full py-2.5 bg-blue-900 text-white rounded-xl text-xs font-bold uppercase tracking-wider hover:bg-blue-800 transition mt-2 cursor-pointer"
+                    className="w-full py-2.5 bg-white text-black font-black rounded-xl text-xs uppercase tracking-wider hover:bg-slate-200 transition mt-2 cursor-pointer shadow-md"
                   >
                     Voir mon Billet Électronique & QR Code
                   </button>

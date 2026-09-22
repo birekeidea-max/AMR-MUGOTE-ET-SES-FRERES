@@ -233,13 +233,13 @@ export function TravelerTicketScannerModal({ isOpen, onClose, siteSettings }: Tr
         <div className="p-6 space-y-6 max-h-[75vh] overflow-y-auto">
           
           {/* Strict Security Rule Banner */}
-          <div className="bg-amber-50 border border-amber-200/80 rounded-2xl p-4 flex items-start gap-3 text-left">
-            <ShieldAlert size={20} className="text-amber-600 shrink-0 mt-0.5" />
+          <div className="bg-slate-100 border border-slate-300 rounded-2xl p-4 flex items-start gap-3 text-left">
+            <ShieldAlert size={20} className="text-slate-800 shrink-0 mt-0.5" />
             <div className="space-y-0.5">
-              <p className="text-xs font-black text-amber-950 uppercase tracking-tight">
+              <p className="text-xs font-black text-slate-950 uppercase tracking-tight">
                 Règle Officielle d'Embarquement
               </p>
-              <p className="text-[11px] font-medium text-amber-900 leading-relaxed">
+              <p className="text-[11px] font-medium text-slate-800 leading-relaxed">
                 Ce scanner voyageur vous permet de <strong>consulter votre statut</strong>. <span className="underline font-bold">Seul l'agent administratif au quai</span> possède l'autorité pour scanner et valider l'embarquement physique à bord du navire. Aucun passager ne peut valider son propre embarquement.
               </p>
             </div>
@@ -314,7 +314,7 @@ export function TravelerTicketScannerModal({ isOpen, onClose, siteSettings }: Tr
                   ? "bg-emerald-50 border-emerald-400 text-emerald-950"
                   : isPaid
                   ? "bg-sky-50 border-sky-400 text-sky-950"
-                  : "bg-amber-50 border-amber-400 text-amber-950"
+                  : "bg-slate-100 border-slate-300 text-slate-900"
               )}>
                 <div className="flex items-center gap-2">
                   {isBoarded ? (
@@ -322,7 +322,7 @@ export function TravelerTicketScannerModal({ isOpen, onClose, siteSettings }: Tr
                   ) : isPaid ? (
                     <CheckCircle2 size={20} className="text-sky-600 shrink-0" />
                   ) : (
-                    <AlertCircle size={20} className="text-amber-600 shrink-0" />
+                    <AlertCircle size={20} className="text-slate-700 shrink-0" />
                   )}
                   <h4 className="text-sm font-black uppercase tracking-tight">
                     {isBoarded

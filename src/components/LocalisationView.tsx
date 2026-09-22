@@ -358,8 +358,8 @@ export default function LocalisationView() {
                     <div key={boat.id || idx} className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex gap-4 items-center hover:bg-slate-100/50 transition-all">
                       <div className={cn(
                         "w-12 h-12 rounded-xl flex items-center justify-center shrink-0 shadow-sm",
-                        boat.status === 'En navigation' ? "bg-sky-500/10 text-sky-500 animate-pulse" :
-                        boat.status === 'En maintenance' ? "bg-amber-500/10 text-amber-500" :
+                        boat.status === 'En navigation' ? "bg-slate-900 text-white animate-pulse" :
+                        boat.status === 'En maintenance' ? "bg-slate-200 text-slate-800" :
                         "bg-emerald-500/10 text-emerald-500"
                       )}>
                         <Ship size={20} />
@@ -369,8 +369,8 @@ export default function LocalisationView() {
                           <h4 className="text-xs font-black uppercase text-slate-800 truncate leading-tight">{boat.name}</h4>
                           <span className={cn(
                             "px-1.5 py-0.5 rounded text-[7px] font-black uppercase shrink-0 tracking-wide border",
-                            boat.status === 'En navigation' ? "bg-sky-50 text-sky-600 border-sky-100" :
-                            boat.status === 'En maintenance' ? "bg-amber-50 text-amber-600 border-amber-100" :
+                            boat.status === 'En navigation' ? "bg-slate-900 text-white border-slate-900" :
+                            boat.status === 'En maintenance' ? "bg-slate-100 text-slate-800 border-slate-300" :
                             "bg-emerald-50 text-emerald-600 border-emerald-100"
                           )}>
                             {boat.status || 'À quai'}

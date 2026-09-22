@@ -37,17 +37,17 @@ const SchedulesAndTariffs: React.FC<SchedulesAndTariffsProps> = ({ siteSettings 
   ];
 
   const classRows: { name: TravelClass; subtitle: string; tag?: string; tagColor?: string }[] = [
-    { name: 'VIP', subtitle: 'Salon VIP Privatisé & Climatisé', tag: 'Prestige', tagColor: 'bg-amber-100 text-amber-800' },
-    { name: '1ère Classe', subtitle: 'Confort Supérieur & Priorité', tag: 'Standard Plus', tagColor: 'bg-yellow-100 text-yellow-800' },
-    { name: '2ème Classe', subtitle: 'Standard Populaire & Aéré', tag: 'Recommandé', tagColor: 'bg-blue-100 text-blue-800' },
+    { name: 'VIP', subtitle: 'Salon VIP Privatisé & Climatisé', tag: 'Prestige', tagColor: 'bg-white text-black font-black' },
+    { name: '1ère Classe', subtitle: 'Confort Supérieur & Priorité', tag: 'Standard Plus', tagColor: 'bg-white/20 text-white border border-white/30' },
+    { name: '2ème Classe', subtitle: 'Standard Populaire & Aéré', tag: 'Recommandé', tagColor: 'bg-[#0b132b] text-white border border-white/20' },
     { name: '3ème Classe', subtitle: 'Économique & Abordable' }
   ];
 
   return (
     <section className="py-8 px-4 max-w-6xl mx-auto w-full text-left" id="schedules-tariffs-section">
       <div className="text-center mb-10">
-        <div className="inline-flex items-center gap-2 px-3.5 py-1.5 bg-gold/10 border border-gold/30 rounded-full text-xs font-black text-amber-400 uppercase tracking-widest mb-3">
-          <Calendar className="w-3.5 h-3.5 text-gold" />
+        <div className="inline-flex items-center gap-2 px-3.5 py-1.5 bg-white/10 border border-white/20 rounded-full text-xs font-black text-white uppercase tracking-widest mb-3">
+          <Calendar className="w-3.5 h-3.5 text-white" />
           <span>Planification & Grille Tarifaire</span>
         </div>
         <h2 className="text-2xl sm:text-4xl font-extrabold text-white tracking-tight uppercase italic">
@@ -62,20 +62,20 @@ const SchedulesAndTariffs: React.FC<SchedulesAndTariffsProps> = ({ siteSettings 
         {routes.map((route, idx) => (
           <div 
             key={idx} 
-            className="bg-[#0b1329] border border-white/10 rounded-3xl p-6 md:p-8 shadow-2xl flex flex-col justify-between text-left"
+            className="bg-[#0b132b] border border-white/15 rounded-3xl p-6 md:p-8 shadow-2xl flex flex-col justify-between text-left"
             id={`route-card-${idx}`}
           >
             <div>
               {/* Header de liaison */}
               <div className="flex items-center gap-3 mb-6 pb-4 border-b border-white/10">
-                <div className="w-12 h-12 rounded-2xl bg-amber-400/10 border border-amber-400/20 flex items-center justify-center text-gold shrink-0 shadow-inner">
-                  <Ship className="w-6 h-6 text-gold" />
+                <div className="w-12 h-12 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center text-white shrink-0 shadow-inner">
+                  <Ship className="w-6 h-6 text-white" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <span className="text-[10px] uppercase tracking-widest font-black text-amber-400 block">Liaison Lacustre Quotidienne</span>
+                  <span className="text-[10px] uppercase tracking-widest font-black text-slate-300 block">Liaison Lacustre Quotidienne</span>
                   <div className="flex items-center gap-2 flex-wrap mt-0.5">
                     <span className="font-extrabold text-base md:text-lg text-white truncate">{route.departure.split(' ')[0]}</span>
-                    <ArrowRight className="w-4 h-4 text-amber-400 shrink-0" />
+                    <ArrowRight className="w-4 h-4 text-white shrink-0" />
                     <span className="font-extrabold text-base md:text-lg text-white truncate">{route.destination.split(' ')[0]}</span>
                   </div>
                 </div>
@@ -86,14 +86,14 @@ const SchedulesAndTariffs: React.FC<SchedulesAndTariffsProps> = ({ siteSettings 
                 <div className="bg-white/5 border border-white/10 p-3.5 rounded-2xl">
                   <span className="text-[10px] uppercase font-black text-slate-400 block mb-1">Fréquence</span>
                   <span className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
-                    <Calendar className="w-4 h-4 text-amber-400" />
+                    <Calendar className="w-4 h-4 text-white" />
                     {route.frequency}
                   </span>
                 </div>
                 <div className="bg-white/5 border border-white/10 p-3.5 rounded-2xl">
                   <span className="text-[10px] uppercase font-black text-slate-400 block mb-1">Voie de navigation</span>
                   <span className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
-                    <MapPin className="w-4 h-4 text-amber-400" />
+                    <MapPin className="w-4 h-4 text-white" />
                     Lac Kivu (RDC)
                   </span>
                 </div>
@@ -101,9 +101,9 @@ const SchedulesAndTariffs: React.FC<SchedulesAndTariffsProps> = ({ siteSettings 
 
               {/* Tableau Sémantique */}
               <div className="overflow-hidden border border-white/10 rounded-2xl">
-                <table className="w-full text-left border-collapse bg-[#070c1a] text-xs">
+                <table className="w-full text-left border-collapse bg-[#070d1e] text-xs">
                   <thead>
-                    <tr className="bg-[#000814] text-white border-b border-white/10">
+                    <tr className="bg-[#0b132b] text-white border-b border-white/10">
                       <th className="py-3.5 px-4 font-black uppercase tracking-wider text-[10px]">Classe Officielle</th>
                       <th className="py-3.5 px-4 font-black uppercase tracking-wider text-center text-[10px]">Départs</th>
                       <th className="py-3.5 px-4 font-black uppercase tracking-wider text-right text-[10px]">Tarif Unitaire</th>
@@ -124,11 +124,11 @@ const SchedulesAndTariffs: React.FC<SchedulesAndTariffsProps> = ({ siteSettings 
                           <span className="text-[11px] text-slate-400 font-medium block mt-0.5">{cr.subtitle}</span>
                         </td>
                         <td className="py-3.5 px-4 text-center">
-                          <div className="inline-flex items-center gap-1.5 bg-white/10 border border-white/10 text-amber-300 px-2.5 py-1 rounded-lg font-mono text-[11px] font-bold">
-                            <Clock className="w-3 h-3 text-gold" /> 07:30 (Matin) / 18:00 (Soir)
+                          <div className="inline-flex items-center gap-1.5 bg-white/10 border border-white/10 text-white px-2.5 py-1 rounded-lg font-mono text-[11px] font-bold">
+                            <Clock className="w-3 h-3 text-white" /> 07:30 (Matin) / 18:00 (Soir)
                           </div>
                         </td>
-                        <td className="py-3.5 px-4 text-right font-black text-amber-400 text-base font-mono whitespace-nowrap">
+                        <td className="py-3.5 px-4 text-right font-black text-white text-base font-mono whitespace-nowrap">
                           {prices[cr.name]} $
                         </td>
                       </tr>
@@ -140,7 +140,7 @@ const SchedulesAndTariffs: React.FC<SchedulesAndTariffsProps> = ({ siteSettings 
             
             <div className="mt-6 pt-3 text-xs text-slate-400 border-t border-white/10 flex items-center justify-between">
               <span>* Embarquement 45 min avant l'horaire</span>
-              <span className="font-bold text-amber-400">Gilets de sauvetage certifiés inclus</span>
+              <span className="font-bold text-white">Gilets de sauvetage certifiés inclus</span>
             </div>
           </div>
         ))}

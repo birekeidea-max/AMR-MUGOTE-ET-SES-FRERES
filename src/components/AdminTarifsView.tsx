@@ -49,13 +49,13 @@ const CLASS_CONFIGS: ClassConfig[] = [
     badge: 'Prestige VIP',
     icon: Crown,
     colorClass: {
-      bgLight: 'bg-amber-50/60',
-      border: 'border-amber-200',
-      text: 'text-amber-900',
-      badgeBg: 'bg-amber-100',
-      badgeText: 'text-amber-800 border-amber-300',
-      accentBg: 'bg-gradient-to-r from-amber-500 to-amber-600',
-      ring: 'focus-within:border-amber-500 focus-within:ring-amber-500/20'
+      bgLight: 'bg-slate-100/90',
+      border: 'border-slate-300',
+      text: 'text-slate-900',
+      badgeBg: 'bg-black',
+      badgeText: 'text-white border-black',
+      accentBg: 'bg-black',
+      ring: 'focus-within:border-black focus-within:ring-black/20'
     },
     features: ['Salon Climatisé VIP', 'Embarquement prioritaire', 'Boisson offerte']
   },
@@ -67,13 +67,13 @@ const CLASS_CONFIGS: ClassConfig[] = [
     badge: 'Première',
     icon: Star,
     colorClass: {
-      bgLight: 'bg-yellow-50/60',
-      border: 'border-yellow-200',
-      text: 'text-yellow-900',
-      badgeBg: 'bg-yellow-100',
-      badgeText: 'text-yellow-800 border-yellow-300',
-      accentBg: 'bg-gradient-to-r from-yellow-500 to-yellow-600',
-      ring: 'focus-within:border-yellow-500 focus-within:ring-yellow-500/20'
+      bgLight: 'bg-slate-50',
+      border: 'border-slate-300',
+      text: 'text-slate-900',
+      badgeBg: 'bg-[#0b132b]',
+      badgeText: 'text-white border-[#0b132b]',
+      accentBg: 'bg-[#0b132b]',
+      ring: 'focus-within:border-[#0b132b] focus-within:ring-[#0b132b]/20'
     },
     features: ['Sièges première classe', 'Vue panoramique', 'Service de bord soigné']
   },
@@ -85,13 +85,13 @@ const CLASS_CONFIGS: ClassConfig[] = [
     badge: 'Standard',
     icon: Ship,
     colorClass: {
-      bgLight: 'bg-blue-50/60',
-      border: 'border-blue-200',
-      text: 'text-blue-900',
-      badgeBg: 'bg-blue-100',
-      badgeText: 'text-blue-800 border-blue-300',
-      accentBg: 'bg-gradient-to-r from-blue-600 to-[#0047AB]',
-      ring: 'focus-within:border-blue-600 focus-within:ring-blue-600/20'
+      bgLight: 'bg-slate-50',
+      border: 'border-slate-300',
+      text: 'text-slate-900',
+      badgeBg: 'bg-slate-800',
+      badgeText: 'text-white border-slate-700',
+      accentBg: 'bg-[#0b132b]',
+      ring: 'focus-within:border-[#0b132b] focus-within:ring-[#0b132b]/20'
     },
     features: ['Sièges confortables', 'Espace ventilé & ouvert', 'Recommandé standard']
   },
@@ -312,7 +312,7 @@ export const AdminTarifsView: React.FC<AdminTarifsViewProps> = ({ siteSettings }
                       Nouveau Prix (USD) :
                     </label>
                     {isModified && (
-                      <span className="text-[9px] font-black uppercase tracking-wider text-amber-600 bg-amber-100 px-2 py-0.5 rounded-md animate-pulse">
+                      <span className="text-[9px] font-black uppercase tracking-wider text-white bg-slate-900 px-2 py-0.5 rounded-md animate-pulse">
                         Modifié (non enregistré)
                       </span>
                     )}

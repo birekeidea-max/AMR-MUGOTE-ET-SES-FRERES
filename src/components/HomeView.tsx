@@ -160,8 +160,8 @@ export function HomeView({
       arrivalCity: toCity,
       arrivalPortName: toCity === 'Goma' ? 'Port Public de Goma' : 'Port MUGOTE (Beach Muhanzi)',
       status: isMatin ? 'Départ Matin (07h30 ➔ 12h30)' : 'Départ Soir (18h00 ➔ 06h00 +1)',
-      statusColor: isMatin ? 'bg-amber-50 text-amber-800 border-amber-200' : 'bg-indigo-50 text-indigo-800 border-indigo-200',
-      statusDot: isMatin ? 'bg-amber-500' : 'bg-indigo-500',
+      statusColor: 'bg-slate-100 text-slate-800 border-slate-300',
+      statusDot: 'bg-slate-700',
       direction,
       days: s.days || 'Quotidien',
       prices: { eco: 10, standard: 17, vip: 27 },
@@ -185,23 +185,23 @@ export function HomeView({
       {/* ========================================================= */}
       <div className="max-w-7xl mx-auto px-3 sm:px-6 space-y-8">
         
-        {/* BANNIÈRE HERO BLEU ROYAL */}
-        <div className="bg-gradient-to-br from-[#1b4fc2] via-[#2563eb] to-[#1e40af] rounded-3xl p-6 sm:p-9 shadow-2xl relative overflow-hidden text-white border border-blue-500/20">
+        {/* BANNIÈRE HERO BLEU DE NUIT */}
+        <div className="bg-gradient-to-br from-[#0b132b] via-[#1c2541] to-[#0b132b] rounded-3xl p-6 sm:p-9 shadow-2xl relative overflow-hidden text-white border border-white/10">
           
           {/* Motifs géométriques décoratifs légers en arrière-plan */}
           <div className="absolute -right-24 -top-24 w-96 h-96 bg-white/5 rounded-full blur-3xl pointer-events-none" />
-          <div className="absolute -left-20 -bottom-20 w-80 h-80 bg-amber-400/10 rounded-full blur-2xl pointer-events-none" />
+          <div className="absolute -left-20 -bottom-20 w-80 h-80 bg-white/5 rounded-full blur-2xl pointer-events-none" />
 
           {/* Badge officiel de liaison */}
           <div className="relative z-10 flex flex-wrap items-center gap-3 mb-4">
             <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-md border border-white/20 px-3.5 py-1.5 rounded-full text-xs font-semibold">
               <span className="w-2 h-2 rounded-full bg-emerald-400" />
-              <span className="text-blue-50 font-bold text-[11px] sm:text-xs">
+              <span className="text-white font-bold text-[11px] sm:text-xs">
                 Liaisons Quotidiennes • 07h30 (Matin ➔ 12h30) & 18h00 (Soir ➔ 06h00 +1)
               </span>
             </div>
             
-            <div className="hidden sm:inline-flex items-center gap-1.5 text-xs text-amber-300 font-bold bg-amber-400/10 border border-amber-400/20 px-3 py-1 rounded-full">
+            <div className="hidden sm:inline-flex items-center gap-1.5 text-xs text-white font-bold bg-white/10 border border-white/20 px-3 py-1 rounded-full">
               <ShieldCheck size={14} />
               <span>Flotte homologuée & gilets certifiés</span>
             </div>
@@ -212,7 +212,7 @@ export function HomeView({
                 <h1 className="text-2xl sm:text-3xl md:text-4xl font-black tracking-tight leading-tight text-white">
                   Voyagez en toute sécurité sur le Lac Kivu
                 </h1>
-                <p className="mt-2 text-xs sm:text-sm text-blue-100/90 font-medium leading-relaxed">
+                <p className="mt-2 text-xs sm:text-sm text-slate-200 font-medium leading-relaxed">
                   ETS AMR MUGOTE & FRÈRES assure vos traversées quotidiennes entre <strong>Goma</strong> et <strong>Bukavu</strong> à bord de vedettes rapides et confortables.
                 </p>
 
@@ -221,7 +221,7 @@ export function HomeView({
                   <button
                     type="button"
                     onClick={onBook}
-                    className="px-6 py-3 bg-amber-400 hover:bg-amber-500 active:scale-95 text-slate-950 font-black rounded-2xl shadow-lg shadow-amber-400/25 flex items-center gap-2 text-xs uppercase tracking-wider transition cursor-pointer"
+                    className="px-6 py-3 bg-white hover:bg-slate-100 active:scale-95 text-slate-950 font-black rounded-2xl shadow-lg shadow-black/25 flex items-center gap-2 text-xs uppercase tracking-wider transition cursor-pointer"
                   >
                     <Ticket size={18} />
                     <span>Réserver un billet maintenant</span>
@@ -249,7 +249,7 @@ export function HomeView({
                       name="tripType" 
                       checked={tripType === 'one-way'} 
                       onChange={() => setTripType('one-way')}
-                      className="w-4 h-4 text-blue-600 focus:ring-blue-500"
+                      className="w-4 h-4 text-[#0b132b] focus:ring-slate-700"
                     />
                     <span>Aller simple</span>
                   </label>
@@ -259,7 +259,7 @@ export function HomeView({
                       name="tripType" 
                       checked={tripType === 'round-trip'} 
                       onChange={() => setTripType('round-trip')}
-                      className="w-4 h-4 text-blue-600 focus:ring-blue-500"
+                      className="w-4 h-4 text-[#0b132b] focus:ring-slate-700"
                     />
                     <span>Aller-retour</span>
                   </label>
@@ -274,7 +274,7 @@ export function HomeView({
                       Départ
                     </label>
                     <div className="flex items-center gap-2">
-                      <MapPin size={18} className="text-blue-600 shrink-0" />
+                      <MapPin size={18} className="text-[#0b132b] shrink-0" />
                       <select 
                         value={departurePort}
                         onChange={(e) => setDeparturePort(e.target.value)}
@@ -293,7 +293,7 @@ export function HomeView({
                       type="button"
                       onClick={handleSwapPorts}
                       title="Inverser départ et arrivée"
-                      className="w-10 h-10 rounded-full bg-slate-100 hover:bg-blue-50 text-blue-600 hover:text-blue-700 border border-slate-200 flex items-center justify-center transition shadow-xs cursor-pointer active:scale-90"
+                      className="w-10 h-10 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-200 flex items-center justify-center transition shadow-xs cursor-pointer active:scale-90"
                     >
                       <ArrowRightLeft size={16} />
                     </button>
@@ -305,7 +305,7 @@ export function HomeView({
                       Destination
                     </label>
                     <div className="flex items-center gap-2">
-                      <MapPin size={18} className="text-blue-600 shrink-0" />
+                      <MapPin size={18} className="text-[#0b132b] shrink-0" />
                       <select 
                         value={arrivalPort}
                         onChange={(e) => setArrivalPort(e.target.value)}
@@ -324,9 +324,9 @@ export function HomeView({
                       Date
                     </label>
                     <div className="flex items-center gap-2">
-                      <Calendar size={18} className="text-blue-600 shrink-0" />
+                      <Calendar size={18} className="text-[#0b132b] shrink-0" />
                       <input 
-                        type="date"
+                        type="date" 
                         value={searchDate}
                         min={new Date().toISOString().split('T')[0]}
                         onChange={(e) => setSearchDate(e.target.value)}
@@ -341,7 +341,7 @@ export function HomeView({
                       Passagers & Classe
                     </label>
                     <div className="flex items-center gap-2">
-                      <Users size={18} className="text-blue-600 shrink-0" />
+                      <Users size={18} className="text-[#0b132b] shrink-0" />
                       <select 
                         value={`${passengerCount}-${selectedClass}`}
                         onChange={(e) => {
@@ -367,14 +367,14 @@ export function HomeView({
                 {/* Bouton de recherche principal qui redirige directement vers la réservation */}
                 <div className="mt-4 pt-3 flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-slate-100">
                   <div className="flex items-center gap-2 text-xs text-slate-500">
-                    <Compass size={16} className="text-blue-600" />
+                    <Compass size={16} className="text-[#0b132b]" />
                     <span>Traversées express 2h30 à 3h00 • Horaires fixes matin & midi</span>
                   </div>
 
                   <button
                     type="button"
                     onClick={onBook}
-                    className="w-full sm:w-auto px-8 py-3.5 bg-amber-400 hover:bg-amber-500 active:scale-95 text-slate-950 font-black rounded-2xl shadow-lg shadow-amber-400/25 flex items-center justify-center gap-2.5 text-xs uppercase tracking-wider transition cursor-pointer"
+                    className="w-full sm:w-auto px-8 py-3.5 bg-[#0b132b] hover:bg-black active:scale-95 text-white font-black rounded-2xl shadow-lg shadow-black/25 flex items-center justify-center gap-2.5 text-xs uppercase tracking-wider transition cursor-pointer"
                   >
                     <Search size={18} className="stroke-[2.5]" />
                     <span>Rechercher & Réserver</span>
@@ -391,7 +391,7 @@ export function HomeView({
                 <div>
                   <div className="flex items-center gap-2">
                     <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-                    <span className="text-[11px] font-black uppercase tracking-widest text-blue-700">
+                    <span className="text-[11px] font-black uppercase tracking-widest text-slate-800">
                       Horaires Officiels Programmés (Console Admin)
                     </span>
                   </div>
@@ -423,7 +423,7 @@ export function HomeView({
                       onClick={() => setTimePeriodFilter('matin')}
                       className={`px-3 py-1.5 text-xs font-black rounded-xl transition cursor-pointer flex items-center gap-1 ${
                         timePeriodFilter === 'matin' 
-                          ? 'bg-amber-500 text-slate-950 shadow-xs' 
+                          ? 'bg-black text-white shadow-xs' 
                           : 'text-slate-600 hover:text-slate-900'
                       }`}
                     >
@@ -435,7 +435,7 @@ export function HomeView({
                       onClick={() => setTimePeriodFilter('soir')}
                       className={`px-3 py-1.5 text-xs font-black rounded-xl transition cursor-pointer flex items-center gap-1 ${
                         timePeriodFilter === 'soir' 
-                          ? 'bg-indigo-600 text-white shadow-xs' 
+                          ? 'bg-[#0b132b] text-white shadow-xs' 
                           : 'text-slate-600 hover:text-slate-900'
                       }`}
                     >
@@ -451,7 +451,7 @@ export function HomeView({
                       onClick={() => setCrossingFilter('all')}
                       className={`px-2.5 py-1.5 text-xs font-black rounded-xl transition cursor-pointer ${
                         crossingFilter === 'all' 
-                          ? 'bg-blue-600 text-white shadow-xs' 
+                          ? 'bg-[#0b132b] text-white shadow-xs' 
                           : 'text-slate-600 hover:text-slate-900'
                       }`}
                     >
@@ -462,7 +462,7 @@ export function HomeView({
                       onClick={() => setCrossingFilter('GOM-BKV')}
                       className={`px-2.5 py-1.5 text-xs font-black rounded-xl transition cursor-pointer ${
                         crossingFilter === 'GOM-BKV' 
-                          ? 'bg-blue-600 text-white shadow-xs' 
+                          ? 'bg-[#0b132b] text-white shadow-xs' 
                           : 'text-slate-600 hover:text-slate-900'
                       }`}
                     >
@@ -473,7 +473,7 @@ export function HomeView({
                       onClick={() => setCrossingFilter('BKV-GOM')}
                       className={`px-2.5 py-1.5 text-xs font-black rounded-xl transition cursor-pointer ${
                         crossingFilter === 'BKV-GOM' 
-                          ? 'bg-blue-600 text-white shadow-xs' 
+                          ? 'bg-[#0b132b] text-white shadow-xs' 
                           : 'text-slate-600 hover:text-slate-900'
                       }`}
                     >
@@ -495,7 +495,7 @@ export function HomeView({
                     <button
                       type="button"
                       onClick={() => { setTimePeriodFilter('all'); setCrossingFilter('all'); }}
-                      className="px-4 py-2 bg-blue-50 text-blue-700 text-xs font-black rounded-xl hover:bg-blue-100 transition cursor-pointer"
+                      className="px-4 py-2 bg-slate-100 text-slate-800 text-xs font-black rounded-xl hover:bg-slate-200 transition cursor-pointer"
                     >
                       Afficher tous les départs (07h30 & 18h00)
                     </button>
@@ -509,7 +509,7 @@ export function HomeView({
                       {/* Infos Horaires & Trajet */}
                       <div className="flex-1 space-y-2">
                         <div className="flex flex-wrap items-center gap-2">
-                          <span className="px-2.5 py-1 rounded-xl text-[10px] font-black uppercase tracking-wider bg-blue-50 text-blue-700 border border-blue-200 flex items-center gap-1.5">
+                          <span className="px-2.5 py-1 rounded-xl text-[10px] font-black uppercase tracking-wider bg-slate-100 text-slate-800 border border-slate-200 flex items-center gap-1.5">
                             <Ship size={13} />
                             {c.boat} • Capacité : {c.capacity} PAX
                           </span>
@@ -538,15 +538,15 @@ export function HomeView({
                               {c.period === 'matin' ? '5h00 directe' : '12h00 • De nuit'}
                             </span>
                             <div className="w-full flex items-center">
-                              <div className="w-2.5 h-2.5 rounded-full border-2 border-blue-600 bg-white shrink-0" />
+                              <div className="w-2.5 h-2.5 rounded-full border-2 border-slate-800 bg-white shrink-0" />
                               <div className="flex-1 h-0.5 bg-slate-200 relative">
                                 <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white px-1">
-                                  <Ship size={13} className="text-blue-600" />
+                                  <Ship size={13} className="text-slate-800" />
                                 </div>
                               </div>
-                              <div className="w-2.5 h-2.5 rounded-full bg-blue-600 shrink-0" />
+                              <div className="w-2.5 h-2.5 rounded-full bg-slate-800 shrink-0" />
                             </div>
-                            <span className="text-[10px] font-bold text-blue-700 mt-0.5">
+                            <span className="text-[10px] font-bold text-slate-700 mt-0.5">
                               {c.period === 'matin' ? 'Arrivée 12h30' : 'Arrivée 06h00 (Lendemain)'}
                             </span>
                           </div>
@@ -556,7 +556,7 @@ export function HomeView({
                               {c.arrivalTime}
                             </span>
                             {c.period === 'soir' && (
-                              <span className="block text-[9px] font-black text-indigo-600 uppercase tracking-tight -mt-0.5">
+                              <span className="block text-[9px] font-black text-slate-700 uppercase tracking-tight -mt-0.5">
                                 Lendemain
                               </span>
                             )}
@@ -572,10 +572,10 @@ export function HomeView({
                           <span className="text-xs font-black text-slate-800 bg-slate-50 px-2 py-1 rounded-lg border border-slate-200" title="Classe Économique">
                             Éco ${c.prices.eco}
                           </span>
-                          <span className="text-xs font-black text-blue-800 bg-blue-50 px-2 py-1 rounded-lg border border-blue-200" title="Classe Standard">
+                          <span className="text-xs font-black text-slate-800 bg-slate-100 px-2 py-1 rounded-lg border border-slate-300" title="Classe Standard">
                             Std ${c.prices.standard}
                           </span>
-                          <span className="text-xs font-black text-amber-800 bg-amber-50 px-2 py-1 rounded-lg border border-amber-200" title="Classe VIP">
+                          <span className="text-xs font-black text-slate-900 bg-slate-200 px-2 py-1 rounded-lg border border-slate-300" title="Classe VIP">
                             VIP ${c.prices.vip}
                           </span>
                         </div>
@@ -587,7 +587,7 @@ export function HomeView({
                             c.boat,
                             'standard'
                           )}
-                          className="px-5 py-2.5 bg-amber-400 hover:bg-amber-500 active:scale-95 text-slate-950 font-black text-xs uppercase tracking-wider rounded-xl shadow-md transition cursor-pointer flex items-center gap-1.5"
+                          className="px-5 py-2.5 bg-[#0b132b] hover:bg-black active:scale-95 text-white font-black text-xs uppercase tracking-wider rounded-xl shadow-md transition cursor-pointer flex items-center gap-1.5"
                         >
                           <Ticket size={15} />
                           <span>Réserver ce départ</span>
@@ -607,7 +607,7 @@ export function HomeView({
       {/* ========================================================= */}
       <section className="max-w-7xl mx-auto px-3 sm:px-6 pt-4">
         <div className="text-center max-w-2xl mx-auto mb-8">
-          <span className="text-[11px] font-black uppercase tracking-widest text-blue-600">
+          <span className="text-[11px] font-black uppercase tracking-widest text-slate-800">
             Qualité & Fiabilité Lacustre
           </span>
           <h2 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
@@ -646,19 +646,19 @@ export function HomeView({
               key={idx}
               className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm hover:shadow-lg transition-all space-y-4"
             >
-              <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center font-black">
+              <div className="w-12 h-12 rounded-2xl bg-[#0b132b] text-white flex items-center justify-center font-black">
                 <Ship size={24} />
               </div>
               <div>
                 <h3 className="text-base font-black text-slate-900">{boat.name}</h3>
-                <span className="text-[11px] font-bold text-blue-600 block">{boat.type}</span>
+                <span className="text-[11px] font-bold text-slate-600 block">{boat.type}</span>
               </div>
               <p className="text-xs text-slate-600 leading-relaxed">
                 {boat.desc}
               </p>
               <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-bold text-slate-700">
                 <span>Capacité : {boat.capacity}</span>
-                <span className="text-blue-600">{boat.speed}</span>
+                <span className="text-slate-900">{boat.speed}</span>
               </div>
             </div>
           ))}

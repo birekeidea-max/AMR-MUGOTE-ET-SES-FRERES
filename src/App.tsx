@@ -270,10 +270,10 @@ export const getClassPrice = (travelClass: TravelClass, settings?: any): number 
 const PRICES: Record<TravelClass, number> = DEFAULT_PRICES;
 
 const CLASS_COLORS: Record<TravelClass, { main: string, rgb: [number, number, number], light: string }> = {
-  '1ère Classe': { main: '#EAB308', rgb: [234, 179, 8], light: 'rgba(234, 179, 8, 0.1)' }, // Gold
-  '2ème Classe': { main: '#0047AB', rgb: [0, 71, 171], light: 'rgba(0, 71, 171, 0.1)' }, // Maritime
-  '3ème Classe': { main: '#10B981', rgb: [16, 185, 129], light: 'rgba(16, 185, 129, 0.1)' }, // Emerald
-  'VIP': { main: '#F59E0B', rgb: [245, 158, 11], light: 'rgba(245, 158, 11, 0.1)' } // Amber
+  '1ère Classe': { main: '#0b132b', rgb: [11, 19, 43], light: 'rgba(11, 19, 43, 0.08)' }, // Bleu de nuit
+  '2ème Classe': { main: '#1c2541', rgb: [28, 37, 65], light: 'rgba(28, 37, 65, 0.08)' }, // Nuit ardoise
+  '3ème Classe': { main: '#334155', rgb: [51, 65, 85], light: 'rgba(51, 65, 85, 0.08)' }, // Ardoise foncée
+  'VIP': { main: '#000000', rgb: [0, 0, 0], light: 'rgba(0, 0, 0, 0.08)' } // Noir
 };
 
 const SYSTEM_PROMPT = `Tu es l'assistant IA officiel de ETS AMR MUGOTE ET SES FRERES...`; // Keep definition but we will use the server version
@@ -316,15 +316,15 @@ const generateTicket = async (res: Reservation, siteSettings: any) => {
     const headerImg = await loadImage(detailImgUrl);
     
     // Choose custom background styling and color scheme based on travelClass
-    let ticketBgColor: [number, number, number] = [255, 255, 255]; // Standard Clean white
+    let ticketBgColor: [number, number, number] = [255, 255, 255]; // Blanc immaculé
     if (res.travelClass === 'VIP') {
-      ticketBgColor = [253, 244, 225]; // Warm gold-champagne shimmer tint
+      ticketBgColor = [250, 250, 252]; // Blanc argenté
     } else if (res.travelClass === '1ère Classe') {
-      ticketBgColor = [240, 244, 255]; // Regal soft blue tint
+      ticketBgColor = [245, 247, 250]; // Teinte neutre claire
     } else if (res.travelClass === '2ème Classe') {
-      ticketBgColor = [240, 253, 250]; // Oceanic soft teal/cyan tint
+      ticketBgColor = [248, 250, 252]; // Gris perle ardoise
     } else {
-      ticketBgColor = [250, 250, 250]; // Cool gray tint for 3ème classe
+      ticketBgColor = [250, 250, 250]; // Gris clair
     }
 
     const color = CLASS_COLORS[res.travelClass] || CLASS_COLORS['2ème Classe'];
@@ -1712,12 +1712,12 @@ export default function App() {
               {/* Header */}
               <div className="p-6 bg-slate-900 text-white flex items-center justify-between border-b border-slate-800">
                 <div className="flex items-center gap-3">
-                  <div className="p-2.5 bg-gradient-to-br from-yellow-400 to-amber-500 rounded-2xl text-slate-950">
+                  <div className="p-2.5 bg-black rounded-2xl text-white">
                     <Ship size={24} className="animate-pulse" />
                   </div>
                   <div>
                     <h2 className="font-extrabold text-sm sm:text-lg uppercase tracking-tight">Installer l'Application</h2>
-                    <p className="text-[9px] text-[#eab308] font-bold uppercase tracking-widest">AMR MUGOTE SUR VOTRE APPAREIL</p>
+                    <p className="text-[9px] text-white/80 font-bold uppercase tracking-widest">AMR MUGOTE SUR VOTRE APPAREIL</p>
                   </div>
                 </div>
                 <button
@@ -1815,28 +1815,28 @@ export default function App() {
 
                   {/* Desktop Install Section */}
                   {userPlatform === 'desktop' && (
-                    <div className="p-5 bg-amber-50 rounded-2xl border border-amber-200/60 space-y-4 text-left">
-                      <span className="text-[#ca8a04] font-black text-xs sm:text-sm uppercase tracking-wider block">Méthode Facile pour Ordinateur (PC / Mac / Linux) 💻</span>
+                    <div className="p-5 bg-slate-100 rounded-2xl border border-slate-200 space-y-4 text-left">
+                      <span className="text-slate-900 font-black text-xs sm:text-sm uppercase tracking-wider block">Méthode Facile pour Ordinateur (PC / Mac / Linux) 💻</span>
                       {isInstallable && deferredPrompt ? (
                         <button
                           onClick={handleInstallClick}
-                          className="w-full py-3.5 bg-[#001233] hover:bg-[#00224d] text-[#eab308] border border-[#eab308]/30 text-xs font-black uppercase tracking-widest rounded-xl shadow-lg transition-all hover:scale-[1.02] active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
+                          className="w-full py-3.5 bg-[#0b132b] hover:bg-slate-900 text-white border border-white/20 text-xs font-black uppercase tracking-widest rounded-xl shadow-lg transition-all hover:scale-[1.02] active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
                         >
                           <Rocket size={16} />
                           Installer l'application sur mon PC
                         </button>
                       ) : (
-                        <div className="space-y-3.5 text-xs text-amber-900 leading-relaxed font-semibold">
+                        <div className="space-y-3.5 text-xs text-slate-800 leading-relaxed font-semibold">
                           <div className="flex items-start gap-2.5">
-                            <span className="bg-amber-100 text-amber-900 w-5 h-5 rounded-full flex items-center justify-center text-[10px] flex-shrink-0 mt-0.5">1</span>
+                            <span className="bg-slate-200 text-slate-900 w-5 h-5 rounded-full flex items-center justify-center text-[10px] flex-shrink-0 mt-0.5">1</span>
                             <p>Dans la barre d'adresse de votre navigateur Chrome ou Edge (en haut à droite, là où vous tapez les adresses de sites), recherchez la petite icône avec une <strong className="text-slate-900">petite flèche pointant vers le bas</strong> ou <strong className="text-slate-900">trois carrés avec un "+"</strong>.</p>
                           </div>
                           <div className="flex items-start gap-2.5">
-                            <span className="bg-amber-100 text-amber-900 w-5 h-5 rounded-full flex items-center justify-center text-[10px] flex-shrink-0 mt-0.5">2</span>
+                            <span className="bg-slate-200 text-slate-900 w-5 h-5 rounded-full flex items-center justify-center text-[10px] flex-shrink-0 mt-0.5">2</span>
                             <p>Cliquez sur cette icône d'installation rapide.</p>
                           </div>
                           <div className="flex items-start gap-2.5">
-                            <span className="bg-amber-100 text-amber-900 w-5 h-5 rounded-full flex items-center justify-center text-[10px] flex-shrink-0 mt-0.5">3</span>
+                            <span className="bg-slate-200 text-slate-900 w-5 h-5 rounded-full flex items-center justify-center text-[10px] flex-shrink-0 mt-0.5">3</span>
                             <p>Choisissez <strong className="text-slate-900">"Installer"</strong>. Un raccourci s'ajoutera automatiquement sur votre Bureau PC/Mac.</p>
                           </div>
                         </div>
@@ -1858,7 +1858,7 @@ export default function App() {
                 {/* Share feature so it's shareable with everyone */}
                 <div className="p-4 bg-slate-900 text-white rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-4 text-left">
                   <div className="space-y-1">
-                    <h5 className="font-extrabold text-[#eab308] text-xs uppercase tracking-wider">📤 Partager avec vos proches</h5>
+                    <h5 className="font-extrabold text-white text-xs uppercase tracking-wider">📤 Partager avec vos proches</h5>
                     <p className="text-[10px] text-slate-300 font-semibold leading-relaxed">
                       Envoyez cette web-app à votre équipe ou vos passagers pour qu'ils puissent également l'installer en quelques secondes.
                     </p>
@@ -1881,9 +1881,9 @@ export default function App() {
                         alert("Lien de l'application copié ! Vous pouvez maintenant le coller et l'envoyer par WhatsApp, SMS ou vos réseaux favoris.");
                       }
                     }}
-                    className="px-5 py-2.5 bg-gradient-to-r from-[#eab308] to-yellow-500 hover:from-yellow-500 hover:to-amber-500 text-slate-950 text-[10px] font-black uppercase tracking-widest rounded-xl shadow-lg flex items-center gap-2 transition-all shrink-0 cursor-pointer"
+                    className="px-5 py-2.5 bg-white hover:bg-slate-100 text-black text-[10px] font-black uppercase tracking-widest rounded-xl shadow-lg flex items-center gap-2 transition-all shrink-0 cursor-pointer"
                   >
-                    <Check size={14} className="text-slate-950 font-black" />
+                    <Check size={14} className="text-black font-black" />
                     Partager l'App
                   </button>
                 </div>
@@ -2572,8 +2572,8 @@ function UserLoginForm({ onSuccess, setUser, setIsAdmin, setIsAdminUnlocked }: {
       </div>
 
       {errorCode === "REGRETS_IFRAME_GOOGLE_AUTH" && (
-        <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl space-y-3 mb-4 text-left">
-          <div className="text-amber-800 text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5">
+        <div className="p-4 bg-slate-100 border border-slate-300 rounded-2xl space-y-3 mb-4 text-left">
+          <div className="text-slate-900 text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5">
             <span className="text-sm">⚠️</span> Restriction de Sécurité Iframe Détectée
           </div>
           <p className="text-slate-600 text-[10px] uppercase font-bold tracking-wide leading-relaxed">
@@ -2583,7 +2583,7 @@ function UserLoginForm({ onSuccess, setUser, setIsAdmin, setIsAdminUnlocked }: {
             <button 
               type="button" 
               onClick={() => window.open(window.location.origin + window.location.pathname, '_blank')}
-              className="py-3 px-4 bg-maritime text-white font-black rounded-xl uppercase text-[9px] tracking-wider text-center hover:bg-black transition-all cursor-pointer shadow-sm text-ellipsis overflow-hidden"
+              className="py-3 px-4 bg-[#0b132b] text-white font-black rounded-xl uppercase text-[9px] tracking-wider text-center hover:bg-black transition-all cursor-pointer shadow-sm text-ellipsis overflow-hidden"
             >
               👉 Nouvel Onglet
             </button>
@@ -2595,7 +2595,7 @@ function UserLoginForm({ onSuccess, setUser, setIsAdmin, setIsAdminUnlocked }: {
         type="button"
         onClick={handleGoogleLogin}
         disabled={loading}
-        className="w-full py-4.5 bg-[#4285F4] hover:bg-[#357ae8] text-white font-black rounded-2xl uppercase tracking-widest text-[10px] sm:text-xs shadow-lg shadow-blue-500/10 flex items-center justify-center gap-3 active:scale-95 transition-all cursor-pointer"
+        className="w-full py-4.5 bg-[#0b132b] hover:bg-black text-white font-black rounded-2xl uppercase tracking-widest text-[10px] sm:text-xs shadow-lg shadow-black/20 flex items-center justify-center gap-3 active:scale-95 transition-all cursor-pointer border border-white/10"
       >
         <svg className="w-4 h-4 text-white fill-current shrink-0" viewBox="0 0 24 24">
           <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
@@ -4253,26 +4253,26 @@ function Booking({ onReserved, user, onLoginRequest, siteSettings }: { onReserve
 
                 {/* 🗓️ SECTION DÉDIÉE : GMAIL & AGENDA EN TEMPS RÉEL DU SERVEUR POUR LES ALERTES BATEAU */}
                 <div className="flex flex-col sm:flex-row group transition-colors hover:bg-slate-50/50 border-t border-slate-100">
-                  <div className="p-2 lg:p-6 sm:border-r border-slate-100 bg-blue-50/30 sm:w-[150px] lg:w-[200px] shrink-0">
+                  <div className="p-2 lg:p-6 sm:border-r border-slate-100 bg-slate-50/60 sm:w-[150px] lg:w-[200px] shrink-0">
                     <div className="flex flex-col gap-0.5 lg:gap-1">
-                      <label className="text-[8px] lg:text-[10px] font-black uppercase text-maritime tracking-widest flex items-center gap-1.5 lg:gap-2">
-                        <Mail size={12} className="text-blue-600" /> Agenda Serveur
+                      <label className="text-[8px] lg:text-[10px] font-black uppercase text-slate-900 tracking-widest flex items-center gap-1.5 lg:gap-2">
+                        <Mail size={12} className="text-[#0b132b]" /> Agenda Serveur
                       </label>
-                      <span className="text-[7px] lg:text-[8px] font-extrabold text-blue-600 uppercase tracking-wider">
+                      <span className="text-[7px] lg:text-[8px] font-extrabold text-slate-600 uppercase tracking-wider">
                         Alertes Bateau Direct
                       </span>
                     </div>
                   </div>
                   <div className="p-2.5 lg:p-6 flex-1 space-y-3">
-                    <div className="bg-gradient-to-br from-blue-900/5 via-slate-50 to-blue-500/5 p-3.5 lg:p-5 rounded-2xl border-2 border-blue-200 shadow-sm space-y-3">
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 border-b border-blue-100 pb-2.5">
-                        <span className="text-[9px] lg:text-[11px] font-black uppercase text-blue-950 tracking-wider flex items-center gap-1.5">
-                          <span className="inline-flex items-center gap-0.5 font-black text-sm">
-                            <span className="text-blue-600">G</span><span className="text-rose-500">m</span><span className="text-amber-500">a</span><span className="text-blue-600">i</span><span className="text-emerald-500">l</span>
+                    <div className="bg-slate-50/80 p-3.5 lg:p-5 rounded-2xl border-2 border-slate-300 shadow-sm space-y-3">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 border-b border-slate-200 pb-2.5">
+                        <span className="text-[9px] lg:text-[11px] font-black uppercase text-slate-900 tracking-wider flex items-center gap-1.5">
+                          <span className="inline-flex items-center gap-0.5 font-black text-sm text-[#0b132b]">
+                            Gmail
                           </span> 
                           & Surveillance Bateau en Temps Réel
                         </span>
-                        <span className="inline-flex items-center gap-1 text-[8px] lg:text-[9px] font-black uppercase bg-blue-600 text-white px-2.5 py-1 rounded-full shadow-xs self-start sm:self-auto">
+                        <span className="inline-flex items-center gap-1 text-[8px] lg:text-[9px] font-black uppercase bg-[#0b132b] text-white px-2.5 py-1 rounded-full shadow-xs self-start sm:self-auto">
                           <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
                           Agenda Central du Serveur
                         </span>
@@ -4285,15 +4285,15 @@ function Booking({ onReserved, user, onLoginRequest, siteSettings }: { onReserve
                       <div className="space-y-1.5 pt-1">
                         <div className="flex items-center justify-between">
                           <label className="text-[8px] lg:text-[10px] font-black uppercase tracking-[0.1em] text-slate-700 flex items-center gap-1.5">
-                            <Mail size={12} className="text-blue-600" /> Insérer votre compte Gmail
+                            <Mail size={12} className="text-slate-800" /> Insérer votre compte Gmail
                           </label>
                           {user?.email && (
                             <button
                               type="button"
                               onClick={() => setFormData(prev => ({ ...prev, email: user.email || '' }))}
-                              className="text-[8px] lg:text-[9px] font-bold text-blue-700 hover:text-blue-900 underline flex items-center gap-1 cursor-pointer"
+                              className="text-[8px] lg:text-[9px] font-bold text-slate-900 hover:text-black underline flex items-center gap-1 cursor-pointer"
                             >
-                              <CheckCircle2 size={10} className="text-blue-600" /> Utiliser mon Gmail de connexion ({user.email})
+                              <CheckCircle2 size={10} className="text-slate-800" /> Utiliser mon Gmail de connexion ({user.email})
                             </button>
                           )}
                         </div>
@@ -4303,10 +4303,10 @@ function Booking({ onReserved, user, onLoginRequest, siteSettings }: { onReserve
                             type="email" 
                             value={formData.email}
                             onChange={e => setFormData({ ...formData, email: e.target.value })}
-                            className="w-full pl-9 pr-3 py-2 lg:pl-11 lg:pr-5 lg:py-3 bg-white border-2 border-blue-300 rounded-lg lg:rounded-2xl focus:outline-none focus:ring-4 focus:ring-blue-500/20 focus:border-blue-600 transition-all font-mono font-bold text-[11px] lg:text-sm text-slate-900 shadow-inner"
+                            className="w-full pl-9 pr-3 py-2 lg:pl-11 lg:pr-5 lg:py-3 bg-white border-2 border-slate-300 rounded-lg lg:rounded-2xl focus:outline-none focus:ring-4 focus:ring-slate-400/20 focus:border-slate-800 transition-all font-mono font-bold text-[11px] lg:text-sm text-slate-900 shadow-inner"
                             placeholder="Ex: voyageur@gmail.com"
                           />
-                          <Mail className="absolute left-3 lg:left-4 top-1/2 -translate-y-1/2 text-blue-500" size={16} />
+                          <Mail className="absolute left-3 lg:left-4 top-1/2 -translate-y-1/2 text-slate-500" size={16} />
                         </div>
 
                         {formData.email && formData.email.includes('@') ? (
@@ -4318,7 +4318,7 @@ function Booking({ onReserved, user, onLoginRequest, siteSettings }: { onReserve
                           </div>
                         ) : (
                           <p className="text-[8px] lg:text-[10px] text-slate-500 font-medium flex items-center gap-1 mt-1">
-                            <Clock size={11} className="text-blue-500 shrink-0" />
+                            <Clock size={11} className="text-slate-500 shrink-0" />
                             Insérez votre adresse Gmail pour activer la surveillance du bateau et recevoir votre rappel d'heure de départ.
                           </p>
                         )}
@@ -4674,19 +4674,19 @@ function Payment({ reservation, onComplete, siteSettings }: { reservation: Reser
             className="bg-white rounded-[32px] sm:rounded-[40px] border border-slate-200 shadow-2xl p-6 sm:p-10 space-y-8 relative overflow-hidden"
           >
             {/* Top accent bar */}
-            <div className="absolute top-0 left-0 w-full h-3 bg-gradient-to-r from-amber-500 via-gold to-amber-600 animate-pulse" />
+            <div className="absolute top-0 left-0 w-full h-2 bg-[#0b132b]" />
 
             {/* Header Badge & Title */}
             <div className="flex flex-col sm:flex-row items-center sm:items-start gap-5 border-b border-slate-100 pb-6 text-center sm:text-left">
-              <div className="w-16 h-16 sm:w-20 sm:h-20 bg-amber-50 text-amber-600 rounded-3xl border border-amber-200 flex items-center justify-center shrink-0 shadow-lg shadow-amber-500/10">
+              <div className="w-16 h-16 sm:w-20 sm:h-20 bg-slate-100 text-slate-800 rounded-3xl border border-slate-300 flex items-center justify-center shrink-0 shadow-md">
                 <Clock size={36} className="animate-spin" style={{ animationDuration: '8s' }} />
               </div>
               <div className="space-y-2">
-                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-50 border border-amber-200 text-amber-700 text-[10px] font-black uppercase tracking-widest">
-                  <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping" />
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-100 border border-slate-300 text-slate-800 text-[10px] font-black uppercase tracking-widest">
+                  <span className="w-2 h-2 rounded-full bg-slate-700 animate-ping" />
                   ⏳ Demande de réservation enregistrée
                 </div>
-                <h2 className="text-2xl sm:text-3xl font-black text-[#001233] uppercase tracking-tight italic leading-tight">
+                <h2 className="text-2xl sm:text-3xl font-black text-slate-900 uppercase tracking-tight italic leading-tight">
                   En Attente de Validation par l'Administration
                 </h2>
                 <p className="text-xs sm:text-sm font-medium text-slate-600">
@@ -4696,10 +4696,10 @@ function Payment({ reservation, onComplete, siteSettings }: { reservation: Reser
             </div>
 
             {/* Main Explanation Box regarding Network Operator Keys & Manual Transfer Verification */}
-            <div className="bg-[#001233] text-white p-6 sm:p-8 rounded-3xl border-2 border-gold/40 shadow-xl space-y-5 relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-64 h-64 bg-gold/5 rounded-full blur-3xl pointer-events-none" />
+            <div className="bg-[#0b132b] text-white p-6 sm:p-8 rounded-3xl border border-white/20 shadow-xl space-y-5 relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full blur-3xl pointer-events-none" />
 
-              <div className="flex items-center gap-3 text-gold">
+              <div className="flex items-center gap-3 text-white">
                 <AlertCircle size={22} className="shrink-0" />
                 <h4 className="text-sm sm:text-base font-black uppercase tracking-wider italic">
                   Instruction de Confirmation du Virement Mobile
@@ -4735,7 +4735,7 @@ function Payment({ reservation, onComplete, siteSettings }: { reservation: Reser
               </div>
 
               {/* Real-time sync note */}
-              <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-4 flex items-center gap-3 text-amber-200 text-xs font-medium">
+              <div className="bg-white/10 border border-white/20 rounded-2xl p-4 flex items-center gap-3 text-white text-xs font-medium">
                 <div className="w-3 h-3 bg-emerald-500 rounded-full animate-ping shrink-0" />
                 <span>
                   **Mise à jour en direct** : Gardez cette page ouverte ou consultez votre section <strong>"Mes Billets"</strong>. Dès la confirmation du virement par la direction, votre billet officiel avec QR code sera immédiatement débloqué.
@@ -4749,11 +4749,11 @@ function Payment({ reservation, onComplete, siteSettings }: { reservation: Reser
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-xs font-bold text-slate-800">
                 <div>
                   <span className="text-[9px] font-black text-slate-400 uppercase block">Passager</span>
-                  <p className="text-sm font-black text-[#001233]">{currentRes.fullName} {currentRes.lastName}</p>
+                  <p className="text-sm font-black text-slate-900">{currentRes.fullName} {currentRes.lastName}</p>
                 </div>
                 <div>
                   <span className="text-[9px] font-black text-slate-400 uppercase block">Trajet & Navire</span>
-                  <p className="text-sm font-extrabold text-maritime">{currentRes.itinerary} ({currentRes.ship})</p>
+                  <p className="text-sm font-extrabold text-slate-900">{currentRes.itinerary} ({currentRes.ship})</p>
                 </div>
                 <div>
                   <span className="text-[9px] font-black text-slate-400 uppercase block">Classe & Places</span>
@@ -4761,7 +4761,7 @@ function Payment({ reservation, onComplete, siteSettings }: { reservation: Reser
                 </div>
                 <div>
                   <span className="text-[9px] font-black text-slate-400 uppercase block">Date & Heure de Voyage</span>
-                  <p className="text-sm font-extrabold text-maritime">{currentRes.travelDate} à {currentRes.departureTime || '07:30'}</p>
+                  <p className="text-sm font-extrabold text-slate-900">{currentRes.travelDate} à {currentRes.departureTime || '07:30'}</p>
                 </div>
                 <div>
                   <span className="text-[9px] font-black text-slate-400 uppercase block">Réservé le</span>
@@ -4772,21 +4772,21 @@ function Payment({ reservation, onComplete, siteSettings }: { reservation: Reser
                   <p className="text-sm font-mono text-slate-700">{currentRes.phone}</p>
                 </div>
                 {currentRes.email && (
-                  <div className="col-span-2 sm:col-span-3 bg-blue-50/90 border border-blue-200 rounded-xl p-3 flex items-start gap-2.5">
-                    <div className="w-7 h-7 rounded-lg bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-xs mt-0.5">
+                  <div className="col-span-2 sm:col-span-3 bg-slate-100 border border-slate-300 rounded-xl p-3 flex items-start gap-2.5">
+                    <div className="w-7 h-7 rounded-lg bg-[#0b132b] text-white flex items-center justify-center shrink-0 shadow-xs mt-0.5">
                       <Mail size={15} />
                     </div>
                     <div className="space-y-0.5 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-[10px] font-black uppercase text-blue-950 tracking-wider">
+                        <span className="text-[10px] font-black uppercase text-slate-900 tracking-wider">
                           🗓️ Inscrit à l'Agenda en Temps Réel du Serveur
                         </span>
                         <span className="bg-emerald-100 text-emerald-800 text-[8px] font-extrabold px-1.5 py-0.5 rounded-full border border-emerald-300">
                           Actif
                         </span>
                       </div>
-                      <p className="text-[11px] text-blue-900 font-medium leading-tight">
-                        Votre adresse <span className="font-mono font-bold text-blue-950">{currentRes.email}</span> a été transmise à l'agenda central du serveur. Les notifications en temps réel concernant votre bateau <span className="font-bold">{currentRes.ship}</span> (départ prévu à {currentRes.departureTime || '07h30'}, embarquement et alertes navigation) vous parviendront automatiquement.
+                      <p className="text-[11px] text-slate-800 font-medium leading-tight">
+                        Votre adresse <span className="font-mono font-bold text-slate-900">{currentRes.email}</span> a été transmise à l'agenda central du serveur. Les notifications en temps réel concernant votre bateau <span className="font-bold">{currentRes.ship}</span> (départ prévu à {currentRes.departureTime || '07h30'}, embarquement et alertes navigation) vous parviendront automatiquement.
                       </p>
                     </div>
                   </div>
@@ -5974,10 +5974,10 @@ function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlock
               <div className="flex flex-wrap justify-center gap-4">
                 {[
                   { label: "Total Réservations", val: stats.total, color: "bg-black text-white" },
-                  { label: "En attente", val: stats.pending, color: "bg-amber-100 text-amber-700 border border-amber-200" },
-                  { label: "Validées", val: stats.validated, color: "bg-emerald-100 text-emerald-700 border border-emerald-200" },
-                  { label: "Passagers Validés", val: stats.validatedPassengers, color: "bg-blue-100 text-blue-700 border border-blue-200" },
-                  { label: "Recettes (USD)", val: `${stats.validatedRevenue}$`, color: "bg-gold/10 text-gold-700 border-2 border-gold/30" }
+                  { label: "En attente", val: stats.pending, color: "bg-slate-100 text-slate-800 border border-slate-300" },
+                  { label: "Validées", val: stats.validated, color: "bg-emerald-100 text-emerald-800 border border-emerald-300" },
+                  { label: "Passagers Validés", val: stats.validatedPassengers, color: "bg-[#0b132b] text-white border border-[#0b132b]" },
+                  { label: "Recettes (USD)", val: `${stats.validatedRevenue}$`, color: "bg-slate-900 text-white border border-slate-700" }
                 ].map((s, i) => (
                   <div key={i} className={cn("px-4 lg:px-8 py-3 lg:py-4 rounded-2xl text-center min-w-[120px] lg:min-w-[140px]", s.color)}>
                     <p className="text-[7px] lg:text-[9px] font-extrabold uppercase tracking-widest opacity-60 mb-1">{s.label}</p>
@@ -6170,7 +6170,7 @@ function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlock
                       <div className="mt-3">
                         <span className={cn(
                           "px-3 py-1 text-[8px] font-bold uppercase tracking-widest rounded-full border",
-                          res.status === 'PENDING' && "bg-amber-50 text-amber-600 border-amber-200",
+                          res.status === 'PENDING' && "bg-slate-100 text-slate-800 border-slate-300",
                           res.status === 'VALIDATED' && "bg-emerald-50 text-emerald-600 border-emerald-200",
                           res.status === 'REJECTED' && "bg-rose-50 text-rose-600 border-rose-200"
                         )}>
@@ -6336,7 +6336,7 @@ function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlock
                   label: "Activité Récente", 
                   val: getUnifiedUsers().filter(u => u.lastLogin).length, 
                   desc: "Membres avec historique enregistré",
-                  color: "border-amber-100 bg-amber-50/20 text-amber-600"
+                  color: "border-slate-300 bg-slate-100 text-slate-800"
                 }
               ].map((s, idx) => (
                 <div key={idx} className={`p-6 bg-white border rounded-[24px] shadow-sm flex flex-col justify-between ${s.color}`}>
@@ -7736,21 +7736,21 @@ function MyTickets({
         {onOpenScanner && (
           <button
             onClick={onOpenScanner}
-            className="w-full sm:w-auto px-5 py-3 bg-[#001233] hover:bg-slate-900 text-white rounded-2xl text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2.5 shadow-lg shadow-black/20 hover:scale-105 active:scale-95 transition cursor-pointer"
+            className="w-full sm:w-auto px-5 py-3 bg-[#0b132b] hover:bg-slate-900 text-white rounded-2xl text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2.5 shadow-lg shadow-black/20 hover:scale-105 active:scale-95 transition cursor-pointer"
           >
-            <QrCode size={16} className="text-[#eab308]" />
+            <QrCode size={16} className="text-white" />
             <span>Scanner QR / Vérifier Statut</span>
           </button>
         )}
       </div>
 
       {!user && (
-        <div className="bg-gradient-to-r from-[#001233] to-[#0a2540] text-white p-6 sm:p-8 rounded-3xl shadow-xl text-left">
+        <div className="bg-[#0b132b] text-white p-6 sm:p-8 rounded-3xl shadow-xl text-left border border-white/10">
           <div className="max-w-2xl">
-            <span className="text-[10px] font-black uppercase tracking-widest text-amber-400">Recherche Rapide Passager</span>
+            <span className="text-[10px] font-black uppercase tracking-widest text-white/80">Recherche Rapide Passager</span>
             <h3 className="text-xl sm:text-2xl font-black uppercase tracking-tight mt-1 mb-2">Retrouvez votre réservation</h3>
             <p className="text-xs text-slate-300 leading-relaxed mb-6">
-              Saisissez la référence de votre billet (ex: <span className="text-amber-300 font-mono">MUG-2026...</span>) ou votre numéro de téléphone pour afficher vos billets et télécharger vos PDF.
+              Saisissez la référence de votre billet (ex: <span className="text-white font-mono font-bold underline">MUG-2026...</span>) ou votre numéro de téléphone pour afficher vos billets et télécharger vos PDF.
             </p>
 
             <form onSubmit={handleGuestSearch} className="flex flex-col sm:flex-row gap-3">
@@ -7759,12 +7759,12 @@ function MyTickets({
                 value={searchRef}
                 onChange={(e) => setSearchRef(e.target.value)}
                 placeholder="Référence billet ou Téléphone (+243...)"
-                className="flex-1 px-4 py-3 bg-white/10 border border-white/20 rounded-2xl text-white placeholder-slate-400 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+                className="flex-1 px-4 py-3 bg-white/10 border border-white/20 rounded-2xl text-white placeholder-slate-400 text-sm focus:outline-none focus:ring-2 focus:ring-white"
               />
               <button
                 type="submit"
                 disabled={isSearching}
-                className="px-6 py-3 bg-gold hover:bg-amber-400 text-maritime font-black uppercase tracking-wider text-xs rounded-2xl transition-all shadow-lg active:scale-95 disabled:opacity-50 cursor-pointer"
+                className="px-6 py-3 bg-white hover:bg-slate-100 text-black font-black uppercase tracking-wider text-xs rounded-2xl transition-all shadow-lg active:scale-95 disabled:opacity-50 cursor-pointer"
               >
                 {isSearching ? 'Recherche...' : 'Rechercher mon billet'}
               </button>
@@ -7780,7 +7780,7 @@ function MyTickets({
                 <button
                   type="button"
                   onClick={onLoginRequest}
-                  className="text-xs font-black text-amber-400 hover:text-white uppercase tracking-wider underline cursor-pointer"
+                  className="text-xs font-black text-white hover:underline uppercase tracking-wider cursor-pointer"
                 >
                   Se connecter à mon compte
                 </button>
@@ -7791,9 +7791,9 @@ function MyTickets({
       )}
 
       {/* Strict Administrative Separation Notice */}
-      <div className="bg-sky-50/80 border border-sky-200/80 rounded-2xl p-4 flex items-start gap-3 text-left">
-        <ShieldCheck size={18} className="text-sky-600 shrink-0 mt-0.5" />
-        <p className="text-[11px] font-medium text-sky-900 leading-relaxed">
+      <div className="bg-slate-100/90 border border-slate-300 rounded-2xl p-4 flex items-start gap-3 text-left">
+        <ShieldCheck size={18} className="text-slate-800 shrink-0 mt-0.5" />
+        <p className="text-[11px] font-medium text-slate-800 leading-relaxed">
           <strong>Règle d'embarquement officiel :</strong> Vous pouvez vérifier le statut de votre billet ci-dessous à tout moment. Seul le <strong>compte administratif</strong> au quai peut scanner pour <strong>autoriser définitivement votre embarquement</strong> physique à bord du navire.
         </p>
       </div>
@@ -7805,34 +7805,31 @@ function MyTickets({
           <div className="col-span-2 text-center py-10 sm:py-16 text-slate-400 uppercase text-[8px] sm:text-[10px] font-bold tracking-widest border border-dashed border-slate-200 rounded-xl mx-4">Aucun billet trouvé.</div>
         ) : (
           tickets.map(res => {
-            let classCardStyle = "bg-white border-slate-100 shadow-sm";
-            let classStubStyle = "bg-slate-50 border-slate-100";
+            let classCardStyle = "bg-white/80 backdrop-blur-md border-slate-300/80 shadow-md hover:border-slate-500 hover:shadow-xl";
+            let classStubStyle = "bg-slate-100/60 backdrop-blur-sm border-slate-200/80";
             
             if (res.travelClass === 'VIP') {
-              classCardStyle = "bg-gradient-to-br from-amber-500/10 via-yellow-500/5 to-amber-500/10 border-amber-300 shadow-amber-500/5 hover:border-amber-400";
-              classStubStyle = "bg-amber-600/10 border-amber-200/55";
+              classCardStyle = "bg-white/75 backdrop-blur-md border-slate-400/80 shadow-lg hover:border-black hover:shadow-2xl";
+              classStubStyle = "bg-slate-900/[0.05] backdrop-blur-sm border-slate-300/80";
             } else if (res.travelClass === '1ère Classe') {
-              classCardStyle = "bg-gradient-to-br from-blue-600/5 via-indigo-600/2 to-indigo-600/5 border-blue-200 shadow-sm hover:border-blue-400";
-              classStubStyle = "bg-blue-600/10 border-blue-200/55";
-            } else if (res.travelClass === '2ème Classe') {
-              classCardStyle = "bg-gradient-to-br from-cyan-600/5 via-teal-600/2 to-teal-600/5 border-teal-200 shadow-sm hover:border-teal-400";
-              classStubStyle = "bg-cyan-600/10 border-teal-200/55";
+              classCardStyle = "bg-white/80 backdrop-blur-md border-slate-400/80 shadow-md hover:border-[#0b132b] hover:shadow-xl";
+              classStubStyle = "bg-[#0b132b]/[0.05] backdrop-blur-sm border-slate-300/80";
             } else {
-              classCardStyle = "bg-gradient-to-br from-slate-100/50 via-zinc-50/10 to-slate-100/50 border-slate-200 shadow-sm hover:border-slate-350";
-              classStubStyle = "bg-slate-100/60 border-slate-200/55";
+              classCardStyle = "bg-white/70 backdrop-blur-md border-slate-300/80 shadow-md hover:border-slate-400 hover:shadow-xl";
+              classStubStyle = "bg-slate-100/50 backdrop-blur-sm border-slate-200/80";
             }
 
             return (
-              <div key={res.id} className={cn("border rounded-xl overflow-hidden flex flex-col sm:flex-row transition-all hover:shadow-md group mx-0 sm:mx-0 relative", classCardStyle)}>
+              <div key={res.id} className={cn("border rounded-2xl overflow-hidden flex flex-col sm:flex-row transition-all hover:shadow-xl group mx-0 sm:mx-0 relative", classCardStyle)}>
                 <div className={cn("w-full sm:w-28 flex flex-row sm:flex-col items-center justify-center p-4 border-b sm:border-b-0 sm:border-r gap-4 sm:gap-0", classStubStyle)}>
                   {res.status === 'VALIDATED' ? (
                     <QRCodeSVG value={`https://${window.location.host}/?verify=${res.id}`} size={64} className="sm:size-16" />
                   ) : (
-                    <div className="w-12 h-12 sm:w-16 sm:h-16 bg-slate-100 flex items-center justify-center text-slate-300 rounded-lg border border-slate-200">
+                    <div className="w-12 h-12 sm:w-16 sm:h-16 bg-white/70 flex items-center justify-center text-slate-400 rounded-lg border border-slate-300/80 shadow-inner">
                       <QrCode size={24} className="sm:w-8 sm:h-8" />
                     </div>
                   )}
-                  <p className="text-[7px] font-bold uppercase tracking-widest text-slate-500 sm:mt-3 text-center">DGM Verify</p>
+                  <p className="text-[7px] font-black uppercase tracking-widest text-slate-700 sm:mt-3 text-center">DGM Verify</p>
                 </div>
                 <div className="flex-1 p-4 sm:p-6 space-y-4">
                   <div className="flex justify-between items-start">
@@ -7848,30 +7845,29 @@ function MyTickets({
                         </div>
                         <div className="min-w-0 flex-1">
                           <div className="flex flex-wrap items-center gap-1.5">
-                             <h3 className="text-xs sm:text-sm font-extrabold tracking-tighter uppercase truncate text-slate-800">{res.fullName} {res.lastName}</h3>
-                             <span className="text-[8px] sm:text-[9px] font-mono text-slate-400">#{res.ticketId || 'ID-'+res.id?.substring(0,6).toUpperCase()}</span>
+                             <h3 className="text-xs sm:text-sm font-black tracking-tight uppercase truncate text-slate-900">{res.fullName} {res.lastName}</h3>
+                             <span className="text-[8px] sm:text-[9px] font-mono text-slate-500 font-bold">#{res.ticketId || 'ID-'+res.id?.substring(0,6).toUpperCase()}</span>
                           </div>
                           <div className="mt-1">
-                            <span className="text-[7px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-full text-white" 
-                                  style={{ backgroundColor: CLASS_COLORS[res.travelClass]?.main || '#ccc' }}>
+                            <span className="text-[7px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full text-white bg-[#0b132b] shadow-xs">
                               {res.travelClass}
                             </span>
                           </div>
                         </div>
                       </div>
                       <div className="mt-3.5 space-y-1">
-                        <p className="text-[8px] sm:text-[10px] text-maritime font-black uppercase tracking-widest leading-tight">Voyage: {res.travelDate} à {res.departureTime || '07:30'} • {res.ship}</p>
-                        <p className="text-[7px] sm:text-[8px] text-slate-400 font-medium uppercase tracking-widest">Réservation faite le: {res.bookingDateFormatted || (res.createdAt ? new Date(res.createdAt).toLocaleDateString('fr-FR') : 'Aujourd\'hui')} {res.bookingTimeFormatted ? `à ${res.bookingTimeFormatted}` : (res.createdAt ? `à ${new Date(res.createdAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}` : '')}</p>
+                        <p className="text-[8px] sm:text-[10px] text-slate-900 font-black uppercase tracking-widest leading-tight">Voyage: {res.travelDate} à {res.departureTime || '07:30'} • {res.ship}</p>
+                        <p className="text-[7px] sm:text-[8px] text-slate-500 font-bold uppercase tracking-widest">Réservation: {res.bookingDateFormatted || (res.createdAt ? new Date(res.createdAt).toLocaleDateString('fr-FR') : 'Aujourd\'hui')} {res.bookingTimeFormatted ? `à ${res.bookingTimeFormatted}` : (res.createdAt ? `à ${new Date(res.createdAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}` : '')}</p>
                         {res.transactionId && (
-                          <p className="text-[7px] text-slate-400 font-mono italic">TX: {res.transactionId}</p>
+                          <p className="text-[7px] text-slate-500 font-mono italic">TX: {res.transactionId}</p>
                         )}
                       </div>
                     </div>
                     <div className="flex flex-col items-end gap-1 flex-shrink-0">
                       <span className={cn(
-                        "text-[7px] font-extrabold uppercase tracking-widest px-1.5 py-0.5 border rounded-sm",
-                        res.status === 'VALIDATED' ? "bg-emerald-50 text-emerald-600 border-emerald-200" : 
-                        res.status === 'PENDING' ? "bg-amber-50 text-amber-600 border-amber-200" : 
+                        "text-[7px] font-black uppercase tracking-widest px-2 py-0.5 border rounded-sm",
+                        res.status === 'VALIDATED' ? "bg-emerald-50 text-emerald-700 border-emerald-300" : 
+                        res.status === 'PENDING' ? "bg-slate-100 text-slate-700 border-slate-300" : 
                         "bg-red-50 text-red-600 border-red-200"
                       )}>
                         {res.status === 'VALIDATED' ? 'PAYÉ' : res.status}
@@ -7882,25 +7878,25 @@ function MyTickets({
                           EMBARQUÉ
                         </span>
                       ) : res.status === 'VALIDATED' ? (
-                        <span className="text-[7px] font-black uppercase tracking-widest px-2 py-0.5 bg-sky-50 text-sky-700 border border-sky-300 rounded-md flex items-center gap-1">
-                          <span className="w-1.5 h-1.5 rounded-full bg-sky-500 animate-pulse" />
+                        <span className="text-[7px] font-black uppercase tracking-widest px-2 py-0.5 bg-slate-900 text-white rounded-md flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
                           PRÊT EMBARQUEMENT
                         </span>
                       ) : (
-                        <span className="text-[7px] font-bold uppercase tracking-widest px-1.5 py-0.5 bg-amber-50 text-amber-700 border border-amber-200 rounded-md">
+                        <span className="text-[7px] font-bold uppercase tracking-widest px-1.5 py-0.5 bg-slate-100 text-slate-700 border border-slate-300 rounded-md">
                           NON ÉLIGIBLE
                         </span>
                       )}
                     </div>
                   </div>
-                <div className="flex items-end justify-between pt-3 sm:pt-4 border-t border-slate-50 gap-2">
+                <div className="flex items-end justify-between pt-3 sm:pt-4 border-t border-slate-200/80 gap-2">
                   <div className="text-left min-w-0">
-                    <p className="text-[7px] sm:text-[8px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Itinéraire</p>
-                    <p className="text-[9px] sm:text-[11px] font-extrabold text-maritime uppercase truncate">{res.itinerary}</p>
+                    <p className="text-[7px] sm:text-[8px] font-bold text-slate-500 uppercase tracking-widest mb-0.5">Itinéraire</p>
+                    <p className="text-[9px] sm:text-[11px] font-black text-slate-900 uppercase truncate">{res.itinerary}</p>
                   </div>
                   <div className="text-right flex-shrink-0">
-                    <p className="text-[7px] sm:text-[8px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Total</p>
-                    <p className="text-sm sm:text-base font-extrabold text-maritime mono tracking-tighter">{res.amount}$</p>
+                    <p className="text-[7px] sm:text-[8px] font-bold text-slate-500 uppercase tracking-widest mb-0.5">Total</p>
+                    <p className="text-sm sm:text-base font-black text-slate-900 mono tracking-tighter">{res.amount}$</p>
                   </div>
                   <div className="flex flex-col gap-2">
                     {res.email && (
@@ -7914,17 +7910,17 @@ function MyTickets({
                             alert("Erreur envoi rappel: " + e.message);
                           }
                         }}
-                        className="px-2.5 sm:px-3 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 text-[6.5px] sm:text-[7.5px] font-bold uppercase tracking-wider rounded-lg transition-colors flex items-center gap-1 shadow-sm"
+                        className="px-2.5 sm:px-3 py-1 bg-black hover:bg-slate-900 text-white border border-slate-700 text-[6.5px] sm:text-[7.5px] font-bold uppercase tracking-wider rounded-lg transition-colors flex items-center gap-1 shadow-sm"
                         title="Recevoir le rappel de départ sur votre compte Gmail"
                       >
-                        <Mail size={10} className="text-blue-600" />
+                        <Mail size={10} className="text-white" />
                         {(res as any).reminderEmailSent ? "Rappel Gmail ✓" : "Rappel Gmail"}
                       </button>
                     )}
                     {res.status === 'VALIDATED' && !(res as any).cancellationRequested && (
                       <button 
                         onClick={() => generateTicketPDF(res)}
-                        className="px-3 sm:px-4 py-1.5 bg-maritime text-white text-[7px] sm:text-[8px] font-bold uppercase tracking-widest rounded-lg hover:bg-maritime-dark transition-all flex-shrink-0 shadow-md"
+                        className="px-3 sm:px-4 py-1.5 bg-[#0b132b] text-white text-[7px] sm:text-[8px] font-black uppercase tracking-widest rounded-lg hover:bg-black transition-all flex-shrink-0 shadow-md"
                       >
                         Billet
                       </button>
