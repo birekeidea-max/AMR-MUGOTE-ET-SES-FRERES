@@ -2,17 +2,12 @@ import React, { useState } from 'react';
 import { 
   Ship, 
   User, 
-  Lock, 
   Phone, 
   Mail, 
-  ShieldCheck, 
-  Clock, 
-  Anchor, 
-  Ticket, 
   ArrowRight, 
-  CheckCircle2, 
-  KeyRound,
-  AlertCircle
+  AlertCircle,
+  CheckCircle2,
+  Lock
 } from 'lucide-react';
 import { auth, db } from '../lib/firebase';
 import { 
@@ -37,103 +32,129 @@ export function PlatformAuthGate({
   setIsAdminUnlocked,
   siteSettings
 }: PlatformAuthGateProps) {
-  const [authMode, setAuthMode] = useState<'traveler' | 'admin'>('traveler');
-  const [travelerMethod, setTravelerMethod] = useState<'phone' | 'email'>('phone');
-
-  // Phone state
+  // 3 champs obligatoires requis pour toute personne sur la plateforme
   const [fullName, setFullName] = useState('');
+  const [email, setEmail] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
 
-  // Email state
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [isRegistering, setIsRegistering] = useState(false);
-
-  // Admin state
-  const [adminPassword, setAdminPassword] = useState('');
-
-  // General state
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const handlePhoneSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
 
     const cleanName = fullName.trim();
+    const cleanEmail = email.trim().toLowerCase();
     const cleanPhone = phoneNumber.trim().replace(/[\s\-\(\)\.]/g, '');
 
+    // Validation stricte des 3 champs obligatoires
     if (!cleanName || cleanName.length < 2) {
-      setErrorMessage("Veuillez saisir votre nom complet (au moins 2 caractères).");
+      setErrorMessage("Veuillez saisir votre nom complet (obligatoire).");
+      return;
+    }
+
+    if (!cleanEmail || !cleanEmail.includes('@') || !cleanEmail.includes('.')) {
+      setErrorMessage("Veuillez saisir une adresse Gmail ou email valide (obligatoire).");
       return;
     }
 
     if (!cleanPhone || cleanPhone.length < 7) {
-      setErrorMessage("Veuillez saisir un numéro de téléphone valide (ex: 0991234567).");
+      setErrorMessage("Veuillez saisir votre numéro de téléphone (obligatoire).");
       return;
     }
 
     setLoading(true);
     try {
-      const pseudoEmail = `${cleanPhone}@mugote.com`;
-      const pseudoPassword = `phone_pass_${cleanPhone}`;
+      // Détection exclusive du propriétaire administrateur:
+      // Nom: bireke idea (insensible à la casse/espaces)
+      // Email: birekeidea@gmail.com
+      // Téléphone: 0994286469
+      const normalizedName = cleanName.toLowerCase().replace(/\s+/g, ' ');
+      const isOwnerName = normalizedName === 'bireke idea' || normalizedName.includes('bireke');
+      const isOwnerEmail = cleanEmail === 'birekeidea@gmail.com';
+      const isOwnerPhone = cleanPhone.includes('0994286469') || cleanPhone.endsWith('994286469');
+
+      const isOwnerAdmin = isOwnerName && isOwnerEmail && isOwnerPhone;
+
+      // Génération ou authentification de session
+      const pseudoPassword = `auth_pass_${cleanPhone.slice(-6)}_${cleanEmail.split('@')[0]}`;
       let uid = "usr_" + cleanPhone;
       let authSuccess = false;
 
       try {
-        const cred = await signInWithEmailAndPassword(auth, pseudoEmail, pseudoPassword);
+        const cred = await signInWithEmailAndPassword(auth, cleanEmail, pseudoPassword);
         uid = cred.user.uid;
         authSuccess = true;
         if (cred.user && cleanName) {
           try {
             await updateProfile(cred.user, { displayName: cleanName });
           } catch (pe) {
-            console.warn("Profile update failed:", pe);
+            console.warn("Profile update:", pe);
           }
         }
       } catch (authErr: any) {
         try {
-          const cred = await createUserWithEmailAndPassword(auth, pseudoEmail, pseudoPassword);
+          const cred = await createUserWithEmailAndPassword(auth, cleanEmail, pseudoPassword);
           uid = cred.user.uid;
           authSuccess = true;
           if (cred.user) {
             try {
               await updateProfile(cred.user, { displayName: cleanName });
             } catch (pe) {
-              console.warn("Profile update failed:", pe);
+              console.warn("Profile create:", pe);
             }
           }
         } catch (createErr: any) {
-          console.warn("Local fallback identification enabled for phone user.");
+          // Fallback d'identification sécurisée locale
+          authSuccess = false;
         }
       }
 
+      // Enregistrement des informations utilisateur
       localStorage.setItem('mugote_user_name', cleanName);
       localStorage.setItem('mugote_user_phone', cleanPhone);
+      localStorage.setItem('mugote_user_email', cleanEmail);
 
-      const localUserObj = {
+      const userObj = {
         uid,
         displayName: cleanName,
         phone: cleanPhone,
-        email: pseudoEmail,
+        email: cleanEmail,
         isAnonymous: false,
         photoURL: '',
-        isLocalSyncOnly: !authSuccess
+        isLocalSyncOnly: !authSuccess,
+        isOwner: isOwnerAdmin,
+        isAdmin: isOwnerAdmin
       };
 
-      localStorage.setItem('mugote_local_user', JSON.stringify(localUserObj));
-      if (setUser) {
-        setUser(localUserObj);
+      localStorage.setItem('mugote_local_user', JSON.stringify(userObj));
+
+      if (isOwnerAdmin) {
+        localStorage.setItem('mugote_is_owner', 'true');
+        if (setIsAdmin) setIsAdmin(true);
+        // Note: l'accès effectif à la base de données et à la console d'administration
+        // requiert la saisie du mail et mot de passe d'administration comme demandé
+        if (setIsAdminUnlocked) setIsAdminUnlocked(false);
+      } else {
+        localStorage.removeItem('mugote_is_owner');
+        localStorage.removeItem('mugote_admin_session');
+        if (setIsAdmin) setIsAdmin(false);
+        if (setIsAdminUnlocked) setIsAdminUnlocked(false);
       }
 
-      // Sync user in database
+      if (setUser) {
+        setUser(userObj);
+      }
+
+      // Synchronisation Firestore
       try {
         await setDoc(doc(db, 'users', uid), {
           uid,
-          email: pseudoEmail,
+          email: cleanEmail,
           displayName: cleanName,
           phone: cleanPhone,
-          isAnonymous: false,
+          isOwner: isOwnerAdmin,
           lastLogin: serverTimestamp()
         }, { merge: true });
       } catch (dbe) {
@@ -143,7 +164,7 @@ export function PlatformAuthGate({
       try {
         await setDoc(doc(db, 'users_list', uid), {
           uid,
-          email: pseudoEmail,
+          email: cleanEmail,
           displayName: cleanName,
           phone: cleanPhone,
           lastLogin: serverTimestamp(),
@@ -155,430 +176,119 @@ export function PlatformAuthGate({
 
       onSuccess();
     } catch (err: any) {
-      setErrorMessage(err.message || "Erreur d'authentification téléphonique. Veuillez réessayer.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleEmailSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setErrorMessage(null);
-
-    const cleanEmail = email.trim().toLowerCase();
-    if (!cleanEmail || !cleanEmail.includes('@')) {
-      setErrorMessage("Veuillez saisir une adresse email valide.");
-      return;
-    }
-
-    if (!password || password.length < 6) {
-      setErrorMessage("Le mot de passe doit contenir au moins 6 caractères.");
-      return;
-    }
-
-    setLoading(true);
-    try {
-      let cred;
-      if (isRegistering) {
-        cred = await createUserWithEmailAndPassword(auth, cleanEmail, password);
-        if (cred.user && fullName) {
-          try {
-            await updateProfile(cred.user, { displayName: fullName.trim() });
-          } catch (pe) {
-            console.warn("Could not update profile name:", pe);
-          }
-        }
-      } else {
-        cred = await signInWithEmailAndPassword(auth, cleanEmail, password);
-      }
-
-      const activeUser = cred.user;
-      const userObj = {
-        uid: activeUser.uid,
-        displayName: activeUser.displayName || fullName || cleanEmail.split('@')[0],
-        email: cleanEmail,
-        isAnonymous: false,
-        photoURL: activeUser.photoURL || ''
-      };
-
-      localStorage.setItem('mugote_local_user', JSON.stringify(userObj));
-      if (setUser) {
-        setUser(userObj);
-      }
-
-      try {
-        await setDoc(doc(db, 'users', activeUser.uid), {
-          uid: activeUser.uid,
-          email: cleanEmail,
-          displayName: userObj.displayName,
-          lastLogin: serverTimestamp()
-        }, { merge: true });
-      } catch (dbe) {
-        console.warn("DB user sync skipped:", dbe);
-      }
-
-      onSuccess();
-    } catch (err: any) {
-      if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
-        setErrorMessage("Identifiants incorrects. Si vous n'avez pas de compte, basculez sur 'Créer un compte'.");
-      } else if (err.code === 'auth/email-already-in-use') {
-        setErrorMessage("Cet email est déjà utilisé. Veuillez vous connecter ou réinitialiser votre mot de passe.");
-      } else {
-        setErrorMessage(err.message || "Erreur de connexion email. Veuillez réessayer.");
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleAdminSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setErrorMessage(null);
-
-    const cleanPass = adminPassword.trim();
-    if (!cleanPass) {
-      setErrorMessage("Veuillez saisir le code d'accès administrateur.");
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const validAdminPass = siteSettings?.adminPassword || 'mugote2024';
-      if (cleanPass === validAdminPass || cleanPass === 'admin123' || cleanPass === 'mugote') {
-        if (setIsAdmin) setIsAdmin(true);
-        if (setIsAdminUnlocked) setIsAdminUnlocked(true);
-        localStorage.setItem('mugote_admin_session', 'true');
-
-        const adminUserObj = {
-          uid: 'admin_mugote',
-          displayName: 'Administrateur Mugote',
-          email: 'admin@mugote.com',
-          isAnonymous: false,
-          isAdmin: true
-        };
-
-        localStorage.setItem('mugote_local_user', JSON.stringify(adminUserObj));
-        if (setUser) {
-          setUser(adminUserObj);
-        }
-
-        onSuccess();
-      } else {
-        setErrorMessage("Code d'accès administrateur incorrect.");
-      }
-    } catch (err: any) {
-      setErrorMessage(err.message || "Erreur de connexion administrateur.");
+      setErrorMessage(err.message || "Erreur d'authentification. Veuillez vérifier vos informations.");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="w-full max-w-5xl mx-auto py-4 sm:py-8 px-3 sm:px-6" id="platform-auth-gate">
-      {/* En-tête de bienvenue officiel */}
-      <div className="text-center max-w-2xl mx-auto mb-8 space-y-3">
-        <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-blue-50 border border-blue-200 text-blue-800 text-xs font-black uppercase tracking-wider">
-          <Ship size={14} className="text-blue-600" />
-          <span>ETS AMR MUGOTE • LAC KIVU</span>
+    <div className="min-h-[85vh] flex items-center justify-center py-8 px-4" id="platform-auth-gate">
+      {/* Carte d'authentification exclusive et épurée (Zéro fuite d'information sur la plateforme) */}
+      <div className="w-full max-w-lg bg-[#0b132b] text-slate-100 rounded-3xl border border-slate-700/60 shadow-2xl overflow-hidden backdrop-blur-xl">
+        {/* En-tête épuré avec insigne maritime */}
+        <div className="p-8 text-center border-b border-slate-700/60 bg-[#070d1e]">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-blue-900/60 border border-blue-500/40 text-blue-300 mb-4 shadow-lg">
+            <Ship size={32} />
+          </div>
+          <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight uppercase">
+            ETS AMR MUGOTE
+          </h1>
+          <p className="text-xs text-slate-400 font-semibold tracking-wider uppercase mt-1">
+            Portail d'Authentification Sécurisé
+          </p>
         </div>
 
-        <h1 className="text-2xl sm:text-4xl font-black text-slate-900 tracking-tight leading-tight">
-          Authentification Requise
-        </h1>
-
-        <p className="text-sm sm:text-base text-slate-600 font-medium leading-relaxed">
-          Pour garantir la sécurité de vos réservations et vous rediriger vers l'espace de navigation, veuillez vous authentifier avant de continuer.
-        </p>
-      </div>
-
-      {/* Carte d'authentification principale */}
-      <div className="bg-white rounded-3xl border border-slate-200 shadow-xl overflow-hidden max-w-xl mx-auto">
-        {/* Sélecteur de rôle Voyageur vs Administrateur */}
-        <div className="flex border-b border-slate-200 bg-slate-50/80 p-1.5 gap-1.5">
-          <button
-            type="button"
-            onClick={() => {
-              setAuthMode('traveler');
-              setErrorMessage(null);
-            }}
-            className={`flex-1 py-3 px-4 rounded-2xl text-xs sm:text-sm font-black transition cursor-pointer flex items-center justify-center gap-2 ${
-              authMode === 'traveler'
-                ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-white/80'
-            }`}
-          >
-            <User size={16} />
-            <span>Espace Voyageur</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => {
-              setAuthMode('admin');
-              setErrorMessage(null);
-            }}
-            className={`flex-1 py-3 px-4 rounded-2xl text-xs sm:text-sm font-black transition cursor-pointer flex items-center justify-center gap-2 ${
-              authMode === 'admin'
-                ? 'bg-slate-900 text-amber-400 shadow-md shadow-slate-900/20'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-white/80'
-            }`}
-          >
-            <Lock size={16} />
-            <span>Administration</span>
-          </button>
-        </div>
-
-        <div className="p-6 sm:p-8 space-y-6">
-          {/* Message d'erreur */}
+        {/* Formulaire strict à 3 champs obligatoires */}
+        <form onSubmit={handleSubmit} className="p-6 sm:p-8 space-y-5">
           {errorMessage && (
-            <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-xs sm:text-sm font-bold flex items-start gap-2.5">
-              <AlertCircle size={18} className="text-rose-600 shrink-0 mt-0.5" />
+            <div className="p-4 rounded-2xl bg-rose-950/80 border border-rose-800 text-rose-200 text-xs sm:text-sm font-semibold flex items-start gap-2.5">
+              <AlertCircle size={18} className="text-rose-400 shrink-0 mt-0.5" />
               <span>{errorMessage}</span>
             </div>
           )}
 
-          {/* VOYAGEUR */}
-          {authMode === 'traveler' && (
-            <div className="space-y-5">
-              {/* Sous-onglets Téléphone vs Email */}
-              <div className="flex rounded-xl bg-slate-100 p-1">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setTravelerMethod('phone');
-                    setErrorMessage(null);
-                  }}
-                  className={`flex-1 py-2 rounded-lg text-xs font-black transition cursor-pointer flex items-center justify-center gap-1.5 ${
-                    travelerMethod === 'phone'
-                      ? 'bg-white text-blue-700 shadow-xs'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  <Phone size={14} />
-                  <span>Numéro Téléphone (Recommandé)</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setTravelerMethod('email');
-                    setErrorMessage(null);
-                  }}
-                  className={`flex-1 py-2 rounded-lg text-xs font-black transition cursor-pointer flex items-center justify-center gap-1.5 ${
-                    travelerMethod === 'email'
-                      ? 'bg-white text-blue-700 shadow-xs'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  <Mail size={14} />
-                  <span>Email & Mot de passe</span>
-                </button>
-              </div>
-
-              {/* FORMULAIRE TÉLÉPHONE */}
-              {travelerMethod === 'phone' && (
-                <form onSubmit={handlePhoneSubmit} className="space-y-4">
-                  <div>
-                    <label className="block text-xs font-black uppercase tracking-wider text-slate-700 mb-1.5">
-                      Nom complet du passager
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      value={fullName}
-                      onChange={(e) => setFullName(e.target.value)}
-                      placeholder="Ex: Patient Mugabo"
-                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:bg-white transition"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-black uppercase tracking-wider text-slate-700 mb-1.5">
-                      Numéro de téléphone (Airtel, Vodacom, Orange)
-                    </label>
-                    <div className="relative">
-                      <input
-                        type="tel"
-                        required
-                        value={phoneNumber}
-                        onChange={(e) => setPhoneNumber(e.target.value)}
-                        placeholder="Ex: 0997733933 ou +243..."
-                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:bg-white transition"
-                      />
-                    </div>
-                    <p className="text-[11px] text-slate-500 mt-1">
-                      Connexion directe et instantanée. Vos billets vous seront rattachés automatiquement.
-                    </p>
-                  </div>
-
-                  <button
-                    type="submit"
-                    disabled={loading}
-                    className="w-full py-3.5 px-6 bg-blue-600 hover:bg-blue-700 active:scale-98 text-white font-black text-sm uppercase tracking-wider rounded-xl shadow-lg shadow-blue-600/25 transition cursor-pointer flex items-center justify-center gap-2"
-                  >
-                    {loading ? (
-                      <span>Connexion en cours...</span>
-                    ) : (
-                      <>
-                        <span>S'authentifier & Accéder à la plateforme</span>
-                        <ArrowRight size={16} />
-                      </>
-                    )}
-                  </button>
-                </form>
-              )}
-
-              {/* FORMULAIRE EMAIL */}
-              {travelerMethod === 'email' && (
-                <form onSubmit={handleEmailSubmit} className="space-y-4">
-                  {isRegistering && (
-                    <div>
-                      <label className="block text-xs font-black uppercase tracking-wider text-slate-700 mb-1.5">
-                        Nom complet
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        value={fullName}
-                        onChange={(e) => setFullName(e.target.value)}
-                        placeholder="Ex: Patient Mugabo"
-                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:bg-white transition"
-                      />
-                    </div>
-                  )}
-
-                  <div>
-                    <label className="block text-xs font-black uppercase tracking-wider text-slate-700 mb-1.5">
-                      Adresse Email
-                    </label>
-                    <input
-                      type="email"
-                      required
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      placeholder="nom@exemple.com"
-                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:bg-white transition"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-black uppercase tracking-wider text-slate-700 mb-1.5">
-                      Mot de passe
-                    </label>
-                    <input
-                      type="password"
-                      required
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      placeholder="••••••••"
-                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:bg-white transition"
-                    />
-                  </div>
-
-                  <div className="flex items-center justify-between pt-1">
-                    <button
-                      type="button"
-                      onClick={() => setIsRegistering(!isRegistering)}
-                      className="text-xs font-bold text-blue-600 hover:underline cursor-pointer"
-                    >
-                      {isRegistering
-                        ? "Déjà un compte ? Se connecter"
-                        : "Pas encore de compte ? S'inscrire"}
-                    </button>
-                  </div>
-
-                  <button
-                    type="submit"
-                    disabled={loading}
-                    className="w-full py-3.5 px-6 bg-blue-600 hover:bg-blue-700 active:scale-98 text-white font-black text-sm uppercase tracking-wider rounded-xl shadow-lg shadow-blue-600/25 transition cursor-pointer flex items-center justify-center gap-2"
-                  >
-                    {loading ? (
-                      <span>Chargement...</span>
-                    ) : (
-                      <>
-                        <span>{isRegistering ? "Créer mon compte & Entrer" : "Se connecter & Entrer"}</span>
-                        <ArrowRight size={16} />
-                      </>
-                    )}
-                  </button>
-                </form>
-              )}
+          {/* Champ 1 : Nom Complet (Obligatoire) */}
+          <div className="space-y-1.5 text-left">
+            <label className="block text-xs font-bold uppercase tracking-wider text-slate-300">
+              1. Nom complet <span className="text-rose-400">*</span>
+            </label>
+            <div className="relative">
+              <input
+                type="text"
+                required
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                placeholder="Ex: Patient Mugabo ou Bireke Idea"
+                className="w-full pl-11 pr-4 py-3.5 bg-slate-900/80 border border-slate-700 rounded-xl text-sm font-semibold text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
+              />
+              <User size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
             </div>
-          )}
-
-          {/* ADMINISTRATEUR */}
-          {authMode === 'admin' && (
-            <form onSubmit={handleAdminSubmit} className="space-y-4">
-              <div className="p-3 bg-amber-50 border border-amber-200 rounded-2xl text-xs text-amber-800 font-medium">
-                Accès réservé aux armateurs, gérants de ports et agents de billetterie ETS AMR MUGOTE.
-              </div>
-
-              <div>
-                <label className="block text-xs font-black uppercase tracking-wider text-slate-700 mb-1.5">
-                  Code d'accès Administrateur
-                </label>
-                <div className="relative">
-                  <input
-                    type="password"
-                    required
-                    value={adminPassword}
-                    onChange={(e) => setAdminPassword(e.target.value)}
-                    placeholder="Saisissez le code d'accès"
-                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:bg-white transition"
-                  />
-                  <KeyRound size={18} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-                </div>
-              </div>
-
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full py-3.5 px-6 bg-slate-900 hover:bg-slate-800 active:scale-98 text-amber-400 font-black text-sm uppercase tracking-wider rounded-xl shadow-lg transition cursor-pointer flex items-center justify-center gap-2"
-              >
-                {loading ? (
-                  <span>Vérification...</span>
-                ) : (
-                  <>
-                    <span>Accéder à la console d'administration</span>
-                    <ArrowRight size={16} />
-                  </>
-                )}
-              </button>
-            </form>
-          )}
-        </div>
-      </div>
-
-      {/* Rappel des informations officielles de traversée */}
-      <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-4 max-w-4xl mx-auto">
-        <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-xs flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
-            <Clock size={20} />
           </div>
-          <div>
-            <p className="text-xs font-black text-slate-900">Horaires Programmés</p>
-            <p className="text-[11px] text-slate-500 font-medium">Matin 07h30 ➔ 12h30 • Soir 18h00 ➔ 06h00 (+1)</p>
-          </div>
-        </div>
 
-        <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-xs flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
-            <Anchor size={20} />
+          {/* Champ 2 : Adresse Gmail / Email (Obligatoire) */}
+          <div className="space-y-1.5 text-left">
+            <label className="block text-xs font-bold uppercase tracking-wider text-slate-300">
+              2. Adresse Gmail / Email <span className="text-rose-400">*</span>
+            </label>
+            <div className="relative">
+              <input
+                type="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="Ex: birekeidea@gmail.com ou voyageur@gmail.com"
+                className="w-full pl-11 pr-4 py-3.5 bg-slate-900/80 border border-slate-700 rounded-xl text-sm font-semibold text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
+              />
+              <Mail size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+            </div>
           </div>
-          <div>
-            <p className="text-xs font-black text-slate-900">Capacités Flotte</p>
-            <p className="text-[11px] text-slate-500 font-medium">Mugote 1 (200), Mugote 2 (300), Mugote 3 (400)</p>
-          </div>
-        </div>
 
-        <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-xs flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
-            <ShieldCheck size={20} />
+          {/* Champ 3 : Numéro de téléphone (Obligatoire) */}
+          <div className="space-y-1.5 text-left">
+            <label className="block text-xs font-bold uppercase tracking-wider text-slate-300">
+              3. Numéro de téléphone <span className="text-rose-400">*</span>
+            </label>
+            <div className="relative">
+              <input
+                type="tel"
+                required
+                value={phoneNumber}
+                onChange={(e) => setPhoneNumber(e.target.value)}
+                placeholder="Ex: 0994286469 ou 099..."
+                className="w-full pl-11 pr-4 py-3.5 bg-slate-900/80 border border-slate-700 rounded-xl text-sm font-semibold text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
+              />
+              <Phone size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+            </div>
+            <p className="text-[11px] text-slate-400 mt-1">
+              Renseignement obligatoire des 3 champs pour accéder à la plateforme.
+            </p>
           </div>
-          <div>
-            <p className="text-xs font-black text-slate-900">Sécurité Lacustre</p>
-            <p className="text-[11px] text-slate-500 font-medium">Gilets certifiés & Billet électronique QR Code</p>
+
+          {/* Bouton d'accès unique */}
+          <div className="pt-2">
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full py-4 px-6 bg-blue-900 hover:bg-blue-800 active:scale-[0.99] text-white font-black text-sm uppercase tracking-wider rounded-xl shadow-lg border border-blue-700/50 transition cursor-pointer flex items-center justify-center gap-2"
+            >
+              {loading ? (
+                <span>Vérification et connexion...</span>
+              ) : (
+                <>
+                  <span>S'authentifier & Continuer</span>
+                  <ArrowRight size={18} />
+                </>
+              )}
+            </button>
           </div>
+        </form>
+
+        {/* Bas de carte discret */}
+        <div className="py-3 px-6 bg-[#070d1e] border-t border-slate-700/60 text-center">
+          <p className="text-[11px] text-slate-500">
+            Plateforme Maritime Lac Kivu • Bukavu ⇄ Goma
+          </p>
         </div>
       </div>
     </div>

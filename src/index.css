@@ -6,19 +6,19 @@
   --font-serif: "Playfair Display", serif;
   --font-mono: "JetBrains Mono", monospace;
   
-  --color-maritime: #000c24;
-  --color-maritime-dark: #00040a;
-  --color-maritime-light: #001b44;
-  --color-gold: #FFC300;
-  --color-bg: #030712;
-  --color-card-dark: #0a1122;
-  --color-lacustre: #003049;
-  --color-lake-shadow: #000814;
+  --color-maritime: #002b49;
+  --color-maritime-dark: #001f35;
+  --color-maritime-light: #003e66;
+  --color-midnight: #070d1e;
+  --color-card-dark: #0b132b;
+  --color-bg: #070d1e;
+  --color-lacustre: #002b49;
+  --color-lake-shadow: #040814;
 }
 
 @layer base {
   body {
-    @apply bg-[#030712] text-slate-100 antialiased font-sans text-center selection:bg-amber-400 selection:text-black;
+    @apply bg-[#070d1e] text-slate-100 antialiased font-sans text-center selection:bg-blue-900 selection:text-white;
   }
 }
 

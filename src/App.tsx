@@ -68,7 +68,9 @@ import {
   EyeOff,
   Info,
   ShieldAlert,
-  Newspaper
+  Newspaper,
+  Sun,
+  Moon
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { MongoMigrationView } from './components/MongoMigrationView';
@@ -502,16 +504,26 @@ export default function App() {
      }
    });
    const [isAdminUnlocked, setIsAdminUnlocked] = useState(false);
-   const _un = null; if (_un) (() => {
+   
+   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
      try {
-       const localUserStr = localStorage.getItem('mugote_local_user');
-       const localUser = localUserStr ? JSON.parse(localUserStr) : null;
-       const hasAdminEmail = localUser && localUser.email?.toLowerCase() === getAdminEmail().toLowerCase();
-       return !!(hasAdminEmail && localStorage.getItem('mugote_admin_session') === 'true');
+       return (localStorage.getItem('mugote_theme') as 'dark' | 'light') || 'dark';
      } catch {
-       return false;
+       return 'dark';
      }
    });
+
+   const isOwnerAdmin = Boolean(
+     user &&
+     (user.email?.toLowerCase().trim() === 'birekeidea@gmail.com' || user.email?.toLowerCase().trim() === getAdminEmail().toLowerCase()) &&
+     (user.isOwner === true || localStorage.getItem('mugote_is_owner') === 'true')
+   );
+
+   useEffect(() => {
+     if (currentPage === 'dashboard' && !isOwnerAdmin) {
+       setCurrentPage('home');
+     }
+   }, [currentPage, isOwnerAdmin]);
   const [loading, setLoading] = useState(true);
   const [verifyId, setVerifyId] = useState<string | null>(null);
   const [currentReservation, setCurrentReservation] = useState<Reservation | null>(null);
@@ -1119,180 +1131,205 @@ export default function App() {
     );
   }
 
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-[#070d1e] text-slate-100 flex items-center justify-center p-4">
+        <JsonLdSchema />
+        <PlatformAuthGate 
+          onSuccess={() => {
+            setCurrentPage('home');
+          }}
+          setUser={setUser}
+          setIsAdmin={setIsAdmin}
+          setIsAdminUnlocked={setIsAdminUnlocked}
+          siteSettings={siteSettings}
+        />
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-[#edf0f5] flex flex-col font-sans relative text-slate-800">
+    <div className={cn(
+      "min-h-screen flex flex-col font-sans relative transition-colors duration-200",
+      theme === 'dark' ? "bg-[#070d1e] text-slate-100" : "bg-[#edf0f5] text-slate-800"
+    )}>
       <JsonLdSchema />
       
-      {/* HEADER SUPÉRIEUR GLASSMORPHISM MODERNE */}
-      <div className="sticky top-0 z-[100] bg-white/90 backdrop-blur-md border-b border-slate-200/80 shadow-xs">
+      {/* HEADER SUPÉRIEUR EN BLEU MARINE (NAVIGATION RESTREINTE AU BLEU MARINE) */}
+      <div className="sticky top-0 z-[100] bg-[#002b49] text-white border-b border-[#001f35] shadow-md">
         <header className="w-full py-2.5 sm:py-3">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 flex items-center justify-between gap-4">
             
             {/* Logo compact "ETS AMR MUGOTE & FRÈRES" à gauche */}
             <div className="flex items-center gap-2.5 cursor-pointer group shrink-0" onClick={() => setCurrentPage('home')}>
-              <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-blue-700 to-blue-500 text-white flex items-center justify-center shadow-md shadow-blue-600/25 group-hover:scale-105 transition">
+              <div className="w-10 h-10 rounded-2xl bg-white/10 border border-white/20 text-white flex items-center justify-center shadow-md group-hover:scale-105 transition">
                 <Ship size={20} className="text-white" />
               </div>
               <div className="text-left">
-                <h1 className="text-base sm:text-lg font-black tracking-tight uppercase text-blue-700 leading-tight">
+                <h1 className="text-base sm:text-lg font-black tracking-tight uppercase text-white leading-tight">
                   ETS AMR MUGOTE
                 </h1>
-                <p className="text-[9px] font-black tracking-widest text-slate-400 uppercase">
+                <p className="text-[9px] font-black tracking-widest text-slate-300 uppercase">
                   LAC KIVU • GOMA ⇄ BUKAVU
                 </p>
               </div>
             </div>
 
-            {/* Actions à droite : Mon Compte / Déconnexion multi-client & Menu Mobile */}
+            {/* Actions à droite : Onglet Thème (Sombre / Clair) + Mon Compte / Déconnexion & Menu Mobile */}
             <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-               {/* Profil / Mon compte avec Déconnexion facile pour changer de client */}
-               {user ? (
-                 <div className="flex items-center gap-2 bg-slate-50 p-1.5 rounded-2xl border border-slate-200">
-                   <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white font-black text-xs flex items-center justify-center shadow-xs shrink-0">
-                     {(user.displayName || user.email || 'U')[0].toUpperCase()}
-                   </div>
-                   <div className="hidden sm:block text-left px-1">
-                     <div className="flex items-center gap-1.5">
-                       <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                       <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider">
-                         {isAdmin ? "Admin" : "Connecté"}
-                       </p>
-                     </div>
-                     <p className="text-xs font-black text-slate-900 truncate max-w-[130px]">
-                       {user.displayName || user.email?.split('@')[0]}
+               {/* Onglet Sélecteur de Thème (Sombre en Bleu de Nuit vs Clair) */}
+               <button
+                 type="button"
+                 onClick={() => {
+                   const nextTheme = theme === 'dark' ? 'light' : 'dark';
+                   setTheme(nextTheme);
+                   localStorage.setItem('mugote_theme', nextTheme);
+                 }}
+                 className="flex items-center gap-1.5 px-3 py-2 bg-[#001f35] hover:bg-[#003154] text-white border border-slate-600 rounded-xl text-xs font-black transition cursor-pointer shadow-xs active:scale-95"
+                 title="Changer de thème (Sombre en Bleu de Nuit ou Clair)"
+               >
+                 {theme === 'dark' ? (
+                   <>
+                     <Sun size={15} className="text-slate-200" />
+                     <span className="hidden sm:inline">Thème Clair</span>
+                   </>
+                 ) : (
+                   <>
+                     <Moon size={15} className="text-slate-200" />
+                     <span className="hidden sm:inline">Bleu Nuit</span>
+                   </>
+                 )}
+               </button>
+
+               {/* Profil / Mon compte */}
+               <div className="flex items-center gap-2 bg-[#001f35] p-1.5 rounded-2xl border border-slate-700">
+                 <div className="w-8 h-8 rounded-xl bg-white/10 text-white font-black text-xs flex items-center justify-center border border-white/20 shrink-0">
+                   {(user.displayName || user.email || 'U')[0].toUpperCase()}
+                 </div>
+                 <div className="hidden sm:block text-left px-1">
+                   <div className="flex items-center gap-1.5">
+                     <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                     <p className="text-[9px] font-black text-slate-300 uppercase tracking-wider">
+                       {isOwnerAdmin ? (isAdminUnlocked ? "Propriétaire" : "Admin Vérifié") : "Passager"}
                      </p>
                    </div>
-                   <button 
-                     onClick={logout} 
-                     className="flex items-center gap-1.5 px-3 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl text-xs font-black transition cursor-pointer shadow-xs active:scale-95"
-                     title="Déconnexion (permet à un autre voyageur ou client de se connecter)"
-                   >
-                     <LogOut size={15} />
-                     <span className="hidden sm:inline">Déconnexion</span>
-                   </button>
+                   <p className="text-xs font-black text-white truncate max-w-[130px]">
+                     {user.displayName || user.email?.split('@')[0]}
+                   </p>
                  </div>
-               ) : (
                  <button 
-                   onClick={() => setAuthModal({ isOpen: true, mode: 'user' })}
-                   className="flex items-center gap-2 px-3.5 sm:px-4 py-2 sm:py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs sm:text-sm font-black shadow-md shadow-blue-600/20 transition cursor-pointer active:scale-95 border border-blue-500"
-                   title="Se connecter pour accéder à vos billets"
+                   onClick={logout} 
+                   className="flex items-center gap-1.5 px-3 py-2 bg-rose-950/80 hover:bg-rose-900 text-rose-200 border border-rose-800 rounded-xl text-xs font-black transition cursor-pointer shadow-xs active:scale-95"
+                   title="Déconnexion"
                  >
-                   <User size={16} />
-                   <span>Connexion</span>
+                   <LogOut size={15} />
+                   <span className="hidden sm:inline">Déconnexion</span>
                  </button>
-               )}
+               </div>
 
                {/* Menu hamburger pour mobile */}
-               {user && (
-                 <button 
-                   onClick={() => setIsMenuOpen(true)} 
-                   className="lg:hidden p-2 text-slate-700 hover:bg-slate-100 rounded-xl border border-slate-200 flex items-center justify-center cursor-pointer shadow-xs"
-                   title="Menu complet"
-                 >
-                   <Menu size={22} />
-                 </button>
-               )}
+               <button 
+                 onClick={() => setIsMenuOpen(true)} 
+                 className="lg:hidden p-2 text-white hover:bg-white/10 rounded-xl border border-white/20 flex items-center justify-center cursor-pointer shadow-xs"
+                 title="Menu complet"
+               >
+                 <Menu size={22} />
+               </button>
             </div>
           </div>
 
           {/* ========================================================= */}
-          {/* BARRE DE NAVIGATION PRINCIPALE DÉFILANTE & BIEN VISIBLE   */}
-          {/* S'adapte à tous les écrans, défilement fluide vers onglet */}
-          {/* Visible seulement si l'utilisateur est authentifié        */}
+          {/* BARRE DE NAVIGATION EN BLEU MARINE                        */}
+          {/* Les onglets d'administration sont réservés au propriétaire */}
           {/* ========================================================= */}
-          {user && (
-            <div className="w-full border-t border-slate-200/90 mt-2.5 pt-2 bg-slate-50/80">
-              <div className="max-w-7xl mx-auto px-2 sm:px-4 flex items-center gap-1 sm:gap-2">
-                {/* Bouton défilement vers la gauche */}
-                <button 
-                  type="button"
-                  onClick={() => scrollNav('left')}
-                  className="p-2 sm:p-2.5 rounded-xl bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 shadow-xs transition shrink-0 cursor-pointer active:scale-90"
-                  title="Défiler vers la gauche"
-                >
-                  <ChevronLeft size={18} className="stroke-[2.5]" />
-                </button>
+          <div className="w-full border-t border-[#001f35] mt-2.5 pt-2 bg-[#00243d]">
+            <div className="max-w-7xl mx-auto px-2 sm:px-4 flex items-center gap-1 sm:gap-2">
+              {/* Bouton défilement vers la gauche */}
+              <button 
+                type="button"
+                onClick={() => scrollNav('left')}
+                className="p-2 sm:p-2.5 rounded-xl bg-[#001f35] hover:bg-[#003154] text-white border border-slate-700 shadow-xs transition shrink-0 cursor-pointer active:scale-90"
+                title="Défiler vers la gauche"
+              >
+                <ChevronLeft size={18} className="stroke-[2.5]" />
+              </button>
 
-                {/* Conteneur défilant des onglets de grande taille */}
-                <nav 
-                  ref={navScrollRef}
-                  className="flex-1 overflow-x-auto scroll-smooth no-scrollbar touch-pan-x flex items-center gap-2.5 py-1 px-1"
-                >
-                  {[
-                    { id: 'home', label: 'ACCUEIL', icon: Anchor, sub: 'Goma ⇄ Bukavu' },
-                    { id: 'booking', label: 'RÉSERVER UN BILLET', icon: Ticket, highlight: true, sub: 'Sièges & Tarifs' },
-                    { id: 'tickets', label: 'MES BILLETS & QR', icon: QrCode, sub: 'Embarquement' },
-                    { id: 'tarifs', label: 'HORAIRES (07H30 & 18H00)', icon: Clock, sub: 'Matin & Soir' },
-                    { id: 'gallery', label: 'LA FLOTTE', icon: Ship, sub: 'Mugote 1, 2, 3' },
-                    { id: 'map', label: 'PORTS & LOCALISATION', icon: MapPin, sub: 'Goma • Beach Muhanzi' },
-                    { id: 'news', label: 'JOURNAL & AVIS', icon: Newspaper, sub: 'Actualités' },
-                    { id: 'dashboard', label: 'ADMINISTRATION', icon: Lock, adminOnly: true, sub: 'Console sécurisée' }
-                  ].map((item) => {
-                    const isDashboard = item.id === 'dashboard';
-                    const isActive = currentPage === item.id;
-                    const Icon = item.icon;
+              {/* Conteneur défilant des onglets de grande taille */}
+              <nav 
+                ref={navScrollRef}
+                className="flex-1 overflow-x-auto scroll-smooth no-scrollbar touch-pan-x flex items-center gap-2.5 py-1 px-1"
+              >
+                {[
+                  { id: 'home', label: 'ACCUEIL', icon: Anchor, sub: 'Goma ⇄ Bukavu' },
+                  { id: 'booking', label: 'RÉSERVER UN BILLET', icon: Ticket, highlight: true, sub: 'Formulaire Unique' },
+                  { id: 'tickets', label: 'MES BILLETS & QR', icon: QrCode, sub: 'Embarquement' },
+                  { id: 'tarifs', label: 'HORAIRES (07H30 & 18H00)', icon: Clock, sub: 'Matin & Soir' },
+                  { id: 'gallery', label: 'LA FLOTTE', icon: Ship, sub: 'Mugote 1, 2, 3' },
+                  { id: 'map', label: 'PORTS & LOCALISATION', icon: MapPin, sub: 'Goma • Beach Muhanzi' },
+                  { id: 'news', label: 'JOURNAL & AVIS', icon: Newspaper, sub: 'Actualités' },
+                  ...(isOwnerAdmin ? [{ id: 'dashboard', label: 'ADMINISTRATION', icon: Lock, sub: 'Console Propriétaire' }] : [])
+                ].map((item) => {
+                  const isDashboard = item.id === 'dashboard';
+                  const isActive = currentPage === item.id;
+                  const Icon = item.icon;
 
-                    return (
-                      <button
-                        key={item.id}
-                        onClick={(e) => {
-                          // Défilement fluide de l'onglet cliqué au centre de la barre
-                          e.currentTarget.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
-                          if (isDashboard && !isAdminUnlocked) {
-                            setAuthModal({ isOpen: true, mode: 'admin' });
-                          } else {
-                            setCurrentPage(item.id as Page);
-                          }
-                        }}
-                        className={cn(
-                          "px-4 sm:px-5 py-2.5 sm:py-3 rounded-2xl font-black uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap flex items-center gap-2.5 border-2 shadow-sm shrink-0 active:scale-95",
-                          isActive
-                            ? "bg-blue-600 text-white border-blue-700 shadow-md shadow-blue-600/30 scale-102 ring-2 ring-blue-400/20"
-                            : item.highlight
-                            ? "bg-amber-400 hover:bg-amber-500 text-slate-950 border-amber-500 shadow-sm font-black"
-                            : isDashboard
-                            ? "bg-slate-900 text-amber-400 hover:bg-black border-slate-800"
-                            : "bg-white text-slate-800 hover:text-blue-700 hover:bg-blue-50/80 border-slate-300 hover:border-blue-400"
-                        )}
-                      >
+                  return (
+                    <button
+                      key={item.id}
+                      onClick={(e) => {
+                        e.currentTarget.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+                        if (isDashboard && !isAdminUnlocked) {
+                          setAuthModal({ isOpen: true, mode: 'admin' });
+                        } else {
+                          setCurrentPage(item.id as Page);
+                        }
+                      }}
+                      className={cn(
+                        "px-4 sm:px-5 py-2.5 sm:py-3 rounded-2xl font-black uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap flex items-center gap-2.5 border shadow-sm shrink-0 active:scale-95",
+                        isActive
+                          ? "bg-white text-[#002b49] border-white shadow-lg scale-102"
+                          : item.highlight
+                          ? "bg-[#003e66] hover:bg-[#004d80] text-white border-blue-400/50 shadow-sm font-black"
+                          : isDashboard
+                          ? "bg-slate-900 text-slate-200 hover:bg-black border-slate-700"
+                          : "bg-[#001f35] text-slate-200 hover:text-white hover:bg-[#003154] border-slate-700/60"
+                      )}
+                    >
+                      <div className={cn(
+                        "p-1.5 rounded-xl flex items-center justify-center shrink-0",
+                        isActive 
+                          ? "bg-[#002b49]/10 text-[#002b49]" 
+                          : item.highlight 
+                          ? "bg-white/20 text-white" 
+                          : "bg-white/10 text-white"
+                      )}>
+                        <Icon size={17} className="stroke-[2.5]" />
+                      </div>
+                      <div className="text-left">
+                        <div className="text-xs sm:text-sm font-black leading-tight">{item.label}</div>
                         <div className={cn(
-                          "p-1.5 rounded-xl flex items-center justify-center shrink-0",
-                          isActive 
-                            ? "bg-white/20 text-white" 
-                            : item.highlight 
-                            ? "bg-slate-950 text-amber-400" 
-                            : isDashboard 
-                            ? "bg-slate-800 text-amber-400" 
-                            : "bg-blue-50 text-blue-700"
+                          "text-[9px] font-bold lowercase tracking-normal",
+                          isActive ? "text-[#002b49]/80" : "text-slate-300"
                         )}>
-                          <Icon size={17} className="stroke-[2.5]" />
+                          {item.sub}
                         </div>
-                        <div className="text-left">
-                          <div className="text-xs sm:text-sm font-black leading-tight">{item.label}</div>
-                          <div className={cn(
-                            "text-[9px] font-bold lowercase tracking-normal",
-                            isActive ? "text-blue-100" : item.highlight ? "text-slate-900" : isDashboard ? "text-slate-400" : "text-slate-400"
-                          )}>
-                            {item.sub}
-                          </div>
-                        </div>
-                      </button>
-                    );
-                  })}
-                </nav>
+                      </div>
+                    </button>
+                  );
+                })}
+              </nav>
 
-                {/* Bouton défilement vers la droite */}
-                <button 
-                  type="button"
-                  onClick={() => scrollNav('right')}
-                  className="p-2 sm:p-2.5 rounded-xl bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 shadow-xs transition shrink-0 cursor-pointer active:scale-90"
-                  title="Défiler vers la droite"
-                >
-                  <ChevronRight size={18} className="stroke-[2.5]" />
-                </button>
-              </div>
+              {/* Bouton défilement vers la droite */}
+              <button 
+                type="button"
+                onClick={() => scrollNav('right')}
+                className="p-2 sm:p-2.5 rounded-xl bg-[#001f35] hover:bg-[#003154] text-white border border-slate-700 shadow-xs transition shrink-0 cursor-pointer active:scale-90"
+                title="Défiler vers la droite"
+              >
+                <ChevronRight size={18} className="stroke-[2.5]" />
+              </button>
             </div>
-          )}
+          </div>
         </header>
       </div>
 
@@ -1303,7 +1340,7 @@ export default function App() {
             initial={{ opacity: 0, x: '100%' }}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: '100%' }}
-            className="fixed inset-0 z-[100] bg-black flex flex-col p-6 sm:p-8 lg:hidden border-l border-white/20"
+            className="fixed inset-0 z-[100] bg-[#070d1e] text-slate-100 flex flex-col p-6 sm:p-8 lg:hidden border-l border-white/20"
           >
             <div className="flex justify-between items-center mb-8 pb-4 border-b border-white/20">
               <div className="flex items-center gap-3">
@@ -1312,7 +1349,7 @@ export default function App() {
                 </div>
                 <div>
                   <span className="font-black text-white tracking-tight text-base uppercase">ETS AMR MUGOTE</span>
-                  <span className="text-[10px] text-neutral-400 font-bold block">Bukavu ⇄ Goma</span>
+                  <span className="text-[10px] text-slate-400 font-bold block">Bukavu ⇄ Goma</span>
                 </div>
               </div>
               <button onClick={() => setIsMenuOpen(false)} className="p-2.5 bg-white/10 rounded-xl text-white hover:bg-white/20 transition-all cursor-pointer border border-white/20">
@@ -1329,7 +1366,7 @@ export default function App() {
                 { id: 'gallery', label: 'NOTRE FLOTTE', icon: Ship },
                 { id: 'map', label: 'PORTS & LOCALISATION', icon: MapPin },
                 { id: 'news', label: 'JOURNAL & AVIS', icon: Newspaper },
-                { id: 'dashboard', label: 'ADMINISTRATION', icon: Lock, adminOnly: true }
+                ...(isOwnerAdmin ? [{ id: 'dashboard', label: 'ADMINISTRATION', icon: Lock }] : [])
               ].map(item => {
                 const isDashboard = item.id === 'dashboard';
                 const Icon = item.icon;
@@ -1348,17 +1385,14 @@ export default function App() {
                     className={cn(
                       "w-full px-5 py-4 rounded-2xl text-left font-black uppercase tracking-wider transition-all duration-200 relative overflow-hidden flex items-center justify-between cursor-pointer border",
                       isActive 
-                        ? "bg-white text-black border-white shadow-xl shadow-white/20"
-                        : isDashboard
-                        ? "text-amber-400 hover:text-white hover:bg-white/10 border-amber-500/30 bg-[#121212]"
-                        : "text-neutral-200 hover:text-white hover:bg-white/10 border-white/20 bg-[#0d0d0d]"
+                        ? "bg-white text-[#002b49] border-white shadow-xl"
+                        : "text-slate-200 hover:text-white hover:bg-white/10 border-white/20 bg-[#0b132b]"
                     )}
                   >
                     <div className="flex items-center gap-3 relative z-10">
-                      {Icon && <Icon size={18} className={isActive ? "text-black" : isDashboard ? "text-amber-400" : "text-white"} />}
+                      {Icon && <Icon size={18} className={isActive ? "text-[#002b49]" : "text-white"} />}
                       <span>{item.label}</span>
                     </div>
-                    {isDashboard && <Lock size={16} className={isActive ? "text-black" : "text-amber-400"} />}
                   </button>
                 );
               })}
@@ -1368,7 +1402,7 @@ export default function App() {
               {user && (
                 <div className="p-4 bg-white/5 rounded-2xl flex items-center justify-between border border-white/10">
                   <div>
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">{isAdmin ? "PROFIL ADMIN" : "PROFIL PASSAGER"}</p>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">{isOwnerAdmin ? "PROFIL PROPRIÉTAIRE" : "PROFIL PASSAGER"}</p>
                     <p className="font-bold text-white text-sm">{user.displayName || user.email}</p>
                   </div>
                   <button onClick={() => { setIsMenuOpen(false); logout(); }} className="p-3 text-rose-400 bg-rose-500/10 rounded-xl hover:bg-rose-500/20 transition-all cursor-pointer">
@@ -1523,12 +1557,12 @@ export default function App() {
             <div className="space-y-3">
               <h5 className="font-black text-white text-sm uppercase tracking-wide">Outils Passagers</h5>
               <ul className="space-y-2 text-blue-200 font-medium">
-                <li><button onClick={() => setIsTravelerScannerOpen(true)} className="hover:text-amber-300 transition text-left cursor-pointer font-bold text-amber-200">Vérifier mon Billet (QR)</button></li>
-                <li><button onClick={() => setCurrentPage('tickets')} className="hover:text-amber-300 transition text-left cursor-pointer">Télécharger mon E-Billet</button></li>
-                <li><button onClick={() => setCurrentPage('tarifs')} className="hover:text-amber-300 transition text-left cursor-pointer">Horaires & Fréquences</button></li>
-                <li><button onClick={() => setCurrentPage('map')} className="hover:text-amber-300 transition text-left cursor-pointer">Localisation des Ports</button></li>
-                <li><button onClick={() => alert("Bagages autorisés : 20 kg par passager standard, 35 kg en VIP.")} className="hover:text-amber-300 transition text-left cursor-pointer">Règles sur les Bagages</button></li>
-                <li><button onClick={() => setCurrentPage('news')} className="hover:text-amber-300 transition text-left cursor-pointer">Météo & État du Lac Kivu</button></li>
+                <li><button onClick={() => setIsTravelerScannerOpen(true)} className="hover:text-white transition text-left cursor-pointer font-bold text-slate-100">Vérifier mon Billet (QR)</button></li>
+                <li><button onClick={() => setCurrentPage('tickets')} className="hover:text-white transition text-left cursor-pointer">Télécharger mon E-Billet</button></li>
+                <li><button onClick={() => setCurrentPage('tarifs')} className="hover:text-white transition text-left cursor-pointer">Horaires & Fréquences</button></li>
+                <li><button onClick={() => setCurrentPage('map')} className="hover:text-white transition text-left cursor-pointer">Localisation des Ports</button></li>
+                <li><button onClick={() => alert("Bagages autorisés : 20 kg par passager standard, 35 kg en VIP.")} className="hover:text-white transition text-left cursor-pointer">Règles sur les Bagages</button></li>
+                <li><button onClick={() => setCurrentPage('news')} className="hover:text-white transition text-left cursor-pointer">Météo & État du Lac Kivu</button></li>
               </ul>
             </div>
 
@@ -1536,38 +1570,40 @@ export default function App() {
             <div className="space-y-3">
               <h5 className="font-black text-white text-sm uppercase tracking-wide">À Propos d'AMR Mugote</h5>
               <ul className="space-y-2 text-blue-200 font-medium">
-                <li><button onClick={() => setCurrentPage('gallery')} className="hover:text-amber-300 transition text-left cursor-pointer">Notre Flotte Officielle</button></li>
-                <li><button onClick={() => setCurrentPage('home')} className="hover:text-amber-300 transition text-left cursor-pointer">Histoire de la Compagnie</button></li>
-                <li><button onClick={() => setCurrentPage('gallery')} className="hover:text-amber-300 transition text-left cursor-pointer">Normes de Sécurité</button></li>
-                <li><button onClick={() => setCurrentPage('news')} className="hover:text-amber-300 transition text-left cursor-pointer">Journal & Actualités</button></li>
-                <li><button onClick={() => alert("Rejoignez les équipes d'ETS AMR MUGOTE. Envoyez votre CV à contact@amrmugote.com")} className="hover:text-amber-300 transition text-left cursor-pointer">Carrières & Équipage</button></li>
-                <li><button onClick={() => alert("Notre engagement : navigation 100% sécurisée avec gilets homologués pour chaque passager.")} className="hover:text-amber-300 transition text-left cursor-pointer">Engagement Qualité</button></li>
+                <li><button onClick={() => setCurrentPage('gallery')} className="hover:text-white transition text-left cursor-pointer">Notre Flotte Officielle</button></li>
+                <li><button onClick={() => setCurrentPage('home')} className="hover:text-white transition text-left cursor-pointer">Histoire de la Compagnie</button></li>
+                <li><button onClick={() => setCurrentPage('gallery')} className="hover:text-white transition text-left cursor-pointer">Normes de Sécurité</button></li>
+                <li><button onClick={() => setCurrentPage('news')} className="hover:text-white transition text-left cursor-pointer">Journal & Actualités</button></li>
+                <li><button onClick={() => alert("Rejoignez les équipes d'ETS AMR MUGOTE. Envoyez votre CV à contact@amrmugote.com")} className="hover:text-white transition text-left cursor-pointer">Carrières & Équipage</button></li>
+                <li><button onClick={() => alert("Notre engagement : navigation 100% sécurisée avec gilets homologués pour chaque passager.")} className="hover:text-white transition text-left cursor-pointer">Engagement Qualité</button></li>
               </ul>
             </div>
 
             {/* Colonne 5: Legal & Console */}
             <div className="space-y-3">
-              <h5 className="font-black text-white text-sm uppercase tracking-wide">Légal & Console</h5>
+              <h5 className="font-black text-white text-sm uppercase tracking-wide">Légal & Assistance</h5>
               <ul className="space-y-2 text-blue-200 font-medium">
-                <li><button onClick={() => alert("Conditions Générales : Billet valable pour le jour et l'heure indiqués. Présentation d'une pièce d'identité obligatoire.")} className="hover:text-amber-300 transition text-left cursor-pointer">Conditions Générales</button></li>
-                <li><button onClick={() => alert("Protection des données personnelles assurée conformément aux lois en vigueur en RDC.")} className="hover:text-amber-300 transition text-left cursor-pointer">Politique de Confidentialité</button></li>
-                <li><button onClick={() => alert("Taxes portuaires et d'embarquement incluses dans les tarifs affichés.")} className="hover:text-amber-300 transition text-left cursor-pointer">Taxes Portuaires RDC</button></li>
-                <li><button onClick={() => alert("Assurance maritime incluse pour tous les passagers à bord de notre flotte.")} className="hover:text-amber-300 transition text-left cursor-pointer">Assurance Maritime</button></li>
-                <li className="pt-2">
-                  <button 
-                    onClick={() => {
-                      if (isAdmin) {
-                        setCurrentPage('dashboard');
-                      } else {
-                        setAuthModal({ isOpen: true, mode: 'admin' });
-                      }
-                    }} 
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white font-black text-[11px] border border-white/20 transition cursor-pointer"
-                  >
-                    <Lock size={12} className="text-amber-400" />
-                    <span>Console Admin</span>
-                  </button>
-                </li>
+                <li><button onClick={() => alert("Conditions Générales : Billet valable pour le jour et l'heure indiqués. Présentation d'une pièce d'identité obligatoire.")} className="hover:text-white transition text-left cursor-pointer">Conditions Générales</button></li>
+                <li><button onClick={() => alert("Protection des données personnelles assurée conformément aux lois en vigueur en RDC.")} className="hover:text-white transition text-left cursor-pointer">Politique de Confidentialité</button></li>
+                <li><button onClick={() => alert("Taxes portuaires et d'embarquement incluses dans les tarifs affichés.")} className="hover:text-white transition text-left cursor-pointer">Taxes Portuaires RDC</button></li>
+                <li><button onClick={() => alert("Assurance maritime incluse pour tous les passagers à bord de notre flotte.")} className="hover:text-white transition text-left cursor-pointer">Assurance Maritime</button></li>
+                {isOwnerAdmin && (
+                  <li className="pt-2">
+                    <button 
+                      onClick={() => {
+                        if (isAdminUnlocked) {
+                          setCurrentPage('dashboard');
+                        } else {
+                          setAuthModal({ isOpen: true, mode: 'admin' });
+                        }
+                      }} 
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white font-black text-[11px] border border-white/20 transition cursor-pointer"
+                    >
+                      <Lock size={12} className="text-white" />
+                      <span>Console Propriétaire</span>
+                    </button>
+                  </li>
+                )}
               </ul>
             </div>
 
