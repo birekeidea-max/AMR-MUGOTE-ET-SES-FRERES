@@ -44,6 +44,7 @@ interface HomeViewProps {
   onLoginRequest?: () => void;
   onLogout?: () => void;
   onOpenScanner?: () => void;
+  isAdmin?: boolean;
 }
 
 export function HomeView({ 
@@ -54,7 +55,8 @@ export function HomeView({
   user, 
   onLoginRequest, 
   onLogout,
-  onOpenScanner 
+  onOpenScanner,
+  isAdmin = false
 }: HomeViewProps) {
   // État de l'image du bateau dans la zone circulaire (en haut à gauche)
   const [boatImage, setBoatImage] = useState<string>(() => {
@@ -247,14 +249,16 @@ export function HomeView({
         {/* BANNIÈRE HERO BLEU DE NUIT */}
         <div className="bg-gradient-to-br from-[#0b132b] via-[#1c2541] to-[#0b132b] rounded-3xl p-6 sm:p-9 shadow-2xl relative overflow-hidden text-white border border-white/10">
           
-          {/* Input fichier caché pour l'image du bateau */}
-          <input
-            type="file"
-            ref={fileInputRef}
-            onChange={handleImageUpload}
-            accept="image/*"
-            className="hidden"
-          />
+          {/* Input fichier caché pour l'image du bateau (administrateur uniquement) */}
+          {isAdmin && (
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleImageUpload}
+              accept="image/*"
+              className="hidden"
+            />
+          )}
 
           {/* Motifs géométriques décoratifs légers en arrière-plan */}
           <div className="absolute -right-24 -top-24 w-96 h-96 bg-white/5 rounded-full blur-3xl pointer-events-none" />
@@ -263,58 +267,76 @@ export function HomeView({
           {/* Conteneur principal avec la zone circulaire en haut à gauche */}
           <div className="relative z-10 flex flex-col md:flex-row items-start gap-6 sm:gap-8 mb-6">
             
-            {/* ZONE EN CERCLE EN HAUT À GAUCHE POUR INSÉRER L'IMAGE DU BATEAU */}
+            {/* ZONE EN CERCLE EN HAUT À GAUCHE POUR AFFICHER/MODIFIER L'IMAGE DU BATEAU */}
             <div className="flex-shrink-0 flex flex-col items-center">
               <div
-                onClick={() => fileInputRef.current?.click()}
-                className="relative w-28 h-28 sm:w-36 sm:h-36 rounded-full border-4 border-amber-400 bg-[#07132c] shadow-2xl overflow-hidden cursor-pointer group hover:scale-105 transition-all duration-300 flex items-center justify-center"
-                title="Cliquez ici pour insérer ou modifier l'image du bateau"
+                onClick={() => {
+                  if (isAdmin) fileInputRef.current?.click();
+                }}
+                className={`relative w-28 h-28 sm:w-36 sm:h-36 rounded-full border-4 border-amber-400 bg-[#07132c] shadow-2xl overflow-hidden flex items-center justify-center transition-all duration-300 ${
+                  isAdmin ? 'cursor-pointer group hover:scale-105' : 'cursor-default'
+                }`}
+                title={isAdmin ? "Cliquez ici pour insérer ou modifier l'image du bateau" : "Navire AMR Mugote"}
               >
                 {boatImage ? (
                   <>
                     <img
                       src={boatImage}
                       alt="Bateau AMR Mugote"
-                      className="w-full h-full object-cover group-hover:opacity-75 transition-opacity"
+                      className={`w-full h-full object-cover transition-opacity ${
+                        isAdmin ? 'group-hover:opacity-75' : ''
+                      }`}
                     />
-                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center text-white transition-opacity">
-                      <Camera size={24} className="text-amber-400 mb-1" />
-                      <span className="text-[9px] font-bold text-center px-1 leading-tight">Changer la photo</span>
-                    </div>
+                    {isAdmin && (
+                      <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center text-white transition-opacity">
+                        <Camera size={24} className="text-amber-400 mb-1" />
+                        <span className="text-[9px] font-bold text-center px-1 leading-tight">Changer la photo</span>
+                      </div>
+                    )}
                   </>
                 ) : (
                   <div className="flex flex-col items-center justify-center text-center p-3 space-y-1">
-                    <div className="w-10 h-10 rounded-full bg-amber-400/15 flex items-center justify-center text-amber-400 group-hover:scale-110 transition-transform">
+                    <div className="w-10 h-10 rounded-full bg-amber-400/15 flex items-center justify-center text-amber-400">
                       <Ship size={22} />
                     </div>
-                    <span className="text-[10px] font-bold text-amber-400 flex items-center gap-1">
-                      <Upload size={10} /> Insérer l'image
-                    </span>
-                    <span className="text-[8px] text-slate-300 leading-tight">du bateau</span>
+                    {isAdmin ? (
+                      <>
+                        <span className="text-[10px] font-bold text-amber-400 flex items-center gap-1">
+                          <Upload size={10} /> Insérer l'image
+                        </span>
+                        <span className="text-[8px] text-slate-300 leading-tight">du bateau</span>
+                      </>
+                    ) : (
+                      <span className="text-[10px] font-black text-amber-400/90 tracking-wide uppercase">
+                        AMR MUGOTE
+                      </span>
+                    )}
                   </div>
                 )}
               </div>
 
-              {/* Actions sous le cercle */}
-              <div className="mt-2 flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="text-[10px] text-amber-400 hover:underline font-semibold flex items-center gap-1 cursor-pointer"
-                >
-                  <Camera size={11} /> {boatImage ? "Modifier photo" : "Ajouter photo bateau"}
-                </button>
-                {boatImage && (
+              {/* Actions sous le cercle (STRICTEMENT réservées à l'administrateur) */}
+              {isAdmin && (
+                <div className="mt-2 flex items-center gap-2">
                   <button
                     type="button"
-                    onClick={handleRemoveImage}
-                    className="text-[10px] text-rose-400 hover:text-rose-300 font-semibold flex items-center gap-1 cursor-pointer"
-                    title="Supprimer la photo"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="text-[10px] text-amber-400 hover:underline font-semibold flex items-center gap-1 cursor-pointer"
                   >
-                    <Trash2 size={11} /> Retirer
+                    <Camera size={11} /> {boatImage ? "Modifier photo" : "Ajouter photo bateau"}
                   </button>
-                )}
-              </div>
+                  {boatImage && (
+                    <button
+                      type="button"
+                      onClick={handleRemoveImage}
+                      className="text-[10px] text-rose-400 hover:text-rose-300 font-semibold flex items-center gap-1 cursor-pointer"
+                      title="Supprimer la photo"
+                    >
+                      <Trash2 size={11} /> Retirer
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Contenu textuel et d'action du Hero */}

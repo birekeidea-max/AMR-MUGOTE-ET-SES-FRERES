@@ -34,7 +34,11 @@ function deg2rad(deg: number): number {
   return deg * (Math.PI / 180);
 }
 
-export default function LocalisationView() {
+interface LocalisationViewProps {
+  isAdmin?: boolean;
+}
+
+export default function LocalisationView({ isAdmin = false }: LocalisationViewProps) {
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [geoError, setGeoError] = useState<string | null>(null);
   const [locating, setLocating] = useState(false);
@@ -195,71 +199,91 @@ export default function LocalisationView() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8 space-y-8 text-left">
-      {/* Hidden file input for boat image upload */}
-      <input
-        type="file"
-        ref={fileInputRef}
-        onChange={handleImageUpload}
-        accept="image/*"
-        className="hidden"
-      />
+      {/* Hidden file input for boat image upload (administrateur uniquement) */}
+      {isAdmin && (
+        <input
+          type="file"
+          ref={fileInputRef}
+          onChange={handleImageUpload}
+          accept="image/*"
+          className="hidden"
+        />
+      )}
 
       {/* Header Banner avec la zone en cercle en haut à gauche */}
       <div className="bg-[#001233] rounded-[32px] p-6 sm:p-10 text-white relative overflow-hidden border border-white/10 shadow-2xl">
         <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center gap-6 sm:gap-8">
           
-          {/* ZONE EN CERCLE EN HAUT À GAUCHE POUR INSÉRER L'IMAGE DU BATEAU */}
+          {/* ZONE EN CERCLE EN HAUT À GAUCHE POUR LE BATEAU */}
           <div className="flex-shrink-0 flex flex-col items-center">
             <div
-              onClick={() => fileInputRef.current?.click()}
-              className="relative w-28 h-28 sm:w-36 sm:h-36 rounded-full border-4 border-gold bg-[#07132c] shadow-2xl overflow-hidden cursor-pointer group hover:scale-105 transition-all duration-300 flex items-center justify-center"
-              title="cliquez ici pour insérer ou modifier l'image du bateau"
+              onClick={() => {
+                if (isAdmin) fileInputRef.current?.click();
+              }}
+              className={`relative w-28 h-28 sm:w-36 sm:h-36 rounded-full border-4 border-gold bg-[#07132c] shadow-2xl overflow-hidden flex items-center justify-center transition-all duration-300 ${
+                isAdmin ? 'cursor-pointer group hover:scale-105' : 'cursor-default'
+              }`}
+              title={isAdmin ? "cliquez ici pour insérer ou modifier l'image du bateau" : "navire amr mugote"}
             >
               {boatImage ? (
                 <>
                   <img
                     src={boatImage}
                     alt="Bateau AMR Mugote"
-                    className="w-full h-full object-cover group-hover:opacity-75 transition-opacity"
+                    className={`w-full h-full object-cover transition-opacity ${
+                      isAdmin ? 'group-hover:opacity-75' : ''
+                    }`}
                   />
-                  <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center text-white transition-opacity">
-                    <Camera size={24} className="text-gold mb-1" />
-                    <span className="text-[9px] font-bold text-center px-1 leading-tight">changer l'image</span>
-                  </div>
+                  {isAdmin && (
+                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center text-white transition-opacity">
+                      <Camera size={24} className="text-gold mb-1" />
+                      <span className="text-[9px] font-bold text-center px-1 leading-tight">changer l'image</span>
+                    </div>
+                  )}
                 </>
               ) : (
                 <div className="flex flex-col items-center justify-center text-center p-3 space-y-1">
-                  <div className="w-10 h-10 rounded-full bg-gold/15 flex items-center justify-center text-gold group-hover:scale-110 transition-transform">
+                  <div className="w-10 h-10 rounded-full bg-gold/15 flex items-center justify-center text-gold">
                     <Ship size={22} />
                   </div>
-                  <span className="text-[10px] font-bold text-gold flex items-center gap-1">
-                    <Upload size={10} /> insérer l'image
-                  </span>
-                  <span className="text-[8px] text-slate-400 leading-tight">du bateau</span>
+                  {isAdmin ? (
+                    <>
+                      <span className="text-[10px] font-bold text-gold flex items-center gap-1">
+                        <Upload size={10} /> insérer l'image
+                      </span>
+                      <span className="text-[8px] text-slate-400 leading-tight">du bateau</span>
+                    </>
+                  ) : (
+                    <span className="text-[10px] font-black text-gold/90 uppercase tracking-wide">
+                      amr mugote
+                    </span>
+                  )}
                 </div>
               )}
             </div>
 
-            {/* Actions sous le cercle */}
-            <div className="mt-2 flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                className="text-[10px] text-gold hover:underline font-semibold flex items-center gap-1 cursor-pointer"
-              >
-                <Camera size={11} /> {boatImage ? "modifier la photo" : "ajouter photo bateau"}
-              </button>
-              {boatImage && (
+            {/* Actions sous le cercle (STRICTEMENT réservées à l'administrateur) */}
+            {isAdmin && (
+              <div className="mt-2 flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={handleRemoveImage}
-                  className="text-[10px] text-rose-400 hover:text-rose-300 font-semibold flex items-center gap-1 cursor-pointer"
-                  title="supprimer la photo"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="text-[10px] text-gold hover:underline font-semibold flex items-center gap-1 cursor-pointer"
                 >
-                  <Trash2 size={11} /> retirer
+                  <Camera size={11} /> {boatImage ? "modifier la photo" : "ajouter photo bateau"}
                 </button>
-              )}
-            </div>
+                {boatImage && (
+                  <button
+                    type="button"
+                    onClick={handleRemoveImage}
+                    className="text-[10px] text-rose-400 hover:text-rose-300 font-semibold flex items-center gap-1 cursor-pointer"
+                    title="supprimer la photo"
+                  >
+                    <Trash2 size={11} /> retirer
+                  </button>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Textes de la bannière (titre en grand, corps en minuscule) */}

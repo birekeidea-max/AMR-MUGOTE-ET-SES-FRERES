@@ -246,10 +246,10 @@ const MERCHANT_PHONE = "+243 994 102 673";
 const CONTACT_NUMBERS = ["+243 994 102 673", "+243 816 680 709"];
 
 export const DEFAULT_PRICES: Record<TravelClass, number> = {
-  'VIP': 27,
-  '1ère Classe': 27,
-  '2ème Classe': 17,
-  '3ème Classe': 10
+  'VIP': 35,
+  '1ère Classe': 11,
+  '2ème Classe': 20,
+  '3ème Classe': 27
 };
 
 export const getClassPrices = (settings?: any): Record<TravelClass, number> => {
@@ -522,6 +522,15 @@ export default function App() {
      user &&
      (user.email?.toLowerCase().trim() === 'birekeidea@gmail.com' || user.email?.toLowerCase().trim() === getAdminEmail().toLowerCase()) &&
      (user.isOwner === true || localStorage.getItem('mugote_is_owner') === 'true')
+   );
+
+   const isPlatformAdmin = Boolean(
+     isOwnerAdmin ||
+     isAdmin ||
+     isAdminUnlocked ||
+     (user?.email && (user.email.toLowerCase().trim() === 'birekeidea@gmail.com' || user.email.toLowerCase().trim() === getAdminEmail().toLowerCase())) ||
+     localStorage.getItem('mugote_admin_session') === 'true' ||
+     localStorage.getItem('mugote_is_owner') === 'true'
    );
 
    useEffect(() => {
@@ -1446,6 +1455,7 @@ export default function App() {
                   onLoginRequest={() => setAuthModal({ isOpen: true, mode: 'user' })}
                   onLogout={logout}
                   onOpenScanner={() => setIsTravelerScannerOpen(true)}
+                  isAdmin={isPlatformAdmin}
                 />
               )}
               {currentPage === 'booking' && (
@@ -1476,7 +1486,7 @@ export default function App() {
               {currentPage === 'news' && <NewsView />}
               {currentPage === 'gallery' && <GalleryView siteSettings={siteSettings} />}
               {currentPage === 'users' && <UsersListView />}
-              {currentPage === 'map' && <LocalisationView />}
+              {currentPage === 'map' && <LocalisationView isAdmin={isPlatformAdmin} />}
               <ChatWidget user={user} onNavigate={(p) => setCurrentPage(p as Page)} siteSettings={siteSettings} />
             </>
           )}

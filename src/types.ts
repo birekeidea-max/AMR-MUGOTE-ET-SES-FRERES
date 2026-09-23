@@ -72,10 +72,10 @@ export interface UserProfile {
 export type ClassPrices = Record<TravelClass, number>;
 
 export const DEFAULT_PRICES: Record<TravelClass, number> = {
-  'VIP': 27,
-  '1ère Classe': 27,
-  '2ème Classe': 17,
-  '3ème Classe': 10
+  'VIP': 35,
+  '1ère Classe': 11,
+  '2ème Classe': 20,
+  '3ème Classe': 27
 };
 
 export const getClassPrices = (settings?: SiteSettings | null): Record<TravelClass, number> => {

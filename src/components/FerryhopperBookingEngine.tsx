@@ -85,12 +85,12 @@ export function FerryhopperBookingEngine({
   const [emailSending, setEmailSending] = useState(false);
   const [emailSuccess, setEmailSuccess] = useState<string | null>(null);
 
-  // Tarifs
+  // Tarifs officiels
   const classPricesUSD: Record<TravelClass, number> = {
-    'VIP': 50,
-    '1ère Classe': 40,
-    '2ème Classe': 35,
-    '3ème Classe': 25
+    'VIP': Number(siteSettings?.classPrices?.['VIP'] ?? 35),
+    '1ère Classe': Number(siteSettings?.classPrices?.['1ère Classe'] ?? 11),
+    '2ème Classe': Number(siteSettings?.classPrices?.['2ème Classe'] ?? 20),
+    '3ème Classe': Number(siteSettings?.classPrices?.['3ème Classe'] ?? 27)
   };
 
   const exchangeRate = 2800; // 1 USD = 2800 CDF

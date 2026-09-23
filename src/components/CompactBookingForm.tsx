@@ -18,6 +18,7 @@ import {
   X
 } from 'lucide-react';
 import { mongoApi } from '../services/api';
+import { TravelClass } from '../types';
 
 export interface CompactBookingFormProps {
   isModal?: boolean;
@@ -26,7 +27,7 @@ export interface CompactBookingFormProps {
   user?: any;
   initialTrajet?: string;
   initialBoat?: string;
-  initialClass?: 'standard' | 'business' | 'vip';
+  initialClass?: 'standard' | 'business' | 'vip' | '1ere' | '2eme' | '3eme';
   currency?: 'USD' | 'CDF';
 }
 
@@ -37,7 +38,7 @@ export function CompactBookingForm({
   user,
   initialTrajet = 'Goma Port Public ➔ Bukavu Ihusi',
   initialBoat = 'Mugote 1',
-  initialClass = 'standard',
+  initialClass = '1ere',
   currency = 'USD'
 }: CompactBookingFormProps) {
   // Sélecteur de devise directement dans le formulaire de réservation
@@ -69,7 +70,12 @@ export function CompactBookingForm({
     return d.toISOString().split('T')[0];
   });
   const [boat, setBoat] = useState(initialBoat);
-  const [travelClass, setTravelClass] = useState<'standard' | 'business' | 'vip'>(initialClass);
+  const [travelClass, setTravelClass] = useState<'1ere' | '2eme' | '3eme' | 'vip'>(() => {
+    if (initialClass === 'vip') return 'vip';
+    if (initialClass === 'business' || initialClass === '2eme') return '2eme';
+    if (initialClass === '3eme') return '3eme';
+    return '1ere';
+  });
   const [passengerCount, setPassengerCount] = useState(1);
 
   // 3. PAIEMENT & VALIDATION
@@ -81,14 +87,15 @@ export function CompactBookingForm({
   const [isSuccess, setIsSuccess] = useState(false);
   const [createdReservation, setCreatedReservation] = useState<any>(null);
 
-  // Barème officiel des classes selon la demande
-  const classPricing: Record<'standard' | 'business' | 'vip', { label: string; price: number; desc: string }> = {
-    standard: { label: 'Standard', price: 15, desc: 'Salon principal' },
-    business: { label: 'Business', price: 20, desc: 'Salon climatisé' },
-    vip: { label: 'VIP', price: 30, desc: 'Salon panoramique & collation' }
+  // Barème officiel des classes selon la demande exacte : 1ère Classe 11$, 2ème Classe 20$, 3ème Classe 27$
+  const classPricing: Record<'1ere' | '2eme' | '3eme' | 'vip', { label: string; price: number; desc: string; mapped: TravelClass }> = {
+    '1ere': { label: '1ère Classe', price: 11, desc: 'Confort Supérieur', mapped: '1ère Classe' },
+    '2eme': { label: '2ème Classe', price: 20, desc: 'Standard Populaire', mapped: '2ème Classe' },
+    '3eme': { label: '3ème Classe', price: 27, desc: 'Économique / Spécial', mapped: '3ème Classe' },
+    'vip': { label: 'VIP', price: 35, desc: 'Salon VIP Privatif', mapped: 'VIP' }
   };
 
-  const unitPrice = classPricing[travelClass].price;
+  const unitPrice = classPricing[travelClass]?.price || 11;
   const totalPriceUSD = unitPrice * passengerCount;
   // Taux indicatif CDF (1 USD = 2850 CDF)
   const exchangeRate = 2850;
@@ -129,11 +136,7 @@ export function CompactBookingForm({
       ? 'Bukavu-Goma' 
       : 'Goma-Bukavu';
 
-    const mappedClass: '1ère Classe' | '2ème Classe' | 'VIP' = travelClass === 'vip' 
-      ? 'VIP' 
-      : travelClass === 'business' 
-        ? '1ère Classe' 
-        : '2ème Classe';
+    const mappedClass: TravelClass = classPricing[travelClass]?.mapped || '1ère Classe';
 
     const reservationPayload = {
       userId: user?.uid || `anon-${Date.now()}`,
@@ -480,9 +483,10 @@ export function CompactBookingForm({
                     onChange={(e) => setTravelClass(e.target.value as any)}
                     className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs text-slate-800 font-bold focus:ring-2 focus:ring-slate-800 focus:outline-none cursor-pointer shadow-2xs"
                   >
-                    <option value="standard">Standard - 15$</option>
-                    <option value="business">Business - 20$</option>
-                    <option value="vip">VIP - 30$</option>
+                    <option value="1ere">1ère Classe - 11$</option>
+                    <option value="2eme">2ème Classe - 20$</option>
+                    <option value="3eme">3ème Classe - 27$</option>
+                    <option value="vip">VIP - 35$</option>
                   </select>
                 </div>
 

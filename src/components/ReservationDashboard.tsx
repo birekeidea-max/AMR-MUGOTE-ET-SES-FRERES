@@ -34,6 +34,7 @@ import {
   X
 } from 'lucide-react';
 import { mongoApi } from '../services/api';
+import { TravelClass } from '../types';
 
 export interface ReservationDashboardProps {
   user?: any;
@@ -71,7 +72,7 @@ export function ReservationDashboard({
     return d.toISOString().split('T')[0];
   });
   const [boat, setBoat] = useState('Mugote 1');
-  const [travelClass, setTravelClass] = useState<'economique' | 'standard' | 'vip'>('standard');
+  const [travelClass, setTravelClass] = useState<'1ere' | '2eme' | '3eme' | 'vip'>('1ere');
   const [billetsCount, setBilletsCount] = useState(1);
   const [paymentMethod, setPaymentMethod] = useState<'mpesa' | 'airtel' | 'orange' | 'cash'>('mpesa');
 
@@ -138,14 +139,15 @@ export function ReservationDashboard({
     }
   ]);
 
-  // Barème des classes selon la demande exacte : Economique, standard 20$, VIP 27$
-  const classOptions: Record<'economique' | 'standard' | 'vip', { label: string; price: number }> = {
-    economique: { label: 'Économique - 15$', price: 15 },
-    standard: { label: 'Standard - 20$', price: 20 },
-    vip: { label: 'VIP - 27$', price: 27 }
+  // Barème officiel des classes selon la demande exacte : 1ère Classe 11$, 2ème Classe 20$, 3ème Classe 27$, VIP 35$
+  const classOptions: Record<'1ere' | '2eme' | '3eme' | 'vip', { label: string; price: number; mapped: TravelClass }> = {
+    '1ere': { label: '1ère Classe - 11$', price: 11, mapped: '1ère Classe' },
+    '2eme': { label: '2ème Classe - 20$', price: 20, mapped: '2ème Classe' },
+    '3eme': { label: '3ème Classe - 27$', price: 27, mapped: '3ème Classe' },
+    'vip': { label: 'VIP - 35$', price: 35, mapped: 'VIP' }
   };
 
-  const currentPriceUnit = classOptions[travelClass].price;
+  const currentPriceUnit = classOptions[travelClass]?.price || 11;
   const totalAmountUSD = currentPriceUnit * billetsCount;
   const totalAmountCDF = totalAmountUSD * 2850;
 
@@ -182,7 +184,7 @@ export function ReservationDashboard({
       ship: boat,
       travelDate,
       departureTime: '07:30',
-      travelClass: travelClass === 'vip' ? 'VIP' : travelClass === 'standard' ? '1ère Classe' : '2ème Classe',
+      travelClass: classOptions[travelClass]?.mapped || '1ère Classe',
       passengersCount: billetsCount,
       status: 'PENDING',
       paymentMethod,
@@ -225,7 +227,7 @@ export function ReservationDashboard({
   };
 
   // Raccourci Sélection en un clic
-  const handleApplyPreset = (presetTrajet: string, presetClass: 'economique' | 'standard' | 'vip', presetBoat: string) => {
+  const handleApplyPreset = (presetTrajet: string, presetClass: '1ere' | '2eme' | '3eme' | 'vip', presetBoat: string) => {
     setTrajet(presetTrajet);
     setTravelClass(presetClass);
     setBoat(presetBoat);
@@ -712,9 +714,10 @@ export function ReservationDashboard({
                           onChange={(e) => setTravelClass(e.target.value as any)}
                           className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-black text-slate-800 focus:bg-white focus:ring-2 focus:ring-slate-800 focus:outline-none cursor-pointer shadow-2xs"
                         >
-                          <option value="economique">Économique - 15$</option>
-                          <option value="standard">Standard - 20$</option>
-                          <option value="vip">VIP - 27$</option>
+                          <option value="1ere">1ère Classe - 11$</option>
+                          <option value="2eme">2ème Classe - 20$</option>
+                          <option value="3eme">3ème Classe - 27$</option>
+                          <option value="vip">VIP - 35$</option>
                         </select>
                       </div>
 
@@ -1062,10 +1065,10 @@ export function ReservationDashboard({
             </p>
             <div className="space-y-2">
               {[
-                { label: 'Goma ➔ Bukavu VIP Mugote 1', trajet: 'Goma ➔ Bukavu', classe: 'vip' as const, boat: 'Mugote 1', price: '$27' },
-                { label: 'Goma ➔ Bukavu Standard Mugote 2', trajet: 'Goma ➔ Bukavu', classe: 'standard' as const, boat: 'Mugote 2', price: '$20' },
-                { label: 'Bukavu ➔ Goma Express Mugote 3', trajet: 'Bukavu ➔ Goma', classe: 'standard' as const, boat: 'Mugote 3', price: '$20' },
-                { label: 'Goma ➔ Idjwi Économique', trajet: 'Goma ➔ Idjwi', classe: 'economique' as const, boat: 'Mugote 2', price: '$15' },
+                { label: 'Goma ➔ Bukavu VIP Mugote 1', trajet: 'Goma ➔ Bukavu', classe: 'vip' as const, boat: 'Mugote 1', price: '$35' },
+                { label: 'Goma ➔ Bukavu 1ère Classe Mugote 2', trajet: 'Goma ➔ Bukavu', classe: '1ere' as const, boat: 'Mugote 2', price: '$11' },
+                { label: 'Bukavu ➔ Goma 2ème Classe Mugote 3', trajet: 'Bukavu ➔ Goma', classe: '2eme' as const, boat: 'Mugote 3', price: '$20' },
+                { label: 'Goma ➔ Bukavu 3ème Classe', trajet: 'Goma ➔ Bukavu', classe: '3eme' as const, boat: 'Mugote 1', price: '$27' },
               ].map((p, i) => (
                 <button
                   key={i}
