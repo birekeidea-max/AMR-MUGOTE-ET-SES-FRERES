@@ -329,7 +329,7 @@ export function TravelerTicketScannerModal({ isOpen, onClose, siteSettings }: Tr
                       ? "✓ EMBARQUÉ À BORD DU NAVIRE"
                       : isPaid
                       ? "🟢 PRÊT POUR L'EMBARQUEMENT"
-                      : "⏳ PAIEMENT EN ATTENTE AU GUICHET"}
+                      : "⏳ EN ATTENTE DE VALIDATION PAR L'ADMINISTRATEUR"}
                   </h4>
                 </div>
 
@@ -350,11 +350,11 @@ export function TravelerTicketScannerModal({ isOpen, onClose, siteSettings }: Tr
                     </>
                   ) : isPaid ? (
                     <>
-                      Votre billet est <strong>officiellement payé et confirmé</strong>. Vous pouvez vous présenter à la passerelle d'embarquement. <strong>Présentez ce QR Code à l'agent administratif au quai pour qu'il autorise votre montée à bord.</strong>
+                      Votre billet a été <strong>validé par l'administration</strong>. Vous pouvez vous présenter à la passerelle d'embarquement. <strong>Présentez ce QR Code à l'agent administratif au quai pour qu'il autorise votre montée à bord.</strong>
                     </>
                   ) : (
                     <>
-                      Ce billet n'est <strong>pas encore validé pour l'embarquement</strong> car le paiement est en attente. Veuillez vous rapprocher du guichet de la compagnie pour régulariser.
+                      Ce billet n'est <strong>pas encore validé par l'administrateur</strong>. Conformément aux consignes de sécurité, tant que le billet n'est pas validé chez l'admin, le client ne peut jamais avoir son billet ni monter à bord. Veuillez attendre la validation de la direction.
                     </>
                   )}
                 </p>

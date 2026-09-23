@@ -184,7 +184,7 @@ export function ReservationDashboard({
       departureTime: '07:30',
       travelClass: travelClass === 'vip' ? 'VIP' : travelClass === 'standard' ? '1ère Classe' : '2ème Classe',
       passengersCount: billetsCount,
-      status: paymentMethod === 'cash' ? 'PENDING' : 'VALIDATED',
+      status: 'PENDING',
       paymentMethod,
       ticketId: ticketNum,
       amount: totalAmountUSD,

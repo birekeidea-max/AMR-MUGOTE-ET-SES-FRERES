@@ -147,10 +147,10 @@ export function CompactBookingForm({
       departureTime: '07:30',
       travelClass: mappedClass,
       passengersCount: passengerCount,
-      status: (paymentMethod === 'cash' ? 'PENDING' : 'VALIDATED') as any,
+      status: 'PENDING' as any,
       paymentMethod,
       transactionId: `TX-${Date.now().toString().slice(-6)}`,
-      ticketId: `MUG-${Date.now().toString().slice(-6)}`,
+      ticketId: `REF-${Date.now().toString().slice(-6)}`,
       amount: totalPriceUSD,
       createdAt: Date.now(),
       notes: `Trajet: ${trajet}, Navire: ${boat}, Classe: ${travelClass.toUpperCase()}`
@@ -247,10 +247,13 @@ export function CompactBookingForm({
             </div>
             <div>
               <h3 className="text-lg font-black text-slate-900">
-                Traversée Réservée avec Succès !
+                Réservation Enregistrée — En attente de validation
               </h3>
               <p className="text-xs text-slate-600 mt-1 max-w-md mx-auto">
-                Billet <strong>#{createdReservation.ticketId}</strong> généré pour <strong>{createdReservation.passengerName}</strong>. Un e-mail de confirmation a été envoyé à <strong>{createdReservation.email}</strong>.
+                Référence <strong>#{createdReservation.ticketId}</strong> pour <strong>{createdReservation.passengerName}</strong>. 
+                <span className="block mt-1 font-bold text-amber-800 bg-amber-50 p-2 rounded-xl border border-amber-200 text-[11px]">
+                  ⏳ Important : L'administrateur doit obligatoirement valider votre billet avant que vous ne puissiez l'obtenir. Tant que le billet n'est pas validé chez l'admin, le client ne peut jamais avoir son billet.
+                </span>
               </p>
             </div>
 

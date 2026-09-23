@@ -280,6 +280,11 @@ const SYSTEM_PROMPT = `Tu es l'assistant IA officiel de ETS AMR MUGOTE ET SES FR
 
 // --- Shared PDF Generator ---
 const generateTicket = async (res: Reservation, siteSettings: any) => {
+  if (res.status !== 'VALIDATED') {
+    alert("Accès refusé : Ce billet est en attente de validation par l'administrateur. Conformément au règlement officiel, le client ne peut jamais obtenir son billet tant que l'administration ne l'a pas validé.");
+    return;
+  }
+
   const qrDataUrl = await QRCode.toDataURL(`https://${window.location.host}/?verify=${res.id}`, {
     margin: 1,
     width: 250,
@@ -7823,13 +7828,23 @@ function MyTickets({
               <div key={res.id} className={cn("border rounded-2xl overflow-hidden flex flex-col sm:flex-row transition-all hover:shadow-xl group mx-0 sm:mx-0 relative", classCardStyle)}>
                 <div className={cn("w-full sm:w-28 flex flex-row sm:flex-col items-center justify-center p-4 border-b sm:border-b-0 sm:border-r gap-4 sm:gap-0", classStubStyle)}>
                   {res.status === 'VALIDATED' ? (
-                    <QRCodeSVG value={`https://${window.location.host}/?verify=${res.id}`} size={64} className="sm:size-16" />
+                    <>
+                      <QRCodeSVG value={`https://${window.location.host}/?verify=${res.id}`} size={64} className="sm:size-16" />
+                      <p className="text-[7px] font-black uppercase tracking-widest text-slate-700 sm:mt-3 text-center">DGM Verify</p>
+                    </>
                   ) : (
-                    <div className="w-12 h-12 sm:w-16 sm:h-16 bg-white/70 flex items-center justify-center text-slate-400 rounded-lg border border-slate-300/80 shadow-inner">
-                      <QrCode size={24} className="sm:w-8 sm:h-8" />
+                    <div className="flex flex-col items-center justify-center text-center p-1 sm:p-2">
+                      <div className="w-10 h-10 sm:w-12 sm:h-12 bg-amber-50 border border-amber-200 text-amber-600 rounded-xl flex items-center justify-center shadow-inner mb-1.5">
+                        <Lock size={20} />
+                      </div>
+                      <p className="text-[6.5px] sm:text-[7.5px] font-black uppercase tracking-tight text-amber-800 leading-tight">
+                        En Attente Admin
+                      </p>
+                      <p className="text-[5.5px] sm:text-[6.5px] text-amber-700/80 font-semibold mt-0.5 leading-none">
+                        Non Validé
+                      </p>
                     </div>
                   )}
-                  <p className="text-[7px] font-black uppercase tracking-widest text-slate-700 sm:mt-3 text-center">DGM Verify</p>
                 </div>
                 <div className="flex-1 p-4 sm:p-6 space-y-4">
                   <div className="flex justify-between items-start">
@@ -7917,14 +7932,25 @@ function MyTickets({
                         {(res as any).reminderEmailSent ? "Rappel Gmail ✓" : "Rappel Gmail"}
                       </button>
                     )}
-                    {res.status === 'VALIDATED' && !(res as any).cancellationRequested && (
+                    {res.status === 'VALIDATED' && !(res as any).cancellationRequested ? (
                       <button 
                         onClick={() => generateTicketPDF(res)}
-                        className="px-3 sm:px-4 py-1.5 bg-[#0b132b] text-white text-[7px] sm:text-[8px] font-black uppercase tracking-widest rounded-lg hover:bg-black transition-all flex-shrink-0 shadow-md"
+                        className="px-3 sm:px-4 py-1.5 bg-[#0b132b] text-white text-[7px] sm:text-[8px] font-black uppercase tracking-widest rounded-lg hover:bg-black transition-all flex-shrink-0 shadow-md flex items-center justify-center gap-1 cursor-pointer"
                       >
+                        <Download size={10} />
                         Billet
                       </button>
-                    )}
+                    ) : !(res as any).cancellationRequested ? (
+                      <button 
+                        type="button"
+                        onClick={() => alert("Ce billet n'est pas encore validé par l'administrateur. Conformément au règlement officiel, tant que le billet n'est pas validé chez l'admin, le client ne peut jamais avoir son billet.")}
+                        className="px-2.5 sm:px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 text-[6.5px] sm:text-[7.5px] font-bold rounded-lg transition-all flex-shrink-0 flex items-center justify-center gap-1 cursor-pointer"
+                        title="Billet bloqué jusqu'à validation par l'administration"
+                      >
+                        <Lock size={9} className="text-amber-600" />
+                        <span>En Attente Admin</span>
+                      </button>
+                    ) : null}
                     {['VALIDATED', 'PENDING'].includes(res.status) && !(res as any).cancellationRequested && (
                       <button 
                         onClick={() => handleRequestCancellation(res.id!)}

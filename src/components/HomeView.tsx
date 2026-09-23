@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Ship, 
   Ticket, 
@@ -24,10 +24,13 @@ import {
   ArrowRight,
   LogOut,
   Sun,
-  Waves
+  Waves,
+  Camera,
+  Upload,
+  Trash2
 } from 'lucide-react';
 import { User as FirebaseUser } from 'firebase/auth';
-import { collection, onSnapshot } from 'firebase/firestore';
+import { collection, onSnapshot, doc, getDoc, updateDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { CompactBookingModal } from './CompactBookingModal';
 import { CompactBookingForm } from './CompactBookingForm';
@@ -53,6 +56,62 @@ export function HomeView({
   onLogout,
   onOpenScanner 
 }: HomeViewProps) {
+  // État de l'image du bateau dans la zone circulaire (en haut à gauche)
+  const [boatImage, setBoatImage] = useState<string>(() => {
+    return localStorage.getItem('mugote_boat_image') || siteSettings?.homeDetail || '';
+  });
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (siteSettings?.homeDetail && !localStorage.getItem('mugote_boat_image')) {
+      setBoatImage(siteSettings.homeDetail);
+    }
+  }, [siteSettings?.homeDetail]);
+
+  // Synchronisation dynamique si modifiée depuis un autre onglet
+  useEffect(() => {
+    const handleSync = () => {
+      const stored = localStorage.getItem('mugote_boat_image');
+      if (stored) setBoatImage(stored);
+    };
+    window.addEventListener('boat_image_updated', handleSync);
+    window.addEventListener('storage', handleSync);
+    return () => {
+      window.removeEventListener('boat_image_updated', handleSync);
+      window.removeEventListener('storage', handleSync);
+    };
+  }, []);
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      const base64 = event.target?.result as string;
+      if (base64) {
+        setBoatImage(base64);
+        try {
+          localStorage.setItem('mugote_boat_image', base64);
+          window.dispatchEvent(new Event('boat_image_updated'));
+          await updateDoc(doc(db, 'settings', 'general'), {
+            homeDetail: base64
+          });
+        } catch (err) {
+          console.warn("Storage sync:", err);
+        }
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleRemoveImage = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setBoatImage('');
+    localStorage.removeItem('mugote_boat_image');
+    window.dispatchEvent(new Event('boat_image_updated'));
+  };
+
   // Compteurs réels auto-incrémentés depuis Firestore en direct
   const [realPaxCount, setRealPaxCount] = useState<number>(0);
   const [realBookingsCount, setRealBookingsCount] = useState<number>(0);
@@ -188,27 +247,95 @@ export function HomeView({
         {/* BANNIÈRE HERO BLEU DE NUIT */}
         <div className="bg-gradient-to-br from-[#0b132b] via-[#1c2541] to-[#0b132b] rounded-3xl p-6 sm:p-9 shadow-2xl relative overflow-hidden text-white border border-white/10">
           
+          {/* Input fichier caché pour l'image du bateau */}
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleImageUpload}
+            accept="image/*"
+            className="hidden"
+          />
+
           {/* Motifs géométriques décoratifs légers en arrière-plan */}
           <div className="absolute -right-24 -top-24 w-96 h-96 bg-white/5 rounded-full blur-3xl pointer-events-none" />
           <div className="absolute -left-20 -bottom-20 w-80 h-80 bg-white/5 rounded-full blur-2xl pointer-events-none" />
 
-          {/* Badge officiel de liaison */}
-          <div className="relative z-10 flex flex-wrap items-center gap-3 mb-4">
-            <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-md border border-white/20 px-3.5 py-1.5 rounded-full text-xs font-semibold">
-              <span className="w-2 h-2 rounded-full bg-emerald-400" />
-              <span className="text-white font-bold text-[11px] sm:text-xs">
-                Liaisons Quotidiennes • 07h30 (Matin ➔ 12h30) & 18h00 (Soir ➔ 06h00 +1)
-              </span>
-            </div>
+          {/* Conteneur principal avec la zone circulaire en haut à gauche */}
+          <div className="relative z-10 flex flex-col md:flex-row items-start gap-6 sm:gap-8 mb-6">
             
-            <div className="hidden sm:inline-flex items-center gap-1.5 text-xs text-white font-bold bg-white/10 border border-white/20 px-3 py-1 rounded-full">
-              <ShieldCheck size={14} />
-              <span>Flotte homologuée & gilets certifiés</span>
+            {/* ZONE EN CERCLE EN HAUT À GAUCHE POUR INSÉRER L'IMAGE DU BATEAU */}
+            <div className="flex-shrink-0 flex flex-col items-center">
+              <div
+                onClick={() => fileInputRef.current?.click()}
+                className="relative w-28 h-28 sm:w-36 sm:h-36 rounded-full border-4 border-amber-400 bg-[#07132c] shadow-2xl overflow-hidden cursor-pointer group hover:scale-105 transition-all duration-300 flex items-center justify-center"
+                title="Cliquez ici pour insérer ou modifier l'image du bateau"
+              >
+                {boatImage ? (
+                  <>
+                    <img
+                      src={boatImage}
+                      alt="Bateau AMR Mugote"
+                      className="w-full h-full object-cover group-hover:opacity-75 transition-opacity"
+                    />
+                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center text-white transition-opacity">
+                      <Camera size={24} className="text-amber-400 mb-1" />
+                      <span className="text-[9px] font-bold text-center px-1 leading-tight">Changer la photo</span>
+                    </div>
+                  </>
+                ) : (
+                  <div className="flex flex-col items-center justify-center text-center p-3 space-y-1">
+                    <div className="w-10 h-10 rounded-full bg-amber-400/15 flex items-center justify-center text-amber-400 group-hover:scale-110 transition-transform">
+                      <Ship size={22} />
+                    </div>
+                    <span className="text-[10px] font-bold text-amber-400 flex items-center gap-1">
+                      <Upload size={10} /> Insérer l'image
+                    </span>
+                    <span className="text-[8px] text-slate-300 leading-tight">du bateau</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Actions sous le cercle */}
+              <div className="mt-2 flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="text-[10px] text-amber-400 hover:underline font-semibold flex items-center gap-1 cursor-pointer"
+                >
+                  <Camera size={11} /> {boatImage ? "Modifier photo" : "Ajouter photo bateau"}
+                </button>
+                {boatImage && (
+                  <button
+                    type="button"
+                    onClick={handleRemoveImage}
+                    className="text-[10px] text-rose-400 hover:text-rose-300 font-semibold flex items-center gap-1 cursor-pointer"
+                    title="Supprimer la photo"
+                  >
+                    <Trash2 size={11} /> Retirer
+                  </button>
+                )}
+              </div>
             </div>
-          </div>
+
+            {/* Contenu textuel et d'action du Hero */}
+            <div className="flex-1 space-y-3">
+              {/* Badge officiel de liaison */}
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-md border border-white/20 px-3.5 py-1.5 rounded-full text-xs font-semibold">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                  <span className="text-white font-bold text-[11px] sm:text-xs">
+                    Liaisons Quotidiennes • 07h30 (Matin ➔ 12h30) & 18h00 (Soir ➔ 06h00 +1)
+                  </span>
+                </div>
+                
+                <div className="hidden sm:inline-flex items-center gap-1.5 text-xs text-white font-bold bg-white/10 border border-white/20 px-3 py-1 rounded-full">
+                  <ShieldCheck size={14} />
+                  <span>Flotte homologuée & gilets certifiés</span>
+                </div>
+              </div>
 
               {/* Titre & Description Hero */}
-              <div className="relative z-10 max-w-2xl mb-6">
+              <div className="max-w-2xl">
                 <h1 className="text-2xl sm:text-3xl md:text-4xl font-black tracking-tight leading-tight text-white">
                   Voyagez en toute sécurité sur le Lac Kivu
                 </h1>
@@ -237,6 +364,9 @@ export function HomeView({
                   </button>
                 </div>
               </div>
+            </div>
+
+          </div>
 
               {/* WIDGET BLANC ENCASTRÉ DE RECHERCHE DE BILLETS */}
               <div className="relative z-10 bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-6 shadow-2xl text-slate-900 border border-slate-100">

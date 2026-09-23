@@ -20,7 +20,8 @@ import {
   Luggage,
   Sparkles,
   ArrowRight,
-  FileText
+  FileText,
+  Lock
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Reservation, TravelClass, Itinerary, ShipName } from '../types';
@@ -143,7 +144,7 @@ export function FerryhopperBookingEngine({
         departureTime,
         travelClass,
         passengersCount,
-        status: 'VALIDATED',
+        status: 'PENDING',
         paymentMethod,
         identityNum: identityNum.trim() || 'NON SPECIFIÉ',
         transactionId: tempTxnId,
@@ -253,11 +254,11 @@ export function FerryhopperBookingEngine({
                 <CheckCircle2 size={28} />
               </div>
               <div>
-                <span className="text-[10px] font-black uppercase tracking-wider text-emerald-400">
-                  Réservation Validée avec Succès
+                <span className="text-[10px] font-black uppercase tracking-wider text-amber-400">
+                  Réservation Enregistrée • En attente de validation admin
                 </span>
                 <h2 className="text-xl sm:text-2xl font-black text-white">
-                  Billet N° #{confirmedReservation.ticketId}
+                  Dossier N° #{confirmedReservation.ticketId}
                 </h2>
               </div>
             </div>
@@ -304,41 +305,42 @@ export function FerryhopperBookingEngine({
                 <span className="text-white font-bold text-sm">{confirmedReservation.travelClass} ({confirmedReservation.passengersCount} place{confirmedReservation.passengersCount > 1 ? 's' : ''})</span>
               </div>
               <div className="p-3 bg-slate-900/80 rounded-xl border border-slate-800">
-                <span className="text-slate-400 text-[10px] uppercase font-bold block">Total Payé</span>
-                <span className="text-white font-bold text-sm">${confirmedReservation.amount} USD</span>
+                <span className="text-slate-400 text-[10px] uppercase font-bold block">Statut du Billet</span>
+                <span className="text-amber-400 font-bold text-sm">En Attente de Validation Admin</span>
               </div>
             </div>
 
-            {/* QR Code d'embarquement */}
-            <div className="p-4 bg-white rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-4">
-              <div className="text-slate-900">
-                <p className="text-xs font-black uppercase tracking-wider text-slate-500">QR Code d'embarquement</p>
-                <p className="text-sm font-bold mt-0.5">Présentez ce code aux scanners du port</p>
-                <p className="text-[11px] text-slate-500 mt-1">Liaison maritime Bukavu ⇄ Goma</p>
+            {/* QR Code d'embarquement verrouillé tant que non validé par l'admin */}
+            <div className="p-5 bg-amber-950/30 border border-amber-500/40 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div className="text-slate-200">
+                <div className="flex items-center gap-2 text-amber-400 font-black text-xs uppercase tracking-wider mb-1">
+                  <Lock size={15} />
+                  <span>Validation Administrative Obligatoire</span>
+                </div>
+                <p className="text-sm font-bold text-white">Votre billet sera débloqué après validation par l'administrateur</p>
+                <p className="text-[11px] text-slate-300 mt-1.5 leading-relaxed">
+                  Conformément aux consignes de sécurité, tant que le billet n'est pas validé chez l'administrateur, le client ne peut pas obtenir son billet ni son QR code d'embarquement. Dès validation par l'administration, votre billet officiel s'affichera dans la section <strong>« Mes Billets »</strong>.
+                </p>
               </div>
-              <div className="bg-white p-2 rounded-xl border border-slate-300">
-                <QRCodeSVG value={confirmedReservation.ticketId || 'MUGOTE'} size={110} />
+              <div className="bg-[#0b132b] p-4 rounded-2xl border border-amber-500/30 text-center shrink-0 flex flex-col items-center justify-center min-w-[140px]">
+                <div className="w-12 h-12 rounded-full bg-amber-500/10 text-amber-400 flex items-center justify-center mb-1">
+                  <Lock size={24} />
+                </div>
+                <span className="text-[9px] font-black uppercase text-amber-400 tracking-wider">QR Code Bloqué</span>
+                <span className="text-[8px] text-slate-400 mt-0.5">En attente admin</span>
               </div>
             </div>
 
-            {/* Actions d'impression & partage */}
+            {/* Actions */}
             <div className="flex flex-wrap items-center gap-3 pt-2">
-              <button
-                type="button"
-                onClick={() => window.print()}
-                className="flex-1 py-3 px-4 bg-white hover:bg-slate-200 text-black font-black rounded-xl text-xs uppercase tracking-wider transition flex items-center justify-center gap-2 cursor-pointer shadow-lg"
-              >
-                <Printer size={16} />
-                <span>Imprimer le Billet</span>
-              </button>
               {onViewAllTickets && (
                 <button
                   type="button"
                   onClick={onViewAllTickets}
-                  className="py-3 px-5 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-bold uppercase tracking-wider transition flex items-center justify-center gap-2 cursor-pointer border border-white/10"
+                  className="flex-1 py-3 px-5 bg-gold hover:bg-gold-light text-[#001233] rounded-xl text-xs font-black uppercase tracking-wider transition flex items-center justify-center gap-2 cursor-pointer shadow-lg"
                 >
                   <Ticket size={16} />
-                  <span>Tous mes Billets</span>
+                  <span>Voir Mes Billets & Statuts</span>
                 </button>
               )}
             </div>
