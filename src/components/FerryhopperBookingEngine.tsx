@@ -1,13 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   CheckCircle2, 
   Ticket, 
-  Lock,
-  Calendar,
-  User,
-  Mail,
-  Phone,
-  AlertCircle
+  Lock, 
+  Calendar, 
+  User, 
+  Mail, 
+  Phone, 
+  AlertCircle,
+  ChevronDown
 } from 'lucide-react';
 import { Reservation, TravelClass, ShipName } from '../types';
 import { cn } from '../lib/utils';
@@ -41,6 +42,10 @@ export function FerryhopperBookingEngine({
     return user?.phone || localStorage.getItem('mugote_user_phone') || '';
   });
   const [travelClass, setTravelClass] = useState<TravelClass>('2ème Classe');
+  const [isClassOpen, setIsClassOpen] = useState(false);
+  const classDropdownRef = useRef<HTMLDivElement>(null);
+  const dateInputRef = useRef<HTMLInputElement>(null);
+
   const [travelDate, setTravelDate] = useState(() => {
     const today = new Date();
     return today.toISOString().split('T')[0];
@@ -68,6 +73,17 @@ export function FerryhopperBookingEngine({
     if (user?.phone && !phone) setPhone(user.phone);
   }, [user]);
 
+  // Fermer le dropdown de classe en cas de clic en dehors
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (classDropdownRef.current && !classDropdownRef.current.contains(e.target as Node)) {
+        setIsClassOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
@@ -79,22 +95,22 @@ export function FerryhopperBookingEngine({
     }
 
     if (!fullName.trim()) {
-      setErrorMessage("Veuillez renseigner votre nom complet.");
+      setErrorMessage("veuillez renseigner votre nom complet.");
       return;
     }
 
     if (!email.trim() || !email.includes('@')) {
-      setErrorMessage("Veuillez renseigner une adresse email valide.");
+      setErrorMessage("veuillez renseigner une adresse mail valide.");
       return;
     }
 
     if (!phone.trim()) {
-      setErrorMessage("Veuillez renseigner votre numéro de téléphone.");
+      setErrorMessage("veuillez renseigner votre numéro de téléphone.");
       return;
     }
 
     if (!travelDate) {
-      setErrorMessage("Veuillez sélectionner la date de votre voyage.");
+      setErrorMessage("veuillez sélectionner la date de votre voyage.");
       return;
     }
 
@@ -165,72 +181,72 @@ export function FerryhopperBookingEngine({
   // --- ECRAN DE CONFIRMATION AVEC VALIDATION ADMIN OBLIGATOIRE ---
   if (confirmedReservation) {
     return (
-      <div className="w-full max-w-xl mx-auto py-8 px-4 text-left font-sans">
-        <div className="bg-[#001f35] text-white rounded-3xl p-6 sm:p-8 shadow-2xl border border-white/10 space-y-6">
-          <div className="flex items-center gap-3 border-b border-white/10 pb-5">
-            <div className="w-12 h-12 rounded-2xl bg-amber-400 text-slate-950 flex items-center justify-center font-bold">
-              <CheckCircle2 size={26} />
+      <div className="w-full max-w-sm mx-auto py-4 px-2 text-left font-sans">
+        <div className="bg-[#001f35] text-white rounded-2xl p-4 shadow-xl border border-white/10 space-y-3.5">
+          <div className="flex items-center gap-2.5 border-b border-white/10 pb-3">
+            <div className="w-9 h-9 rounded-xl bg-amber-400 text-slate-950 flex items-center justify-center font-bold">
+              <CheckCircle2 size={20} />
             </div>
             <div>
-              <h2 className="text-xl font-black text-white">Réservation Enregistrée</h2>
-              <p className="text-xs text-amber-300 font-bold">Billet N° #{confirmedReservation.ticketId}</p>
+              <h2 className="text-sm font-bold text-white">réservation enregistrée</h2>
+              <p className="text-[11px] text-amber-300 font-mono font-semibold">billet n° #{confirmedReservation.ticketId}</p>
             </div>
           </div>
 
-          <div className="space-y-2 text-xs bg-slate-900/60 p-4 rounded-2xl border border-white/5">
-            <div className="flex justify-between py-1 border-b border-white/5">
-              <span className="text-slate-400">Nom complet :</span>
-              <span className="font-bold text-white">{confirmedReservation.fullName}</span>
+          <div className="space-y-1.5 text-[11px] bg-slate-900/60 p-3 rounded-xl border border-white/5">
+            <div className="flex justify-between py-0.5 border-b border-white/5">
+              <span className="text-slate-400">nom complet :</span>
+              <span className="font-semibold text-white">{confirmedReservation.fullName}</span>
             </div>
-            <div className="flex justify-between py-1 border-b border-white/5">
-              <span className="text-slate-400">Email :</span>
-              <span className="font-bold text-white">{confirmedReservation.email}</span>
+            <div className="flex justify-between py-0.5 border-b border-white/5">
+              <span className="text-slate-400">adresse mail :</span>
+              <span className="font-semibold text-white">{confirmedReservation.email}</span>
             </div>
-            <div className="flex justify-between py-1 border-b border-white/5">
-              <span className="text-slate-400">Téléphone :</span>
-              <span className="font-bold text-white">{confirmedReservation.phone}</span>
+            <div className="flex justify-between py-0.5 border-b border-white/5">
+              <span className="text-slate-400">numéro téléphone :</span>
+              <span className="font-semibold text-white">{confirmedReservation.phone}</span>
             </div>
-            <div className="flex justify-between py-1 border-b border-white/5">
-              <span className="text-slate-400">Bateau :</span>
-              <span className="font-bold text-amber-300">{confirmedReservation.ship}</span>
+            <div className="flex justify-between py-0.5 border-b border-white/5">
+              <span className="text-slate-400">bateau :</span>
+              <span className="font-semibold text-amber-300">{confirmedReservation.ship}</span>
             </div>
-            <div className="flex justify-between py-1 border-b border-white/5">
-              <span className="text-slate-400">Classe :</span>
-              <span className="font-bold text-white">{confirmedReservation.travelClass} ({confirmedReservation.amount}$)</span>
+            <div className="flex justify-between py-0.5 border-b border-white/5">
+              <span className="text-slate-400">classe :</span>
+              <span className="font-semibold text-white">{confirmedReservation.travelClass} ({confirmedReservation.amount}$)</span>
             </div>
-            <div className="flex justify-between py-1">
-              <span className="text-slate-400">Date du voyage :</span>
-              <span className="font-bold text-white">{confirmedReservation.travelDate}</span>
+            <div className="flex justify-between py-0.5">
+              <span className="text-slate-400">date du voyage :</span>
+              <span className="font-semibold text-white">{confirmedReservation.travelDate}</span>
             </div>
           </div>
 
           {/* Avertissement réglementaire : Validation admin obligatoire */}
-          <div className="p-4 bg-amber-500/15 border border-amber-400/40 rounded-2xl flex items-start gap-3">
-            <Lock size={20} className="text-amber-400 shrink-0 mt-0.5" />
-            <div className="text-xs space-y-1">
-              <p className="font-bold text-amber-300 uppercase tracking-wide">Validation administrative requise</p>
-              <p className="text-slate-200 leading-relaxed">
+          <div className="p-2.5 bg-amber-500/15 border border-amber-400/40 rounded-xl flex items-start gap-2">
+            <Lock size={15} className="text-amber-400 shrink-0 mt-0.5" />
+            <div className="text-[10px] space-y-0.5">
+              <p className="font-bold text-amber-300 uppercase tracking-tight">validation administrative requise</p>
+              <p className="text-slate-200 leading-normal">
                 Avant que le client n'ait son billet, l'administrateur doit le valider d'abord. Tant que le billet n'est pas validé chez l'administrateur, il ne peut être ni téléchargé ni émis.
               </p>
             </div>
           </div>
 
-          <div className="flex flex-col sm:flex-row gap-3 pt-2">
+          <div className="flex gap-2 pt-1">
             {onViewAllTickets && (
               <button
                 type="button"
                 onClick={onViewAllTickets}
-                className="flex-1 py-3 px-4 bg-amber-400 hover:bg-amber-300 text-slate-950 font-black rounded-xl text-xs uppercase tracking-wider transition cursor-pointer"
+                className="flex-1 py-2 px-3 bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold rounded-lg text-xs uppercase tracking-wider transition cursor-pointer"
               >
-                Consulter mes billets
+                mes billets
               </button>
             )}
             <button
               type="button"
               onClick={() => setConfirmedReservation(null)}
-              className="py-3 px-4 bg-white/10 hover:bg-white/15 text-white font-bold rounded-xl text-xs uppercase tracking-wider transition cursor-pointer"
+              className="py-2 px-3 bg-white/10 hover:bg-white/15 text-white font-medium rounded-lg text-xs uppercase tracking-wider transition cursor-pointer"
             >
-              Autre réservation
+              retour
             </button>
           </div>
         </div>
@@ -238,132 +254,175 @@ export function FerryhopperBookingEngine({
     );
   }
 
-  // --- FORMULAIRE DE RÉSERVATION SIMPLE & ÉPURÉ ---
+  // --- FORMULAIRE DE RÉSERVATION PETIT, COURT ET ÉPURÉ ---
   return (
-    <div className="w-full max-w-xl mx-auto py-8 px-4 text-left font-sans">
-      <div className="bg-[#001f35] text-white rounded-3xl p-6 sm:p-8 shadow-2xl border border-white/10 space-y-6">
+    <div className="w-full max-w-sm mx-auto py-4 px-2 text-left font-sans">
+      <div className="bg-[#001f35] text-white rounded-2xl p-4 sm:p-5 shadow-xl border border-white/10 space-y-3">
         
-        {/* Titre */}
-        <div className="border-b border-white/10 pb-4">
-          <h1 className="text-2xl font-black text-white tracking-tight">
-            Formulaire de Réservation
+        {/* Titre discret et compact */}
+        <div className="border-b border-white/10 pb-2 flex items-center justify-between">
+          <h1 className="text-sm font-bold text-white tracking-tight">
+            formulaire de réservation
           </h1>
+          <span className="text-[10px] text-amber-300 font-semibold bg-amber-400/10 px-2 py-0.5 rounded border border-amber-400/20">
+            {ship}
+          </span>
         </div>
 
         {errorMessage && (
-          <div className="p-3 bg-rose-500/20 border border-rose-500/40 rounded-xl text-rose-200 text-xs font-semibold flex items-center gap-2">
-            <AlertCircle size={16} className="shrink-0" />
+          <div className="p-2 bg-rose-500/20 border border-rose-500/40 rounded-lg text-rose-200 text-[11px] font-medium flex items-center gap-1.5">
+            <AlertCircle size={13} className="shrink-0" />
             <span>{errorMessage}</span>
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-2.5">
           
-          {/* Nom complet */}
+          {/* nom complet */}
           <div>
-            <label className="block text-xs font-bold text-slate-300 uppercase mb-1 flex items-center gap-1.5">
-              <User size={13} className="text-amber-400" />
-              <span>Nom complet</span>
+            <label className="block text-[12px] font-normal text-slate-300 mb-1 lowercase">
+              nom complet
             </label>
-            <input
-              type="text"
-              required
-              value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
-              placeholder="Ex: Patient Mugabo"
-              className="w-full px-4 py-3 bg-slate-900/80 border border-slate-700 rounded-xl text-sm font-semibold text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-400"
-            />
-          </div>
-
-          {/* Adresse mail */}
-          <div>
-            <label className="block text-xs font-bold text-slate-300 uppercase mb-1 flex items-center gap-1.5">
-              <Mail size={13} className="text-amber-400" />
-              <span>Adresse mail</span>
-            </label>
-            <input
-              type="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="Ex: passager@gmail.com"
-              className="w-full px-4 py-3 bg-slate-900/80 border border-slate-700 rounded-xl text-sm font-semibold text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-400"
-            />
-          </div>
-
-          {/* Numéro de téléphone */}
-          <div>
-            <label className="block text-xs font-bold text-slate-300 uppercase mb-1 flex items-center gap-1.5">
-              <Phone size={13} className="text-amber-400" />
-              <span>Numéro téléphone</span>
-            </label>
-            <input
-              type="tel"
-              required
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              placeholder="Ex: 0994102673"
-              className="w-full px-4 py-3 bg-slate-900/80 border border-slate-700 rounded-xl text-sm font-semibold text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-400"
-            />
-          </div>
-
-          {/* Classe (sélectionnée : 1ère Classe 11$, 2ème Classe 20$, 3ème Classe 27$, VIP 35$) */}
-          <div>
-            <label className="block text-xs font-bold text-slate-300 uppercase mb-1.5 flex items-center gap-1.5">
-              <Ticket size={13} className="text-amber-400" />
-              <span>Classe</span>
-            </label>
-            <div className="grid grid-cols-2 gap-2">
-              {(['1ère Classe', '2ème Classe', '3ème Classe', 'VIP'] as TravelClass[]).map((cls) => {
-                const price = classPricesUSD[cls];
-                const isSelected = travelClass === cls;
-                return (
-                  <button
-                    key={cls}
-                    type="button"
-                    onClick={() => setTravelClass(cls)}
-                    className={cn(
-                      "p-3 rounded-xl border text-left transition cursor-pointer flex flex-col justify-between",
-                      isSelected
-                        ? "bg-amber-400 text-slate-950 border-amber-400 font-black shadow-md ring-2 ring-amber-300/40"
-                        : "bg-slate-900/70 text-slate-200 border-slate-700 hover:border-slate-500"
-                    )}
-                  >
-                    <span className="text-xs font-black uppercase tracking-wider">{cls}</span>
-                    <span className={cn("text-base font-black mt-1", isSelected ? "text-slate-950" : "text-amber-300")}>
-                      ${price} USD
-                    </span>
-                  </button>
-                );
-              })}
+            <div className="relative flex items-center">
+              <input
+                type="text"
+                required
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                placeholder="ex: patient mugabo"
+                className="w-full h-8 sm:h-9 px-2.5 bg-slate-900/80 border border-slate-700 rounded-lg text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-amber-400"
+              />
+              <User size={13} className="absolute right-2.5 text-slate-500 pointer-events-none" />
             </div>
           </div>
 
-          {/* Date (calendrier) */}
+          {/* adresse mail */}
           <div>
-            <label className="block text-xs font-bold text-slate-300 uppercase mb-1 flex items-center gap-1.5">
-              <Calendar size={13} className="text-amber-400" />
-              <span>Date</span>
+            <label className="block text-[12px] font-normal text-slate-300 mb-1 lowercase">
+              adresse mail
             </label>
-            <input
-              type="date"
-              required
-              value={travelDate}
-              min={new Date().toISOString().split('T')[0]}
-              onChange={(e) => setTravelDate(e.target.value)}
-              className="w-full px-4 py-3 bg-slate-900/80 border border-slate-700 rounded-xl text-sm font-semibold text-white focus:outline-none focus:ring-2 focus:ring-amber-400"
-            />
+            <div className="relative flex items-center">
+              <input
+                type="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="ex: passager@gmail.com"
+                className="w-full h-8 sm:h-9 px-2.5 bg-slate-900/80 border border-slate-700 rounded-lg text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-amber-400"
+              />
+              <Mail size={13} className="absolute right-2.5 text-slate-500 pointer-events-none" />
+            </div>
           </div>
 
-          {/* Touche Réserver */}
-          <div className="pt-3">
+          {/* numéro téléphone */}
+          <div>
+            <label className="block text-[12px] font-normal text-slate-300 mb-1 lowercase">
+              numéro téléphone
+            </label>
+            <div className="relative flex items-center">
+              <input
+                type="tel"
+                required
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="ex: 0994102673"
+                className="w-full h-8 sm:h-9 px-2.5 bg-slate-900/80 border border-slate-700 rounded-lg text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-amber-400"
+              />
+              <Phone size={13} className="absolute right-2.5 text-slate-500 pointer-events-none" />
+            </div>
+          </div>
+
+          {/* classe avec petite onglet de sélection */}
+          <div className="relative" ref={classDropdownRef}>
+            <label className="block text-[12px] font-normal text-slate-300 mb-1 lowercase">
+              classe
+            </label>
+            <button
+              type="button"
+              onClick={() => setIsClassOpen(!isClassOpen)}
+              className="w-full h-8 sm:h-9 px-2.5 bg-slate-900/80 border border-slate-700 hover:border-slate-500 rounded-lg text-xs text-white flex items-center justify-between transition cursor-pointer"
+            >
+              <span className="font-semibold text-white">
+                {travelClass} ({classPricesUSD[travelClass]}$)
+              </span>
+              <span className="flex items-center gap-1 text-[11px] text-amber-300 bg-amber-400/20 px-2 py-0.5 rounded border border-amber-400/40">
+                <span>sélectionner</span>
+                <ChevronDown size={12} className={cn("transition-transform duration-200", isClassOpen && "rotate-180")} />
+              </span>
+            </button>
+
+            {/* Menu d'options déroulant pour la sélection de classe */}
+            {isClassOpen && (
+              <div className="absolute z-30 left-0 right-0 mt-1 bg-[#001726] border border-slate-700 rounded-lg shadow-2xl overflow-hidden py-1">
+                {(['1ère Classe', '2ème Classe', '3ème Classe', 'VIP'] as TravelClass[]).map((cls) => {
+                  const price = classPricesUSD[cls];
+                  const isSelected = travelClass === cls;
+                  return (
+                    <button
+                      key={cls}
+                      type="button"
+                      onClick={() => {
+                        setTravelClass(cls);
+                        setIsClassOpen(false);
+                      }}
+                      className={cn(
+                        "w-full px-3 py-1.5 text-xs flex items-center justify-between text-left hover:bg-white/10 transition cursor-pointer",
+                        isSelected ? "bg-amber-400 text-slate-950 font-bold hover:bg-amber-300" : "text-slate-200"
+                      )}
+                    >
+                      <span>{cls}</span>
+                      <span className={cn("font-bold text-[11px]", isSelected ? "text-slate-950" : "text-amber-300")}>
+                        {price}$
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* date avec petite onglet calendrier */}
+          <div>
+            <label className="block text-[12px] font-normal text-slate-300 mb-1 lowercase">
+              date
+            </label>
+            <div className="relative flex items-center">
+              <input
+                ref={dateInputRef}
+                type="date"
+                required
+                value={travelDate}
+                min={new Date().toISOString().split('T')[0]}
+                onChange={(e) => setTravelDate(e.target.value)}
+                className="w-full h-8 sm:h-9 pl-2.5 pr-28 bg-slate-900/80 border border-slate-700 rounded-lg text-xs text-white focus:outline-none focus:ring-1 focus:ring-amber-400 cursor-pointer"
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  try {
+                    (dateInputRef.current as any)?.showPicker?.();
+                  } catch {
+                    dateInputRef.current?.focus();
+                  }
+                }}
+                className="absolute right-1 px-2 py-1 bg-amber-400/20 hover:bg-amber-400/30 text-amber-300 border border-amber-400/40 rounded text-[11px] font-medium flex items-center gap-1 cursor-pointer transition"
+                title="Ouvrir le calendrier"
+              >
+                <Calendar size={12} className="text-amber-400" />
+                <span>calendrier</span>
+              </button>
+            </div>
+          </div>
+
+          {/* touche reserver */}
+          <div className="pt-2">
             <button
               type="submit"
               disabled={submitting}
-              className="w-full py-3.5 bg-amber-400 hover:bg-amber-300 active:scale-98 text-slate-950 font-black rounded-xl text-xs sm:text-sm uppercase tracking-wider transition shadow-lg cursor-pointer flex items-center justify-center gap-2"
+              className="w-full h-8 sm:h-9 bg-amber-400 hover:bg-amber-300 active:scale-98 text-slate-950 font-bold rounded-lg text-xs uppercase tracking-wider transition shadow-md cursor-pointer flex items-center justify-center gap-1.5"
             >
-              <Ticket size={16} />
-              <span>{submitting ? "Réservation en cours..." : "Réserver"}</span>
+              <Ticket size={14} />
+              <span>{submitting ? "réservation en cours..." : "réserver"}</span>
             </button>
           </div>
 
@@ -372,3 +431,4 @@ export function FerryhopperBookingEngine({
     </div>
   );
 }
+
