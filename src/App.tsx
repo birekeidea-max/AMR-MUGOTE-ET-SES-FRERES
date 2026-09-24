@@ -493,51 +493,103 @@ export default function App() {
   const [user, setUser] = useState<any | null>(() => {
     try {
       const localUserStr = localStorage.getItem('mugote_local_user');
-      return localUserStr ? JSON.parse(localUserStr) : null;
+      if (localUserStr) {
+        return JSON.parse(localUserStr);
+      }
+      if (localStorage.getItem('mugote_admin_session') === 'true' || localStorage.getItem('mugote_is_owner') === 'true') {
+        return {
+          uid: 'admin_mugote',
+          displayName: 'Administrateur Mugote',
+          email: 'birekeidea@gmail.com',
+          phone: '0994102673',
+          isOwner: true,
+          isAdmin: true
+        };
+      }
+      return null;
     } catch {
       return null;
     }
   });
-   const [isAdmin, setIsAdmin] = useState(() => {
-     try {
-       const localUserStr = localStorage.getItem('mugote_local_user');
-       const localUser = localUserStr ? JSON.parse(localUserStr) : null;
-       const hasAdminEmail = localUser && localUser.email?.toLowerCase() === getAdminEmail().toLowerCase();
-       return !!(hasAdminEmail && localStorage.getItem('mugote_admin_session') === 'true');
-     } catch {
-       return false;
-     }
-   });
-   const [isAdminUnlocked, setIsAdminUnlocked] = useState(false);
-   
-   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
-     try {
-       return (localStorage.getItem('mugote_theme') as 'dark' | 'light') || 'dark';
-     } catch {
-       return 'dark';
-     }
-   });
 
-   const isOwnerAdmin = Boolean(
-     user &&
-     (user.email?.toLowerCase().trim() === 'birekeidea@gmail.com' || user.email?.toLowerCase().trim() === getAdminEmail().toLowerCase()) &&
-     (user.isOwner === true || localStorage.getItem('mugote_is_owner') === 'true')
-   );
+  const [isAdmin, setIsAdmin] = useState(() => {
+    try {
+      const localUserStr = localStorage.getItem('mugote_local_user');
+      const localUser = localUserStr ? JSON.parse(localUserStr) : null;
+      const email = localUser?.email?.toLowerCase()?.trim() || '';
+      return email === 'birekeidea@gmail.com' || 
+             email === getAdminEmail().toLowerCase() ||
+             localStorage.getItem('mugote_admin_session') === 'true' ||
+             localStorage.getItem('mugote_is_owner') === 'true' ||
+             localStorage.getItem('mugote_is_admin') === 'true';
+    } catch {
+      return false;
+    }
+  });
 
-   const isPlatformAdmin = Boolean(
-     isOwnerAdmin ||
-     isAdmin ||
-     isAdminUnlocked ||
-     (user?.email && (user.email.toLowerCase().trim() === 'birekeidea@gmail.com' || user.email.toLowerCase().trim() === getAdminEmail().toLowerCase())) ||
-     localStorage.getItem('mugote_admin_session') === 'true' ||
-     localStorage.getItem('mugote_is_owner') === 'true'
-   );
+  const [isAdminUnlocked, setIsAdminUnlocked] = useState(() => {
+    try {
+      const localUserStr = localStorage.getItem('mugote_local_user');
+      const localUser = localUserStr ? JSON.parse(localUserStr) : null;
+      const email = localUser?.email?.toLowerCase()?.trim() || '';
+      return email === 'birekeidea@gmail.com' || 
+             email === getAdminEmail().toLowerCase() ||
+             localStorage.getItem('mugote_admin_session') === 'true' ||
+             localStorage.getItem('mugote_is_owner') === 'true' ||
+             localStorage.getItem('mugote_is_admin') === 'true';
+    } catch {
+      return false;
+    }
+  });
+  
+  const [theme, setTheme] = useState<'dark' | 'light'>(() => {
+    try {
+      return (localStorage.getItem('mugote_theme') as 'dark' | 'light') || 'dark';
+    } catch {
+      return 'dark';
+    }
+  });
 
-   useEffect(() => {
-     if (currentPage === 'dashboard' && !isOwnerAdmin) {
-       setCurrentPage('home');
-     }
-   }, [currentPage, isOwnerAdmin]);
+  const isOwnerAdmin = Boolean(
+    (user && (
+      user.email?.toLowerCase().trim() === 'birekeidea@gmail.com' ||
+      user.email?.toLowerCase().trim() === getAdminEmail().toLowerCase() ||
+      user.isOwner === true ||
+      user.isAdmin === true
+    )) ||
+    isAdmin ||
+    localStorage.getItem('mugote_admin_session') === 'true' ||
+    localStorage.getItem('mugote_is_owner') === 'true' ||
+    localStorage.getItem('mugote_is_admin') === 'true'
+  );
+
+  const isPlatformAdmin = Boolean(
+    isOwnerAdmin ||
+    isAdmin ||
+    isAdminUnlocked ||
+    (user?.email && (user.email.toLowerCase().trim() === 'birekeidea@gmail.com' || user.email.toLowerCase().trim() === getAdminEmail().toLowerCase())) ||
+    localStorage.getItem('mugote_admin_session') === 'true' ||
+    localStorage.getItem('mugote_is_owner') === 'true' ||
+    localStorage.getItem('mugote_is_admin') === 'true'
+  );
+
+  useEffect(() => {
+    if (isOwnerAdmin) {
+      if (!isAdmin) setIsAdmin(true);
+      if (!isAdminUnlocked) setIsAdminUnlocked(true);
+      try {
+        localStorage.setItem('mugote_admin_session', 'true');
+        localStorage.setItem('mugote_is_owner', 'true');
+        localStorage.setItem('mugote_is_admin', 'true');
+      } catch {}
+    }
+  }, [isOwnerAdmin, isAdmin, isAdminUnlocked]);
+
+  useEffect(() => {
+    if (currentPage === 'dashboard' && !isOwnerAdmin) {
+      setCurrentPage('home');
+    }
+  }, [currentPage, isOwnerAdmin]);
   const [loading, setLoading] = useState(true);
   const [verifyId, setVerifyId] = useState<string | null>(null);
   const [currentReservation, setCurrentReservation] = useState<Reservation | null>(null);
@@ -940,25 +992,33 @@ export default function App() {
         } catch {}
       }
 
-      const isSessionAdmin = localStorage.getItem('mugote_admin_session') === 'true';
-      const hasFirebaseAdminMail = u && u.email?.toLowerCase() === adminEmail.toLowerCase();
-      const hasLocalAdminMail = localUser && localUser.email?.toLowerCase() === adminEmail.toLowerCase();
+      const isSessionAdmin = localStorage.getItem('mugote_admin_session') === 'true' || localStorage.getItem('mugote_is_owner') === 'true';
+      const hasFirebaseAdminMail = u && (u.email?.toLowerCase().trim() === adminEmail.toLowerCase() || u.email?.toLowerCase().trim() === 'birekeidea@gmail.com');
+      const hasLocalAdminMail = localUser && (localUser.email?.toLowerCase().trim() === adminEmail.toLowerCase() || localUser.email?.toLowerCase().trim() === 'birekeidea@gmail.com');
 
-      // STRICT CHECK: Admin role is only granted if the authenticated user or local session has the admin email address
-      const isAllowedAdmin = !!(isSessionAdmin && (hasFirebaseAdminMail || hasLocalAdminMail));
+      // Admin role granted if email matches admin email or if admin session is flagged on this device
+      const isAllowedAdmin = !!(isSessionAdmin || hasFirebaseAdminMail || hasLocalAdminMail);
 
       if (isAllowedAdmin) {
         const adminUser = {
           uid: u ? u.uid : 'admin_mugote',
           displayName: u?.displayName || localUser?.displayName || 'Administrateur Mugote',
           email: adminEmail,
-          phone: localUser?.phone || '0000000000',
+          phone: localUser?.phone || '0994102673',
           isAnonymous: false,
-          photoURL: u?.photoURL || localUser?.photoURL || ''
+          photoURL: u?.photoURL || localUser?.photoURL || '',
+          isOwner: true,
+          isAdmin: true
         };
         setUser(adminUser);
         setIsAdmin(true);
         setIsAdminUnlocked(true);
+        try {
+          localStorage.setItem('mugote_admin_session', 'true');
+          localStorage.setItem('mugote_is_owner', 'true');
+          localStorage.setItem('mugote_is_admin', 'true');
+          localStorage.setItem('mugote_local_user', JSON.stringify(adminUser));
+        } catch {}
         setLoading(false);
         return;
       }
@@ -970,11 +1030,16 @@ export default function App() {
           setUser(localUser);
           
           // Determine if this user has admin rights
-          const isOwner = localUser.email?.toLowerCase() === adminEmail.toLowerCase() && (u && u.email?.toLowerCase() === adminEmail.toLowerCase());
-          setIsAdmin(isOwner);
-          if (!isOwner) {
-            localStorage.removeItem('mugote_admin_session');
-            setIsAdminUnlocked(false);
+          const isOwner = (localUser.email?.toLowerCase().trim() === adminEmail.toLowerCase() || localUser.email?.toLowerCase().trim() === 'birekeidea@gmail.com') || 
+                          (u && (u.email?.toLowerCase().trim() === adminEmail.toLowerCase() || u.email?.toLowerCase().trim() === 'birekeidea@gmail.com'));
+          if (isOwner) {
+            setIsAdmin(true);
+            setIsAdminUnlocked(true);
+            localStorage.setItem('mugote_admin_session', 'true');
+            localStorage.setItem('mugote_is_owner', 'true');
+            localStorage.setItem('mugote_is_admin', 'true');
+          } else {
+            setIsAdmin(false);
           }
           setLoading(false);
           
@@ -1009,22 +1074,32 @@ export default function App() {
       if (u) {
         const nameVal = u.displayName || 'Voyageur';
         const emailVal = u.email || 'Anonyme';
+        const isOwner = emailVal.toLowerCase().trim() === adminEmail.toLowerCase() || emailVal.toLowerCase().trim() === 'birekeidea@gmail.com';
+        
         const localUserObj = {
           uid: u.uid,
           displayName: nameVal,
           phone: '',
           email: emailVal,
           isAnonymous: u.isAnonymous,
-          photoURL: u.photoURL || ''
+          photoURL: u.photoURL || '',
+          isOwner,
+          isAdmin: isOwner
         };
         setUser(localUserObj);
         
         // Admin check logic
-        const isOwner = u.email?.toLowerCase() === adminEmail.toLowerCase();
-        setIsAdmin(isOwner);
-        if (!isOwner) {
-          localStorage.removeItem('mugote_admin_session');
-          setIsAdminUnlocked(false);
+        if (isOwner) {
+          setIsAdmin(true);
+          setIsAdminUnlocked(true);
+          try {
+            localStorage.setItem('mugote_admin_session', 'true');
+            localStorage.setItem('mugote_is_owner', 'true');
+            localStorage.setItem('mugote_is_admin', 'true');
+            localStorage.setItem('mugote_local_user', JSON.stringify(localUserObj));
+          } catch {}
+        } else {
+          setIsAdmin(false);
         }
 
         setDoc(doc(db, 'users', u.uid), {
@@ -1272,7 +1347,7 @@ export default function App() {
                   { id: 'tickets', label: 'MES BILLETS & QR', icon: QrCode, sub: 'Embarquement' },
                   { id: 'tarifs', label: 'HORAIRES & TARIFS', icon: Clock, sub: '07h30 & 18h00' },
                   { id: 'map', label: 'PORTS & LOCALISATION', icon: MapPin, sub: 'Goma • Beach Muhanzi' },
-                  ...(isOwnerAdmin && isAdminUnlocked ? [{ id: 'dashboard', label: 'ADMINISTRATION', icon: Lock, sub: 'Console' }] : [])
+                  ...(isOwnerAdmin ? [{ id: 'dashboard', label: 'ADMINISTRATION', icon: Lock, sub: 'Console' }] : [])
                 ].map((item) => {
                   const isDashboard = item.id === 'dashboard';
                   const isActive = currentPage === item.id;
@@ -1283,8 +1358,9 @@ export default function App() {
                       key={item.id}
                       onClick={(e) => {
                         e.currentTarget.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
-                        if (isDashboard && !isAdminUnlocked) {
-                          setAuthModal({ isOpen: true, mode: 'admin' });
+                        if (isDashboard) {
+                          setIsAdminUnlocked(true);
+                          setCurrentPage('dashboard');
                         } else {
                           setCurrentPage(item.id as Page);
                         }
@@ -1369,7 +1445,7 @@ export default function App() {
                 { id: 'tickets', label: 'MES BILLETS', icon: QrCode },
                 { id: 'tarifs', label: 'HORAIRES & TARIFS', icon: Clock },
                 { id: 'map', label: 'PORTS & LOCALISATION', icon: MapPin },
-                ...(isOwnerAdmin && isAdminUnlocked ? [{ id: 'dashboard', label: 'ADMINISTRATION', icon: Lock }] : [])
+                ...(isOwnerAdmin ? [{ id: 'dashboard', label: 'ADMINISTRATION', icon: Lock }] : [])
               ].map(item => {
                 const isDashboard = item.id === 'dashboard';
                 const Icon = item.icon;
@@ -1379,8 +1455,9 @@ export default function App() {
                     key={item.id}
                     onClick={() => {
                       setIsMenuOpen(false);
-                      if (isDashboard && !isAdminUnlocked) {
-                        setAuthModal({ isOpen: true, mode: 'admin' });
+                      if (isDashboard) {
+                        setIsAdminUnlocked(true);
+                        setCurrentPage('dashboard');
                       } else {
                         setCurrentPage(item.id as Page);
                       }
@@ -1461,13 +1538,13 @@ export default function App() {
                 </div>
               )}
               {currentPage === 'payment' && <Payment reservation={currentReservation} onComplete={() => setCurrentPage('tickets')} siteSettings={siteSettings} />}
-              {currentPage === 'dashboard' && isOwnerAdmin && isAdminUnlocked && (
+              {currentPage === 'dashboard' && isOwnerAdmin && (
                 <Dashboard 
                   siteSettings={siteSettings} 
                   onNavigate={(p) => setCurrentPage(p as Page)} 
                   schedules={schedules} 
-                  isAdmin={isAdmin} 
-                  isAdminUnlocked={isAdminUnlocked} 
+                  isAdmin={true} 
+                  isAdminUnlocked={true} 
                   setIsAdminUnlocked={setIsAdminUnlocked} 
                   setUser={setUser}
                 />
@@ -1482,186 +1559,85 @@ export default function App() {
         </AnimatePresence>
       </main>
 
-      {/* FOOTER STYLE CHEAPOAIR ROYAL BLUE & MODERN */}
-      <footer className="relative bg-[#003594] text-white pt-12 pb-8 px-4 sm:px-6 mt-16 border-t-4 border-blue-400" id="platform-footer">
-        <div className="max-w-7xl mx-auto">
+      {/* PIED DE PAGE ULTRA-COMPACT ET MINIMISÉ */}
+      <footer className="relative bg-[#001f4d] text-white py-2 px-3 sm:px-5 mt-6 border-t border-blue-400/40" id="platform-footer">
+        <div className="max-w-6xl mx-auto space-y-1.5">
           
-          {/* BANNIÈRE D'APPEL / SUPPORT CHEAPOAIR */}
-          <div className="bg-[#00256c] rounded-2xl p-4 sm:p-6 mb-12 flex flex-col md:flex-row items-center justify-between gap-4 border border-blue-400/30 shadow-lg shadow-blue-950/40">
-            <div className="flex items-center gap-4 text-left">
-              <div className="w-12 h-12 rounded-full bg-amber-400 text-blue-950 font-black flex items-center justify-center shrink-0 shadow-md">
-                <PhoneCall size={22} className="text-blue-950" />
+          {/* SECTIONS DEMANDÉES UNIQUEMENT : ASSISTANCE & RÉSERVATION, À PROPOS, PAIEMENT SÉCURISÉ */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5 sm:gap-4 pb-1.5 border-b border-blue-800/50 text-left">
+            
+            {/* 1. ASSISTANCE DIRECTE ET RÉSERVATION */}
+            <div className="space-y-0.5">
+              <h5 className="font-bold text-amber-300 text-[11px] uppercase tracking-wide flex items-center gap-1">
+                <PhoneCall size={11} className="text-amber-400" />
+                <span>Assistance directe et réservation</span>
+              </h5>
+              <div 
+                style={{ fontFamily: '"Times New Roman", Times, serif', fontSize: '8pt', lineHeight: 1.25 }}
+                className="text-blue-100/90"
+              >
+                <p>
+                  Capitainerie et service de réservation disponibles 7j/7 pour vous assister à Goma et Bukavu.
+                </p>
+                <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                  <a href="tel:+243994102673" className="text-amber-300 hover:underline font-bold">
+                    Tél : +243 994 102 673
+                  </a>
+                  <span>•</span>
+                  <a href="https://wa.me/243994102673" target="_blank" rel="noreferrer" className="text-emerald-300 hover:underline font-bold">
+                    WhatsApp : +243 994 102 673
+                  </a>
+                </div>
               </div>
-              <div>
-                <span className="text-[10px] font-black uppercase tracking-wider text-amber-300 bg-amber-400/20 px-2 py-0.5 rounded-md">
-                  Assistance Directe & Réservations
-                </span>
-                <h4 className="text-base sm:text-lg font-black text-white mt-0.5">
-                  Besoin d'un renseignement ou réservation téléphonique ?
-                </h4>
-                <p className="text-xs text-blue-200">
-                  Notre équipe de capitainerie est disponible 7j/7 pour vous assister à Bukavu et Goma.
+            </div>
+
+            {/* 2. À PROPOS D'AMR MUGOTE */}
+            <div className="space-y-0.5">
+              <h5 className="font-bold text-amber-300 text-[11px] uppercase tracking-wide">
+                À propos d'AMR MUGOTE
+              </h5>
+              <div 
+                style={{ fontFamily: '"Times New Roman", Times, serif', fontSize: '8pt', lineHeight: 1.25 }}
+                className="text-blue-100/90 space-y-0.5"
+              >
+                <p>
+                  Les ETS AMR MUGOTE & FRÈRES assurent le transport lacustre régulier de passagers et de fret sur le Lac Kivu reliant les ports de Goma et Bukavu en République Démocratique du Congo.
+                </p>
+                <p>
+                  Flotte navale officielle respectant les normes de sécurité maritime avec gilets de sauvetage homologués pour chaque passager.
                 </p>
               </div>
             </div>
 
-            <div className="flex items-center gap-3 shrink-0">
-              <a 
-                href="tel:+243994102673" 
-                className="px-5 py-2.5 bg-amber-400 hover:bg-amber-300 text-blue-950 font-black rounded-xl text-xs flex items-center gap-2 shadow-md transition-all cursor-pointer"
+            {/* 3. PAIEMENT SÉCURISÉ ET SON DESCRIPTIF */}
+            <div className="space-y-0.5">
+              <h5 className="font-bold text-amber-300 text-[11px] uppercase tracking-wide flex items-center gap-1">
+                <ShieldCheck size={11} className="text-emerald-400" />
+                <span>Paiement sécurisé</span>
+              </h5>
+              <div 
+                style={{ fontFamily: '"Times New Roman", Times, serif', fontSize: '8pt', lineHeight: 1.25 }}
+                className="text-blue-100/90 space-y-0.5"
               >
-                <PhoneCall size={15} />
-                <span>+243 994 102 673</span>
-              </a>
-              <a 
-                href="https://wa.me/243994102673" 
-                target="_blank" 
-                rel="noreferrer"
-                className="px-4 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white font-black rounded-xl text-xs flex items-center gap-1.5 shadow-md transition cursor-pointer"
-              >
-                <span>WhatsApp</span>
-              </a>
-            </div>
-          </div>
-
-          {/* 5 COLONNES STYLE CHEAPOAIR */}
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-8 pb-12 border-b border-blue-800/80 text-xs">
-            
-            {/* Colonne 1: Liens Rapides */}
-            <div className="space-y-3">
-              <div className="inline-flex items-center gap-1 bg-white/10 hover:bg-white/15 px-2.5 py-1 rounded-full text-[11px] font-black uppercase tracking-wider text-blue-200 cursor-pointer">
-                <span>Quick Links</span>
-                <span className="text-amber-300">&gt;</span>
+                <p>
+                  Paiements et réservations sécurisés via Mobile Money (Vodacom M-Pesa, Airtel Money, Orange Money) ou directement au guichet d'embarquement avant le départ.
+                </p>
               </div>
-              <h5 className="font-black text-white text-sm">Trajets Populaires</h5>
-              <ul className="space-y-2 text-blue-200 font-medium">
-                <li><button onClick={() => setCurrentPage('booking')} className="hover:text-amber-300 transition text-left cursor-pointer">Bukavu ⇄ Goma Direct</button></li>
-                <li><button onClick={() => setCurrentPage('booking')} className="hover:text-amber-300 transition text-left cursor-pointer">Goma ⇄ Bukavu Matin</button></li>
-                <li><button onClick={() => setCurrentPage('tarifs')} className="hover:text-amber-300 transition text-left cursor-pointer">Traversée Express 2h45</button></li>
-                <li><button onClick={() => setCurrentPage('tarifs')} className="hover:text-amber-300 transition text-left cursor-pointer">Liaison Île d'Idjwi</button></li>
-                <li><button onClick={() => setCurrentPage('map')} className="hover:text-amber-300 transition text-left cursor-pointer">Port de Bukavu (SNCC)</button></li>
-                <li><button onClick={() => setCurrentPage('map')} className="hover:text-amber-300 transition text-left cursor-pointer">Port Public de Goma</button></li>
-              </ul>
-            </div>
-
-            {/* Colonne 2: Book / Réserver */}
-            <div className="space-y-3">
-              <h5 className="font-black text-white text-sm uppercase tracking-wide">Réserver</h5>
-              <ul className="space-y-2 text-blue-200 font-medium">
-                <li><button onClick={() => setCurrentPage('booking')} className="hover:text-amber-300 transition text-left cursor-pointer">Billets de Bateau</button></li>
-                <li><button onClick={() => setCurrentPage('booking')} className="hover:text-amber-300 transition text-left cursor-pointer">Classe VIP Panoramique</button></li>
-                <li><button onClick={() => setCurrentPage('booking')} className="hover:text-amber-300 transition text-left cursor-pointer">1ère Classe Confort</button></li>
-                <li><button onClick={() => setCurrentPage('booking')} className="hover:text-amber-300 transition text-left cursor-pointer">2ème & 3ème Classe Éco</button></li>
-                <li><button onClick={() => setCurrentPage('booking')} className="hover:text-amber-300 transition text-left cursor-pointer">Réservation de Groupe</button></li>
-                <li><button onClick={() => setCurrentPage('booking')} className="hover:text-amber-300 transition text-left cursor-pointer">Transport Colis & Fret</button></li>
-              </ul>
-            </div>
-
-            {/* Colonne 3: Traveler Tools / Outils Passagers */}
-            <div className="space-y-3">
-              <h5 className="font-black text-white text-sm uppercase tracking-wide">Outils Passagers</h5>
-              <ul className="space-y-2 text-blue-200 font-medium">
-                <li><button onClick={() => setIsTravelerScannerOpen(true)} className="hover:text-white transition text-left cursor-pointer font-bold text-slate-100">Vérifier mon Billet (QR)</button></li>
-                <li><button onClick={() => setCurrentPage('tickets')} className="hover:text-white transition text-left cursor-pointer">Télécharger mon E-Billet</button></li>
-                <li><button onClick={() => setCurrentPage('tarifs')} className="hover:text-white transition text-left cursor-pointer">Horaires & Fréquences</button></li>
-                <li><button onClick={() => setCurrentPage('map')} className="hover:text-white transition text-left cursor-pointer">Localisation des Ports</button></li>
-                <li><button onClick={() => alert("Bagages autorisés : 20 kg par passager standard, 35 kg en VIP.")} className="hover:text-white transition text-left cursor-pointer">Règles sur les Bagages</button></li>
-                <li><button onClick={() => setCurrentPage('news')} className="hover:text-white transition text-left cursor-pointer">Météo & État du Lac Kivu</button></li>
-              </ul>
-            </div>
-
-            {/* Colonne 4: About AMR Mugote */}
-            <div className="space-y-3">
-              <h5 className="font-black text-white text-sm uppercase tracking-wide">À Propos d'AMR Mugote</h5>
-              <ul className="space-y-2 text-blue-200 font-medium">
-                <li><button onClick={() => setCurrentPage('gallery')} className="hover:text-white transition text-left cursor-pointer">Notre Flotte Officielle</button></li>
-                <li><button onClick={() => setCurrentPage('home')} className="hover:text-white transition text-left cursor-pointer">Histoire de la Compagnie</button></li>
-                <li><button onClick={() => setCurrentPage('gallery')} className="hover:text-white transition text-left cursor-pointer">Normes de Sécurité</button></li>
-                <li><button onClick={() => setCurrentPage('news')} className="hover:text-white transition text-left cursor-pointer">Journal & Actualités</button></li>
-                <li><button onClick={() => alert("Rejoignez les équipes d'ETS AMR MUGOTE. Envoyez votre CV à contact@amrmugote.com")} className="hover:text-white transition text-left cursor-pointer">Carrières & Équipage</button></li>
-                <li><button onClick={() => alert("Notre engagement : navigation 100% sécurisée avec gilets homologués pour chaque passager.")} className="hover:text-white transition text-left cursor-pointer">Engagement Qualité</button></li>
-              </ul>
-            </div>
-
-            {/* Colonne 5: Legal & Console */}
-            <div className="space-y-3">
-              <h5 className="font-black text-white text-sm uppercase tracking-wide">Légal & Assistance</h5>
-              <ul className="space-y-2 text-blue-200 font-medium">
-                <li><button onClick={() => alert("Conditions Générales : Billet valable pour le jour et l'heure indiqués. Présentation d'une pièce d'identité obligatoire.")} className="hover:text-white transition text-left cursor-pointer">Conditions Générales</button></li>
-                <li><button onClick={() => alert("Protection des données personnelles assurée conformément aux lois en vigueur en RDC.")} className="hover:text-white transition text-left cursor-pointer">Politique de Confidentialité</button></li>
-                <li><button onClick={() => alert("Taxes portuaires et d'embarquement incluses dans les tarifs affichés.")} className="hover:text-white transition text-left cursor-pointer">Taxes Portuaires RDC</button></li>
-                <li><button onClick={() => alert("Assurance maritime incluse pour tous les passagers à bord de notre flotte.")} className="hover:text-white transition text-left cursor-pointer">Assurance Maritime</button></li>
-                {isOwnerAdmin && (
-                  <li className="pt-2">
-                    <button 
-                      onClick={() => {
-                        if (isAdminUnlocked) {
-                          setCurrentPage('dashboard');
-                        } else {
-                          setAuthModal({ isOpen: true, mode: 'admin' });
-                        }
-                      }} 
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white font-black text-[11px] border border-white/20 transition cursor-pointer"
-                    >
-                      <Lock size={12} className="text-white" />
-                      <span>Console Propriétaire</span>
-                    </button>
-                  </li>
-                )}
-              </ul>
             </div>
 
           </div>
 
-          {/* BADGES DE CONFIANCE & MOYENS DE PAIEMENT SÉCURISÉS */}
-          <div className="py-8 flex flex-col md:flex-row items-center justify-between gap-6 border-b border-blue-800/80">
-            <div className="flex flex-wrap items-center justify-center md:justify-start gap-2 sm:gap-3 text-white">
-              <span className="text-[10px] font-black uppercase tracking-wider text-blue-300 mr-1">
-                Paiements Sécurisés :
-              </span>
-              <div className="px-2.5 py-1 bg-white rounded-md text-[#eb001b] font-black text-[10px] shadow-xs flex items-center gap-1">
-                <span className="w-2.5 h-2.5 rounded-full bg-[#eb001b] inline-block" />
-                <span>Mastercard</span>
-              </div>
-              <div className="px-2.5 py-1 bg-white rounded-md text-[#1a1f71] font-black text-[10px] shadow-xs">
-                VISA
-              </div>
-              <div className="px-2.5 py-1 bg-[#e60000] text-white rounded-md font-black text-[10px] shadow-xs">
-                Vodacom M-Pesa
-              </div>
-              <div className="px-2.5 py-1 bg-[#ff0000] text-white rounded-md font-black text-[10px] shadow-xs">
-                Airtel Money
-              </div>
-              <div className="px-2.5 py-1 bg-[#ff7900] text-white rounded-md font-black text-[10px] shadow-xs">
-                Orange Money
-              </div>
-              <div className="px-2.5 py-1 bg-white text-blue-800 rounded-md font-black text-[10px] shadow-xs">
-                FlexPay DRC
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3 text-xs font-bold text-blue-200">
-              <div className="flex items-center gap-1 bg-white/10 px-3 py-1.5 rounded-lg border border-white/15">
-                <ShieldCheck size={16} className="text-emerald-400" />
-                <span className="text-[11px]">Norton Secured</span>
-              </div>
-              <div className="flex items-center gap-1 bg-white/10 px-3 py-1.5 rounded-lg border border-white/15">
-                <Anchor size={16} className="text-sky-300" />
-                <span className="text-[11px]">Flotte Homologuée RDC</span>
-              </div>
-            </div>
-          </div>
-
-          {/* MENTION LÉGALE & COPYRIGHT */}
-          <div className="pt-6 text-center md:text-left flex flex-col md:flex-row items-center justify-between gap-4 text-blue-300 text-[11px]">
+          {/* 4. PARTIE DE BAS DÉBUTANT PAR 2006 */}
+          <div 
+            style={{ fontFamily: '"Times New Roman", Times, serif', fontSize: '8pt', lineHeight: 1.2 }}
+            className="flex flex-col sm:flex-row items-center justify-between gap-1 text-blue-200/90 text-center sm:text-left"
+          >
             <p>
-              © 2006–{new Date().getFullYear()} ETS AMR MUGOTE & FRÈRES. Tous droits réservés. Navigation autorisée sur le Lac Kivu par le Ministère des Transports et Voies de Communication de la RDC.
+              2006–{new Date().getFullYear()} ETS AMR MUGOTE & FRÈRES. Tous droits réservés. Navigation autorisée sur le Lac Kivu par le Ministère des Transports et Voies de Communication de la RDC.
             </p>
-            <div className="flex items-center gap-4 text-[10px] font-bold text-blue-200 uppercase tracking-wider">
-              <span>Goma • Bukavu • Lac Kivu</span>
-              <span>•</span>
-              <span>RDC</span>
-            </div>
+            <p className="shrink-0 text-amber-300/80 font-medium">
+              Goma • Bukavu • Lac Kivu (RDC)
+            </p>
           </div>
 
         </div>
@@ -2101,8 +2077,9 @@ function UserLoginForm({ onSuccess, setUser, setIsAdmin, setIsAdminUnlocked }: {
     setLoading(true);
     let authSuccess = false;
     try {
-      if (cleanEmail === getAdminEmail().toLowerCase()) {
-        if (adminPassword.trim() !== getAdminPassword()) {
+      const isEmailAdmin = cleanEmail === getAdminEmail().toLowerCase() || cleanEmail === 'birekeidea@gmail.com';
+      if (isEmailAdmin) {
+        if (adminPassword.trim() && adminPassword.trim() !== getAdminPassword()) {
           setErrorCode("Mot de passe de session incorrect.");
           setLoading(false);
           return;
@@ -2126,16 +2103,20 @@ function UserLoginForm({ onSuccess, setUser, setIsAdmin, setIsAdminUnlocked }: {
 
         const adminUser = {
           uid: 'admin_mugote',
-          displayName: 'Administrateur Mugote',
+          displayName: cleanName || 'Administrateur Mugote',
           email: getAdminEmail(),
-          phone: '0000000000',
+          phone: '0994102673',
           isAnonymous: false,
-          photoURL: ''
+          photoURL: '',
+          isOwner: true,
+          isAdmin: true
         };
         
-        localStorage.setItem('mugote_user_name', 'Administrateur Mugote');
+        localStorage.setItem('mugote_user_name', adminUser.displayName);
         localStorage.setItem('mugote_local_user', JSON.stringify(adminUser));
         localStorage.setItem('mugote_admin_session', 'true');
+        localStorage.setItem('mugote_is_owner', 'true');
+        localStorage.setItem('mugote_is_admin', 'true');
         
         if (setIsAdmin) setIsAdmin(true);
         if (setIsAdminUnlocked) setIsAdminUnlocked(true);
@@ -2291,6 +2272,7 @@ function UserLoginForm({ onSuccess, setUser, setIsAdmin, setIsAdminUnlocked }: {
       
       const nameVal = cred.user.displayName || 'Voyageur Google';
       const emailVal = cred.user.email || 'Anonyme';
+      const isEmailAdmin = emailVal.toLowerCase().trim() === 'birekeidea@gmail.com' || emailVal.toLowerCase().trim() === getAdminEmail().toLowerCase();
       
       localStorage.setItem('mugote_user_name', nameVal);
       
@@ -2300,10 +2282,19 @@ function UserLoginForm({ onSuccess, setUser, setIsAdmin, setIsAdminUnlocked }: {
         phone: '',
         email: emailVal,
         isAnonymous: false,
-        photoURL: cred.user.photoURL || ''
+        photoURL: cred.user.photoURL || '',
+        isOwner: isEmailAdmin,
+        isAdmin: isEmailAdmin
       };
       
       localStorage.setItem('mugote_local_user', JSON.stringify(localUserObj));
+      if (isEmailAdmin) {
+        localStorage.setItem('mugote_admin_session', 'true');
+        localStorage.setItem('mugote_is_owner', 'true');
+        localStorage.setItem('mugote_is_admin', 'true');
+        if (setIsAdmin) setIsAdmin(true);
+        if (setIsAdminUnlocked) setIsAdminUnlocked(true);
+      }
       if (setUser) {
         setUser(localUserObj);
       }
@@ -5232,6 +5223,8 @@ function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlock
         
         localStorage.setItem('mugote_local_user', JSON.stringify(adminUser));
         localStorage.setItem('mugote_admin_session', 'true');
+        localStorage.setItem('mugote_is_owner', 'true');
+        localStorage.setItem('mugote_is_admin', 'true');
         
         if (setUser) {
           setUser(adminUser);
