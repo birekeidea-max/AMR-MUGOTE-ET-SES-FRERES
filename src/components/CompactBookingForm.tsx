@@ -145,7 +145,7 @@ export function CompactBookingForm({
       phone: telephone.trim(),
       email: email.trim().toLowerCase(),
       itinerary: mappedItinerary,
-      ship: (boat as any) || 'Mugote 1',
+      ship: 'Bateau Mugote' as any,
       travelDate,
       departureTime: '07:30',
       travelClass: mappedClass,
@@ -443,33 +443,6 @@ export function CompactBookingForm({
                       onChange={(e) => setTravelDate(e.target.value)}
                       className="w-full pl-9 pr-3 py-2 bg-white border border-slate-300 rounded-xl text-xs text-slate-800 font-bold focus:ring-2 focus:ring-slate-800 focus:outline-none cursor-pointer shadow-2xs"
                     />
-                  </div>
-                </div>
-
-                {/* Bateau (Puces / badges cliquables Mugote 1, 2, 3) */}
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                    Bateau
-                  </label>
-                  <div className="grid grid-cols-3 gap-1.5">
-                    {['Mugote 1', 'Mugote 2', 'Mugote 3'].map((b) => {
-                      const isSelected = boat === b;
-                      return (
-                        <button
-                          key={b}
-                          type="button"
-                          onClick={() => setBoat(b)}
-                          className={`py-1.5 px-2 rounded-xl border text-center transition cursor-pointer flex items-center justify-center gap-1.5 text-xs font-black ${
-                            isSelected
-                              ? 'bg-[#0b132b] text-white border-[#0b132b] shadow-xs'
-                              : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
-                          }`}
-                        >
-                          <Ship size={13} className={isSelected ? 'text-white' : 'text-slate-700'} />
-                          <span>{b}</span>
-                        </button>
-                      );
-                    })}
                   </div>
                 </div>
 

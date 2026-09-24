@@ -1145,23 +1145,6 @@ export default function App() {
     );
   }
 
-  if (!user) {
-    return (
-      <div className="min-h-screen bg-[#070d1e] text-slate-100 flex items-center justify-center p-4">
-        <JsonLdSchema />
-        <PlatformAuthGate 
-          onSuccess={() => {
-            setCurrentPage('home');
-          }}
-          setUser={setUser}
-          setIsAdmin={setIsAdmin}
-          setIsAdminUnlocked={setIsAdminUnlocked}
-          siteSettings={siteSettings}
-        />
-      </div>
-    );
-  }
-
   return (
     <div className={cn(
       "min-h-screen flex flex-col font-sans relative transition-colors duration-200",
@@ -1169,7 +1152,7 @@ export default function App() {
     )}>
       <JsonLdSchema />
       
-      {/* HEADER SUPÉRIEUR EN BLEU MARINE (NAVIGATION RESTREINTE AU BLEU MARINE) */}
+      {/* HEADER SUPÉRIEUR EN BLEU MARINE */}
       <div className="sticky top-0 z-[100] bg-[#002b49] text-white border-b border-[#001f35] shadow-md">
         <header className="w-full py-2.5 sm:py-3">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 flex items-center justify-between gap-4">
@@ -1189,9 +1172,9 @@ export default function App() {
               </div>
             </div>
 
-            {/* Actions à droite : Onglet Thème (Sombre / Clair) + Mon Compte / Déconnexion & Menu Mobile */}
+            {/* Actions à droite : Thème + Connexion/Profil & Menu Mobile */}
             <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-               {/* Onglet Sélecteur de Thème (Sombre en Bleu de Nuit vs Clair) */}
+               {/* Sélecteur de Thème */}
                <button
                  type="button"
                  onClick={() => {
@@ -1200,7 +1183,7 @@ export default function App() {
                    localStorage.setItem('mugote_theme', nextTheme);
                  }}
                  className="flex items-center gap-1.5 px-3 py-2 bg-[#001f35] hover:bg-[#003154] text-white border border-slate-600 rounded-xl text-xs font-black transition cursor-pointer shadow-xs active:scale-95"
-                 title="Changer de thème (Sombre en Bleu de Nuit ou Clair)"
+                 title="Changer de thème"
                >
                  {theme === 'dark' ? (
                    <>
@@ -1215,31 +1198,43 @@ export default function App() {
                  )}
                </button>
 
-               {/* Profil / Mon compte */}
-               <div className="flex items-center gap-2 bg-[#001f35] p-1.5 rounded-2xl border border-slate-700">
-                 <div className="w-8 h-8 rounded-xl bg-white/10 text-white font-black text-xs flex items-center justify-center border border-white/20 shrink-0">
-                   {(user.displayName || user.email || 'U')[0].toUpperCase()}
-                 </div>
-                 <div className="hidden sm:block text-left px-1">
-                   <div className="flex items-center gap-1.5">
-                     <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                     <p className="text-[9px] font-black text-slate-300 uppercase tracking-wider">
-                       {isOwnerAdmin ? (isAdminUnlocked ? "Propriétaire" : "Admin Vérifié") : "Passager"}
+               {/* Profil utilisateur ou Petit bouton Se connecter */}
+               {user ? (
+                 <div className="flex items-center gap-2 bg-[#001f35] p-1.5 rounded-2xl border border-slate-700">
+                   <div className="w-8 h-8 rounded-xl bg-white/10 text-white font-black text-xs flex items-center justify-center border border-white/20 shrink-0">
+                     {(user.displayName || user.email || 'U')[0].toUpperCase()}
+                   </div>
+                   <div className="hidden sm:block text-left px-1">
+                     <div className="flex items-center gap-1.5">
+                       <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                       <p className="text-[9px] font-black text-slate-300 uppercase tracking-wider">
+                         {isOwnerAdmin ? (isAdminUnlocked ? "Propriétaire" : "Admin Vérifié") : "Passager"}
+                       </p>
+                     </div>
+                     <p className="text-xs font-black text-white truncate max-w-[130px]">
+                       {user.displayName || user.email?.split('@')[0]}
                      </p>
                    </div>
-                   <p className="text-xs font-black text-white truncate max-w-[130px]">
-                     {user.displayName || user.email?.split('@')[0]}
-                   </p>
+                   <button 
+                     onClick={logout} 
+                     className="flex items-center gap-1.5 px-3 py-2 bg-rose-950/80 hover:bg-rose-900 text-rose-200 border border-rose-800 rounded-xl text-xs font-black transition cursor-pointer shadow-xs active:scale-95"
+                     title="Déconnexion"
+                   >
+                     <LogOut size={15} />
+                     <span className="hidden sm:inline">Déconnexion</span>
+                   </button>
                  </div>
-                 <button 
-                   onClick={logout} 
-                   className="flex items-center gap-1.5 px-3 py-2 bg-rose-950/80 hover:bg-rose-900 text-rose-200 border border-rose-800 rounded-xl text-xs font-black transition cursor-pointer shadow-xs active:scale-95"
-                   title="Déconnexion"
+               ) : (
+                 <button
+                   type="button"
+                   onClick={() => setAuthModal({ isOpen: true, mode: 'user' })}
+                   className="flex items-center gap-1.5 px-3 sm:px-4 py-2 bg-amber-400 hover:bg-amber-300 active:scale-95 text-slate-950 font-black rounded-xl text-xs uppercase tracking-wider transition cursor-pointer shadow-md"
+                   title="Se connecter"
                  >
-                   <LogOut size={15} />
-                   <span className="hidden sm:inline">Déconnexion</span>
+                   <User size={15} />
+                   <span>Se connecter</span>
                  </button>
-               </div>
+               )}
 
                {/* Menu hamburger pour mobile */}
                <button 
@@ -1254,11 +1249,10 @@ export default function App() {
 
           {/* ========================================================= */}
           {/* BARRE DE NAVIGATION EN BLEU MARINE                        */}
-          {/* Les onglets d'administration sont réservés au propriétaire */}
+          {/* Dashboard masqué aux clients, Flotte & Journal retirés    */}
           {/* ========================================================= */}
           <div className="w-full border-t border-[#001f35] mt-2.5 pt-2 bg-[#00243d]">
             <div className="max-w-7xl mx-auto px-2 sm:px-4 flex items-center gap-1 sm:gap-2">
-              {/* Bouton défilement vers la gauche */}
               <button 
                 type="button"
                 onClick={() => scrollNav('left')}
@@ -1268,20 +1262,17 @@ export default function App() {
                 <ChevronLeft size={18} className="stroke-[2.5]" />
               </button>
 
-              {/* Conteneur défilant des onglets de grande taille */}
               <nav 
                 ref={navScrollRef}
                 className="flex-1 overflow-x-auto scroll-smooth no-scrollbar touch-pan-x flex items-center gap-2.5 py-1 px-1"
               >
                 {[
                   { id: 'home', label: 'ACCUEIL', icon: Anchor, sub: 'Goma ⇄ Bukavu' },
-                  { id: 'booking', label: 'RÉSERVER UN BILLET', icon: Ticket, highlight: true, sub: 'Formulaire Unique' },
+                  { id: 'booking', label: 'RÉSERVER UN BILLET', icon: Ticket, highlight: true, sub: 'Formulaire' },
                   { id: 'tickets', label: 'MES BILLETS & QR', icon: QrCode, sub: 'Embarquement' },
-                  { id: 'tarifs', label: 'HORAIRES (07H30 & 18H00)', icon: Clock, sub: 'Matin & Soir' },
-                  { id: 'gallery', label: 'LA FLOTTE', icon: Ship, sub: 'Mugote 1, 2, 3' },
+                  { id: 'tarifs', label: 'HORAIRES & TARIFS', icon: Clock, sub: '07h30 & 18h00' },
                   { id: 'map', label: 'PORTS & LOCALISATION', icon: MapPin, sub: 'Goma • Beach Muhanzi' },
-                  { id: 'news', label: 'JOURNAL & AVIS', icon: Newspaper, sub: 'Actualités' },
-                  ...(isOwnerAdmin ? [{ id: 'dashboard', label: 'ADMINISTRATION', icon: Lock, sub: 'Console Propriétaire' }] : [])
+                  ...(isOwnerAdmin && isAdminUnlocked ? [{ id: 'dashboard', label: 'ADMINISTRATION', icon: Lock, sub: 'Console' }] : [])
                 ].map((item) => {
                   const isDashboard = item.id === 'dashboard';
                   const isActive = currentPage === item.id;
@@ -1377,10 +1368,8 @@ export default function App() {
                 { id: 'booking', label: 'RÉSERVER UN BILLET', icon: Ticket },
                 { id: 'tickets', label: 'MES BILLETS', icon: QrCode },
                 { id: 'tarifs', label: 'HORAIRES & TARIFS', icon: Clock },
-                { id: 'gallery', label: 'NOTRE FLOTTE', icon: Ship },
                 { id: 'map', label: 'PORTS & LOCALISATION', icon: MapPin },
-                { id: 'news', label: 'JOURNAL & AVIS', icon: Newspaper },
-                ...(isOwnerAdmin ? [{ id: 'dashboard', label: 'ADMINISTRATION', icon: Lock }] : [])
+                ...(isOwnerAdmin && isAdminUnlocked ? [{ id: 'dashboard', label: 'ADMINISTRATION', icon: Lock }] : [])
               ].map(item => {
                 const isDashboard = item.id === 'dashboard';
                 const Icon = item.icon;
@@ -1413,7 +1402,7 @@ export default function App() {
             </div>
 
             <div className="pt-8 space-y-4">
-              {user && (
+              {user ? (
                 <div className="p-4 bg-white/5 rounded-2xl flex items-center justify-between border border-white/10">
                   <div>
                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">{isOwnerAdmin ? "PROFIL PROPRIÉTAIRE" : "PROFIL PASSAGER"}</p>
@@ -1423,6 +1412,18 @@ export default function App() {
                     <LogOut size={20} />
                   </button>
                 </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsMenuOpen(false);
+                    setAuthModal({ isOpen: true, mode: 'user' });
+                  }}
+                  className="w-full py-3.5 px-4 bg-amber-400 hover:bg-amber-300 text-slate-950 font-black rounded-2xl text-xs uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer shadow-md"
+                >
+                  <User size={16} />
+                  <span>Se connecter</span>
+                </button>
               )}
             </div>
           </motion.div>
@@ -1433,16 +1434,6 @@ export default function App() {
         <AnimatePresence mode="wait">
           {verifyId ? (
             <VerificationView id={verifyId} onClose={() => { setVerifyId(null); window.history.pushState({}, '', '/'); }} isAdmin={isAdmin} siteSettings={siteSettings} />
-          ) : !user ? (
-            <PlatformAuthGate 
-              onSuccess={() => {
-                setCurrentPage('home');
-              }}
-              setUser={setUser}
-              setIsAdmin={setIsAdmin}
-              setIsAdminUnlocked={setIsAdminUnlocked}
-              siteSettings={siteSettings}
-            />
           ) : (
             <>
               {currentPage === 'home' && (
@@ -1470,7 +1461,7 @@ export default function App() {
                 </div>
               )}
               {currentPage === 'payment' && <Payment reservation={currentReservation} onComplete={() => setCurrentPage('tickets')} siteSettings={siteSettings} />}
-              {currentPage === 'dashboard' && (
+              {currentPage === 'dashboard' && isOwnerAdmin && isAdminUnlocked && (
                 <Dashboard 
                   siteSettings={siteSettings} 
                   onNavigate={(p) => setCurrentPage(p as Page)} 
@@ -1483,9 +1474,7 @@ export default function App() {
               )}
               {currentPage === 'tickets' && <MyTickets user={user} siteSettings={siteSettings} onOpenScanner={() => setIsTravelerScannerOpen(true)} onLoginRequest={() => setAuthModal({ isOpen: true, mode: 'user' })} />}
               {currentPage === 'tarifs' && <SchedulesAndTariffs siteSettings={siteSettings} />}
-              {currentPage === 'news' && <NewsView />}
-              {currentPage === 'gallery' && <GalleryView siteSettings={siteSettings} />}
-              {currentPage === 'users' && <UsersListView />}
+              {currentPage === 'users' && isPlatformAdmin && <UsersListView />}
               {currentPage === 'map' && <LocalisationView isAdmin={isPlatformAdmin} />}
               <ChatWidget user={user} onNavigate={(p) => setCurrentPage(p as Page)} siteSettings={siteSettings} />
             </>
@@ -3854,6 +3843,7 @@ function Home({
 }
 
 const SHIP_CLASS_CAPACITIES: Record<ShipName, Record<TravelClass, number>> = {
+  'Bateau Mugote': { 'VIP': 20, '1ère Classe': 50, '2ème Classe': 120, '3ème Classe': 250 },
   'Mugote 1': { 'VIP': 10, '1ère Classe': 25, '2ème Classe': 60, '3ème Classe': 120 },
   'Mugote 2': { 'VIP': 15, '1ère Classe': 35, '2ème Classe': 80, '3ème Classe': 150 },
   'Mugote 3': { 'VIP': 20, '1ère Classe': 45, '2ème Classe': 100, '3ème Classe': 180 }
@@ -7759,61 +7749,37 @@ function MyTickets({
         )}
       </div>
 
-      {!user && (
-        <div className="bg-[#0b132b] text-white p-6 sm:p-8 rounded-3xl shadow-xl text-left border border-white/10">
-          <div className="max-w-2xl">
-            <span className="text-[10px] font-black uppercase tracking-widest text-white/80">Recherche Rapide Passager</span>
-            <h3 className="text-xl sm:text-2xl font-black uppercase tracking-tight mt-1 mb-2">Retrouvez votre réservation</h3>
-            <p className="text-xs text-slate-300 leading-relaxed mb-6">
-              Saisissez la référence de votre billet (ex: <span className="text-white font-mono font-bold underline">MUG-2026...</span>) ou votre numéro de téléphone pour afficher vos billets et télécharger vos PDF.
-            </p>
-
-            <form onSubmit={handleGuestSearch} className="flex flex-col sm:flex-row gap-3">
-              <input
-                type="text"
-                value={searchRef}
-                onChange={(e) => setSearchRef(e.target.value)}
-                placeholder="Référence billet ou Téléphone (+243...)"
-                className="flex-1 px-4 py-3 bg-white/10 border border-white/20 rounded-2xl text-white placeholder-slate-400 text-sm focus:outline-none focus:ring-2 focus:ring-white"
-              />
-              <button
-                type="submit"
-                disabled={isSearching}
-                className="px-6 py-3 bg-white hover:bg-slate-100 text-black font-black uppercase tracking-wider text-xs rounded-2xl transition-all shadow-lg active:scale-95 disabled:opacity-50 cursor-pointer"
-              >
-                {isSearching ? 'Recherche...' : 'Rechercher mon billet'}
-              </button>
-            </form>
-
-            {searchError && (
-              <p className="text-xs text-rose-400 font-bold mt-3">{searchError}</p>
-            )}
-
-            {onLoginRequest && (
-              <div className="mt-6 pt-4 border-t border-white/10 flex items-center justify-between">
-                <span className="text-xs text-slate-400">Vous possédez un compte ?</span>
-                <button
-                  type="button"
-                  onClick={onLoginRequest}
-                  className="text-xs font-black text-white hover:underline uppercase tracking-wider cursor-pointer"
-                >
-                  Se connecter à mon compte
-                </button>
-              </div>
-            )}
+      {!user ? (
+        <div className="bg-[#001f35] text-white p-8 sm:p-12 rounded-3xl shadow-2xl text-center max-w-lg mx-auto border border-white/10 space-y-6">
+          <div className="w-16 h-16 rounded-2xl bg-amber-400/20 text-amber-400 mx-auto flex items-center justify-center">
+            <Lock size={32} />
           </div>
+          <div className="space-y-2">
+            <h3 className="text-xl sm:text-2xl font-black uppercase tracking-tight">Connexion requise</h3>
+            <p className="text-xs text-slate-300 leading-relaxed">
+              Pour consulter vos billets de voyage et accéder à vos cartes d'embarquement, veuillez vous connecter à votre compte.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onLoginRequest}
+            className="w-full py-3.5 bg-amber-400 hover:bg-amber-300 text-slate-950 font-black rounded-xl text-xs sm:text-sm uppercase tracking-wider transition cursor-pointer shadow-lg active:scale-95 flex items-center justify-center gap-2"
+          >
+            <User size={16} />
+            <span>Se connecter pour consulter mes billets</span>
+          </button>
         </div>
-      )}
+      ) : (
+        <>
+          {/* Strict Administrative Separation Notice */}
+          <div className="bg-slate-100/90 border border-slate-300 rounded-2xl p-4 flex items-start gap-3 text-left">
+            <ShieldCheck size={18} className="text-slate-800 shrink-0 mt-0.5" />
+            <p className="text-[11px] font-medium text-slate-800 leading-relaxed">
+              <strong>Règle d'embarquement officiel :</strong> Vous pouvez vérifier le statut de votre billet ci-dessous à tout moment. Seul le <strong>compte administratif</strong> au quai peut scanner pour <strong>autoriser définitivement votre embarquement</strong> physique à bord du navire.
+            </p>
+          </div>
 
-      {/* Strict Administrative Separation Notice */}
-      <div className="bg-slate-100/90 border border-slate-300 rounded-2xl p-4 flex items-start gap-3 text-left">
-        <ShieldCheck size={18} className="text-slate-800 shrink-0 mt-0.5" />
-        <p className="text-[11px] font-medium text-slate-800 leading-relaxed">
-          <strong>Règle d'embarquement officiel :</strong> Vous pouvez vérifier le statut de votre billet ci-dessous à tout moment. Seul le <strong>compte administratif</strong> au quai peut scanner pour <strong>autoriser définitivement votre embarquement</strong> physique à bord du navire.
-        </p>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
         {loading ? (
           <div className="col-span-2 text-center py-10 sm:py-16 text-slate-400 animate-pulse uppercase text-[8px] sm:text-[10px] font-bold tracking-widest">Chargement...</div>
         ) : tickets.length === 0 ? (
@@ -7987,6 +7953,8 @@ function MyTickets({
         })
         )}
       </div>
+      </>
+      )}
     </motion.div>
   );
 }

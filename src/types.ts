@@ -1,7 +1,7 @@
 export type TravelClass = '1ère Classe' | '2ème Classe' | '3ème Classe' | 'VIP';
 export type ReservationStatus = 'PENDING' | 'VALIDATED' | 'REJECTED' | 'ANNULÉ';
 export type Itinerary = 'Bukavu-Goma' | 'Goma-Bukavu';
-export type ShipName = 'Mugote 1' | 'Mugote 2' | 'Mugote 3';
+export type ShipName = 'Bateau Mugote' | 'Mugote 1' | 'Mugote 2' | 'Mugote 3';
 
 export interface Reservation {
   id?: string;

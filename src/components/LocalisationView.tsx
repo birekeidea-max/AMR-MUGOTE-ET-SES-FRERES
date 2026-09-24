@@ -459,7 +459,7 @@ export default function LocalisationView({ isAdmin = false }: LocalisationViewPr
                 />
                 <div className="absolute top-3 right-3 bg-[#001233]/90 text-white backdrop-blur-md px-3 py-1.5 rounded-xl border border-white/20 text-[10px] font-semibold shadow-lg flex items-center gap-1.5">
                   <MapPin size={12} className="text-gold" />
-                  <span>Port AMR MUGOTE - Beach Muhanzi</span>
+                  <span>port amr mugote - beach muhanzi</span>
                 </div>
               </div>
             )}
