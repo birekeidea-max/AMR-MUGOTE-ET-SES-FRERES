@@ -530,20 +530,7 @@ export default function App() {
     }
   });
 
-  const [isAdminUnlocked, setIsAdminUnlocked] = useState(() => {
-    try {
-      const localUserStr = localStorage.getItem('mugote_local_user');
-      const localUser = localUserStr ? JSON.parse(localUserStr) : null;
-      const email = localUser?.email?.toLowerCase()?.trim() || '';
-      return email === 'birekeidea@gmail.com' || 
-             email === getAdminEmail().toLowerCase() ||
-             localStorage.getItem('mugote_admin_session') === 'true' ||
-             localStorage.getItem('mugote_is_owner') === 'true' ||
-             localStorage.getItem('mugote_is_admin') === 'true';
-    } catch {
-      return false;
-    }
-  });
+  const [isAdminUnlocked, setIsAdminUnlocked] = useState(false);
   
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
     try {
@@ -579,20 +566,13 @@ export default function App() {
   useEffect(() => {
     if (isOwnerAdmin) {
       if (!isAdmin) setIsAdmin(true);
-      if (!isAdminUnlocked) setIsAdminUnlocked(true);
       try {
-        localStorage.setItem('mugote_admin_session', 'true');
         localStorage.setItem('mugote_is_owner', 'true');
         localStorage.setItem('mugote_is_admin', 'true');
       } catch {}
     }
-  }, [isOwnerAdmin, isAdmin, isAdminUnlocked]);
+  }, [isOwnerAdmin, isAdmin]);
 
-  useEffect(() => {
-    if (currentPage === 'dashboard' && !isOwnerAdmin) {
-      setCurrentPage('home');
-    }
-  }, [currentPage, isOwnerAdmin]);
   const [loading, setLoading] = useState(true);
   const [verifyId, setVerifyId] = useState<string | null>(null);
   const [currentReservation, setCurrentReservation] = useState<Reservation | null>(null);
@@ -1350,7 +1330,7 @@ export default function App() {
                   { id: 'tickets', label: 'MES BILLETS & QR', icon: QrCode, sub: 'Embarquement' },
                   { id: 'tarifs', label: 'HORAIRES & TARIFS', icon: Clock, sub: '07h30 & 18h00' },
                   { id: 'map', label: 'PORTS & LOCALISATION', icon: MapPin, sub: 'Goma • Beach Muhanzi' },
-                  ...(isOwnerAdmin ? [{ id: 'dashboard', label: 'ADMINISTRATION', icon: Lock, sub: 'Console' }] : [])
+                  { id: 'dashboard', label: 'BASE DE DONNÉES', icon: Database, sub: 'Secret requis' }
                 ].map((item) => {
                   const isDashboard = item.id === 'dashboard';
                   const isActive = currentPage === item.id;
@@ -1362,7 +1342,7 @@ export default function App() {
                       onClick={(e) => {
                         e.currentTarget.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
                         if (isDashboard) {
-                          setIsAdminUnlocked(true);
+                          setIsAdminUnlocked(false);
                           setCurrentPage('dashboard');
                         } else {
                           setCurrentPage(item.id as Page);
@@ -1448,7 +1428,7 @@ export default function App() {
                 { id: 'tickets', label: 'MES BILLETS', icon: QrCode },
                 { id: 'tarifs', label: 'HORAIRES & TARIFS', icon: Clock },
                 { id: 'map', label: 'PORTS & LOCALISATION', icon: MapPin },
-                ...(isOwnerAdmin ? [{ id: 'dashboard', label: 'ADMINISTRATION', icon: Lock }] : [])
+                { id: 'dashboard', label: 'BASE DE DONNÉES & ADMIN', icon: Database }
               ].map(item => {
                 const isDashboard = item.id === 'dashboard';
                 const Icon = item.icon;
@@ -1459,7 +1439,7 @@ export default function App() {
                     onClick={() => {
                       setIsMenuOpen(false);
                       if (isDashboard) {
-                        setIsAdminUnlocked(true);
+                        setIsAdminUnlocked(false);
                         setCurrentPage('dashboard');
                       } else {
                         setCurrentPage(item.id as Page);
@@ -1541,13 +1521,13 @@ export default function App() {
                 </div>
               )}
               {currentPage === 'payment' && <Payment reservation={currentReservation} onComplete={() => setCurrentPage('tickets')} siteSettings={siteSettings} />}
-              {currentPage === 'dashboard' && isOwnerAdmin && (
+              {currentPage === 'dashboard' && (
                 <Dashboard 
                   siteSettings={siteSettings} 
                   onNavigate={(p) => setCurrentPage(p as Page)} 
                   schedules={schedules} 
-                  isAdmin={true} 
-                  isAdminUnlocked={true} 
+                  isAdmin={isPlatformAdmin} 
+                  isAdminUnlocked={isAdminUnlocked} 
                   setIsAdminUnlocked={setIsAdminUnlocked} 
                   setUser={setUser}
                 />
@@ -1638,9 +1618,24 @@ export default function App() {
             <p>
               2006–{new Date().getFullYear()} ETS AMR MUGOTE & FRÈRES. Tous droits réservés. Navigation autorisée sur le Lac Kivu par le Ministère des Transports et Voies de Communication de la RDC.
             </p>
-            <p className="shrink-0 text-amber-300/80 font-medium">
-              Goma • Bukavu • Lac Kivu (RDC)
-            </p>
+            <div className="flex items-center gap-3 shrink-0">
+              <span className="text-amber-300/80 font-medium">
+                Goma • Bukavu • Lac Kivu (RDC)
+              </span>
+              <span className="text-white/20">•</span>
+              <button 
+                type="button"
+                onClick={() => {
+                  setIsAdminUnlocked(false);
+                  setCurrentPage('dashboard');
+                }}
+                className="inline-flex items-center gap-1 text-[8pt] text-blue-300 hover:text-white transition-colors cursor-pointer opacity-80 hover:opacity-100"
+                title="Accès sécurisé à la Base de Données (Secret obligatoire)"
+              >
+                <Lock size={10} className="text-[#00ED64]" />
+                <span className="font-bold text-[#00ED64]">Base de Données</span>
+              </button>
+            </div>
           </div>
 
         </div>
@@ -2730,22 +2725,24 @@ function AdminAuthForm({ onSuccess, setIsAdmin, setIsAdminUnlocked, setUser }: {
 
   return (
     <div className="space-y-6">
-      <div className="bg-emerald-50 border border-emerald-100 p-4 rounded-2xl">
-        <p className="text-[10px] font-bold text-emerald-700 uppercase tracking-widest text-center leading-relaxed">
-          Accès Base de Données — Entrez votre Code d'accés
+      <div className="bg-emerald-50 border border-emerald-200 p-4 rounded-2xl">
+        <p className="text-[10px] font-black text-emerald-800 uppercase tracking-widest text-center leading-relaxed">
+          Accès Base de Données — Le Secret de la Base de Données est Obligatoire
         </p>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1 ml-1">Code de la Base de Données</label>
+          <label className="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1 ml-1">
+            Secret de la Base de Données (Clé Obligatoire)
+          </label>
           <input 
             required
             type="password" 
             value={password} 
             onChange={e => setPassword(e.target.value)}
-            className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl focus:outline-none focus:ring-2 ring-maritime/5 text-sm font-bold"
-            placeholder="••••••••"
+            className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 ring-[#00ED64] text-sm font-bold tracking-widest"
+            placeholder="Entrez le secret obligatoire..."
             autoFocus
           />
         </div>
@@ -2759,9 +2756,9 @@ function AdminAuthForm({ onSuccess, setIsAdmin, setIsAdminUnlocked, setUser }: {
         <button 
           type="submit"
           disabled={loading}
-          className="w-full py-5 bg-black text-white font-black rounded-2xl uppercase tracking-[0.2em] text-xs shadow-xl shadow-black/20 transform active:scale-95 transition-all disabled:opacity-50 cursor-pointer"
+          className="w-full py-5 bg-gradient-to-r from-[#001E2B] via-[#003B2B] to-[#00684A] text-[#00ED64] font-black rounded-2xl uppercase tracking-[0.2em] text-xs shadow-xl shadow-[#00ED64]/20 border border-[#00ED64]/40 transform active:scale-95 transition-all disabled:opacity-50 cursor-pointer"
         >
-          {loading ? "Vérification..." : "Accéder à la Console"}
+          {loading ? "Vérification du Secret..." : "Valider le Secret & Entrer"}
         </button>
       </form>
     </div>
@@ -5184,21 +5181,21 @@ function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlock
     setAdminLoading(true);
     
     try {
-      const cleanEmail = adminEmailInput.trim().toLowerCase();
+      const cleanEmail = adminEmailInput.trim().toLowerCase() || getAdminEmail().toLowerCase();
       const cleanPassword = adminPasswordInput.trim();
 
-      if (!cleanEmail) {
-        throw new Error("L'adresse e-mail administrative est requise.");
-      }
-
       if (!cleanPassword) {
-        throw new Error("La clé d'accès de sécurité de la base de données est requise.");
+        throw new Error("Pour tout accès dans la base de données, le secret de la base de données est obligatoire avant d'entrer dans la base de données.");
       }
 
-      const isValidEmail = cleanEmail === getAdminEmail().toLowerCase() || cleanEmail === 'birekeidea@gmail.com' || cleanEmail === 'admin@amrmugote.com';
+      const isValidEmail = !cleanEmail || cleanEmail === getAdminEmail().toLowerCase() || cleanEmail === 'birekeidea@gmail.com' || cleanEmail === 'admin@amrmugote.com';
       const isValidKey = cleanPassword === getAdminPassword() || cleanPassword === 'b012000b' || (Boolean((siteSettings as any)?.adminCode) && cleanPassword === (siteSettings as any)?.adminCode);
 
-      if (isValidEmail && isValidKey) {
+      if (!isValidKey) {
+        throw new Error("Accès refusé : Secret de la base de données incorrect. Le secret de la base de données est strictement obligatoire avant d'entrer.");
+      }
+
+      if (isValidKey) {
         // Authentifier également en arrière-plan avec Firebase Auth pour accorder les privilèges Firestore
         try {
           await signInWithEmailAndPassword(auth, getAdminEmail(), getAdminPassword());
@@ -5219,10 +5216,12 @@ function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlock
         const adminUser = {
           uid: 'admin_mugote',
           displayName: 'Administrateur Mugote',
-          email: getAdminEmail(),
+          email: cleanEmail || getAdminEmail(),
           phone: '0000000000',
           isAnonymous: false,
-          photoURL: ''
+          photoURL: '',
+          isOwner: true,
+          isAdmin: true
         };
         
         localStorage.setItem('mugote_local_user', JSON.stringify(adminUser));
@@ -5235,8 +5234,6 @@ function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlock
         }
         
         setIsAdminUnlocked(true);
-      } else {
-        throw new Error("Identifiants incorrects : Adresse e-mail ou clé d'accès de la base de données invalide.");
       }
     } catch (err: any) {
       console.error("Admin unlock auth failed:", err);
@@ -5584,30 +5581,41 @@ function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlock
 
       await updateDoc(doc(db, 'reservations', resId), updateFields);
 
-      // Synchronisation vers MongoDB Atlas
+      const targetRes = reservations.find(r => r.id === resId);
+
+      // Synchronisation vers MongoDB Atlas avec transmission des données passager pour notification
       try {
         await mongoApi.updateReservationStatus(resId, {
+          ...(targetRes || {}),
           status: action,
           ticketId: action === 'VALIDATED' ? ticketId : '',
-          validatedBy: auth.currentUser?.uid || 'Administration AMR MUGOTE'
+          validatedBy: auth.currentUser?.uid || 'Administration AMR MUGOTE',
+          email: targetRes?.email,
+          fullName: targetRes?.fullName,
+          phone: targetRes?.phone
         });
       } catch (mErr) {
         console.warn("Mongo status sync:", mErr);
       }
 
-      // Envoi automatique du rappel d'heure de départ par Gmail si un email est associé
-      if (action === 'VALIDATED') {
-        const targetRes = reservations.find(r => r.id === resId);
-        if (targetRes?.email && targetRes.email.includes('@')) {
-          try {
-            await mongoApi.sendDepartureReminder(ticketId || resId);
-          } catch (e) {
-            console.warn("Auto departure reminder notification note:", e);
-          }
+      // Envoi automatique de la confirmation par Gmail au passager dès que son billet est validé
+      if (action === 'VALIDATED' && targetRes?.email && targetRes.email.includes('@')) {
+        try {
+          await mongoApi.sendBookingConfirmation(ticketId || resId, targetRes.email, {
+            ...targetRes,
+            status: 'VALIDATED',
+            ticketId: ticketId || resId
+          });
+          console.log(`Confirmation email sent to ${targetRes.email}`);
+        } catch (e) {
+          console.warn("Auto validation confirmation notification note:", e);
         }
       }
 
-      alert(action === 'VALIDATED' ? "Billet validé avec succès !" : "Billet rejeté avec succès.");
+      alert(action === 'VALIDATED' 
+        ? (targetRes?.email ? `Billet validé avec succès ! Une confirmation officielle a été envoyée par email à ${targetRes.email}.` : "Billet validé avec succès !")
+        : "Billet rejeté avec succès."
+      );
     } catch (error) {
       console.error("Action failed", error);
       alert("Une erreur est survenue lors du traitement du billet. Veuillez réessayer.");
@@ -5747,24 +5755,24 @@ function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlock
             </div>
 
             <div className="text-center mb-6">
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-full text-[9px] font-black uppercase tracking-widest mb-2">
-                <Lock size={11} className="text-emerald-600" />
-                Accès Restreint & Chiffré AES-256
+              <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-[#001E2B] border border-[#00ED64]/50 text-[#00ED64] rounded-full text-[9px] font-black uppercase tracking-widest mb-2 shadow-md">
+                <Lock size={11} className="text-[#00ED64]" />
+                Accès Restreint • Secret Base de Données Obligatoire
               </span>
               <h3 className="text-2xl font-black uppercase tracking-tighter text-maritime">
-                Console d'Administration
+                Console & Base de Données
               </h3>
-              <p className="text-[11px] font-bold text-slate-500 mt-1 uppercase tracking-wider">
-                Vérification de la Clé d'Accès de la Base de Données
+              <p className="text-[11px] font-bold text-slate-600 mt-1 uppercase tracking-wider">
+                Le secret de la base de données est obligatoire avant d'entrer
               </p>
             </div>
 
             {/* Information relative dans l'accès de la base de données */}
-            <div className="mb-6 p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2.5 text-slate-700">
+            <div className="mb-6 p-4 rounded-2xl bg-emerald-50/60 border border-emerald-200 space-y-2.5 text-slate-700">
               <div className="flex items-center justify-between">
-                <span className="text-[10px] font-black uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
-                  <Info size={14} className="text-[#00684A]" />
-                  Informations de Sécurité Base de Données
+                <span className="text-[10px] font-black uppercase tracking-wider text-emerald-950 flex items-center gap-1.5">
+                  <ShieldCheck size={14} className="text-[#00684A]" />
+                  Règle de Sécurité : Secret Obligatoire
                 </span>
                 <button
                   type="button"
@@ -5775,23 +5783,23 @@ function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlock
                 </button>
               </div>
 
-              <p className="text-[11px] text-slate-600 leading-relaxed">
-                Chaque entrée dans la console d'administration requiert obligatoirement votre clé d'accès afin de verrouiller et protéger les données sensibles de la base de données (réservations, passagers, flotte et caisse).
+              <p className="text-[11px] text-slate-700 font-medium leading-relaxed">
+                Pour tout accès dans la base de données, <strong>le secret de la base de données est obligatoire avant d'entrer dans la base de données</strong>. Toutes les données (réservations, passagers, flotte, caisse et MongoDB Atlas) sont verrouillées tant que le secret n'a pas été validé.
               </p>
 
               {showAccessHelp && (
-                <div className="pt-2.5 border-t border-slate-200 text-[10px] space-y-1.5 text-slate-600">
+                <div className="pt-2.5 border-t border-emerald-200 text-[10px] space-y-1.5 text-slate-700">
                   <div className="flex items-start gap-2">
                     <span className="text-[#00684A] font-bold">1.</span>
                     <span><strong>Email Administrateur Autorisé :</strong> birekeidea@gmail.com</span>
                   </div>
                   <div className="flex items-start gap-2">
                     <span className="text-[#00684A] font-bold">2.</span>
-                    <span><strong>Clé d'Accès Principale :</strong> Clé confidentielle de sécurité délivrée à la direction.</span>
+                    <span><strong>Secret de la Base de Données :</strong> Clé secrète de sécurité confidentielle délivrée à la direction.</span>
                   </div>
                   <div className="flex items-start gap-2">
                     <span className="text-[#00684A] font-bold">3.</span>
-                    <span><strong>Sécurité Active :</strong> La session se reverrouille automatiquement dès la fermeture ou le changement de page.</span>
+                    <span><strong>Protection Automatique :</strong> La base de données se reverrouille dès que vous quittez ou fermez la page.</span>
                   </div>
                 </div>
               )}
@@ -5806,7 +5814,7 @@ function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlock
                 >
                   <Mail size={11} /> Pré-remplir l'Email Administrateur
                 </button>
-                <span className="text-[9px] font-bold text-slate-400">TLS/SSL 256-bit</span>
+                <span className="text-[9px] font-bold text-emerald-700">Chiffrement AES-256</span>
               </div>
             </div>
 
@@ -5831,7 +5839,7 @@ function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlock
                 <div className="flex items-center justify-between mb-1.5 ml-1">
                   <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 flex items-center gap-1.5">
                     <Key size={12} className="text-slate-400" />
-                    Clé d'Accès / Mot de Passe Base de Données
+                    Secret Obligatoire de la Base de Données
                   </label>
                   <button
                     type="button"
@@ -5843,7 +5851,7 @@ function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlock
                 </div>
                 <input 
                   type={showPassword ? "text" : "password"}
-                  placeholder="••••••••••••"
+                  placeholder="Entrez le secret de la base de données..."
                   value={adminPasswordInput}
                   onChange={e => setAdminPasswordInput(e.target.value)}
                   className="w-full px-5 py-3.5 bg-slate-50 border-2 border-slate-200 focus:border-[#00684A] focus:bg-white rounded-2xl focus:outline-none text-sm font-bold text-slate-800 transition-all placeholder:text-slate-400 tracking-wider"
@@ -5866,12 +5874,12 @@ function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlock
                 {adminLoading ? (
                   <>
                     <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1, ease: 'linear' }} className="border-2 border-white/33 border-t-white w-4 h-4 rounded-full" />
-                    Vérification de la Clé de Sécurité...
+                    Vérification du Secret de la Base de Données...
                   </>
                 ) : (
                   <>
                     <Key size={15} className="text-[#00ED64]" />
-                    <span>Valider la Clé & Ouvrir la Base de Données</span>
+                    <span>Valider le Secret & Entrer dans la Base de Données</span>
                   </>
                 )}
               </button>
@@ -5887,21 +5895,26 @@ function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlock
                   <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
                 </span>
                 <div className="text-left">
-                  <h2 className="text-sm font-black tracking-tight uppercase text-black">Console d'Administration & Données</h2>
+                  <h2 className="text-sm font-black tracking-tight uppercase text-black">Console d'Administration & Base de Données</h2>
                   <p className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider">
-                    Session Authentifiée ({adminEmailInput || getAdminEmail()}) • Base de Données Déverrouillée
+                    Session Déverrouillée ({adminEmailInput || getAdminEmail()}) • Base de Données Accessible
                   </p>
                 </div>
               </div>
 
               <div className="flex items-center gap-3">
                 <button
-                  onClick={() => setIsAdminUnlocked(false)}
+                  onClick={() => {
+                    setIsAdminUnlocked(false);
+                    try {
+                      localStorage.removeItem('mugote_admin_session');
+                    } catch {}
+                  }}
                   className="flex items-center gap-1.5 px-4 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer shadow-sm active:scale-95"
-                  title="Verrouiller immédiatement la console pour exiger à nouveau la clé d'accès"
+                  title="Verrouiller immédiatement la base de données"
                 >
                   <Lock size={12} />
-                  <span>Verrouiller la console</span>
+                  <span>Verrouiller la base de données</span>
                 </button>
               </div>
             </div>
@@ -6199,6 +6212,7 @@ function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlock
                             try {
                               if (newStatus === 'BOARDED') {
                                 const payload: any = {
+                                  ...res,
                                   status: 'VALIDATED',
                                   boardingStatus: 'BOARDED',
                                   boarded: true,
@@ -6206,13 +6220,20 @@ function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlock
                                   isUsed: true,
                                   usedAt: now,
                                   ticketId,
-                                  validatedAt: res.validatedAt || now
+                                  validatedAt: res.validatedAt || now,
+                                  email: res.email,
+                                  fullName: res.fullName,
+                                  phone: res.phone
                                 };
                                 await updateDoc(doc(db, 'reservations', res.id!), payload);
                                 try {
                                   await mongoApi.updateReservationStatus(res.id!, payload);
                                 } catch (mErr) {
                                   console.warn("Mongo status sync:", mErr);
+                                }
+
+                                if (res.email && res.email.includes('@')) {
+                                  mongoApi.sendBookingConfirmation(ticketId, res.email, payload).catch(e => console.warn("Boarding email trigger note:", e));
                                 }
                               } else {
                                 const revertPayload: any = {
@@ -6274,6 +6295,7 @@ function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlock
                                     const ticketId = res.ticketId || `AMR-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
                                     try {
                                       const payload: any = {
+                                        ...res,
                                         status: 'VALIDATED',
                                         boardingStatus: 'BOARDED',
                                         boarded: true,
@@ -6281,7 +6303,10 @@ function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlock
                                         isUsed: true,
                                         usedAt: now,
                                         ticketId,
-                                        validatedAt: now
+                                        validatedAt: now,
+                                        email: res.email,
+                                        fullName: res.fullName,
+                                        phone: res.phone
                                       };
                                       await updateDoc(doc(db, 'reservations', res.id!), payload);
                                       try {
@@ -6289,7 +6314,15 @@ function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlock
                                       } catch (mErr) {
                                         console.warn("Mongo sync note:", mErr);
                                       }
-                                      alert("Billet lâché et validé dans la base de données ! Le statut du passager est maintenant embarqué.");
+
+                                      if (res.email && res.email.includes('@')) {
+                                        mongoApi.sendBookingConfirmation(ticketId, res.email, payload).catch(e => console.warn("Direct boarding email note:", e));
+                                      }
+
+                                      alert(res.email 
+                                        ? `Billet lâché et validé ! Une confirmation a été envoyée par email à ${res.email}. Le passager est maintenant embarqué.`
+                                        : "Billet lâché et validé dans la base de données ! Le statut du passager est maintenant embarqué."
+                                      );
                                     } catch (err: any) {
                                       alert("Erreur lors du lâcher du billet: " + err.message);
                                     }
@@ -6322,6 +6355,7 @@ function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlock
                                       const ticketId = res.ticketId || `AMR-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
                                       try {
                                         const payload: any = {
+                                          ...res,
                                           status: 'VALIDATED',
                                           boardingStatus: 'BOARDED',
                                           boarded: true,
@@ -6329,7 +6363,10 @@ function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlock
                                           isUsed: true,
                                           usedAt: now,
                                           ticketId,
-                                          validatedAt: res.validatedAt || now
+                                          validatedAt: res.validatedAt || now,
+                                          email: res.email,
+                                          fullName: res.fullName,
+                                          phone: res.phone
                                         };
                                         await updateDoc(doc(db, 'reservations', res.id!), payload);
                                         try {
@@ -6337,7 +6374,15 @@ function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlock
                                         } catch (mErr) {
                                           console.warn("Mongo sync note:", mErr);
                                         }
-                                        alert("Passager lâché à bord et statut mis à jour dans la base de données !");
+
+                                        if (res.email && res.email.includes('@')) {
+                                          mongoApi.sendBookingConfirmation(ticketId, res.email, payload).catch(e => console.warn("Lâcher passager email note:", e));
+                                        }
+
+                                        alert(res.email
+                                          ? `Passager lâché à bord ! Une confirmation a été envoyée par email à ${res.email}.`
+                                          : "Passager lâché à bord et statut mis à jour dans la base de données !"
+                                        );
                                       } catch (err: any) {
                                         alert("Erreur lors de l'enregistrement de l'embarquement : " + err.message);
                                       }
@@ -8373,14 +8418,23 @@ function VerificationView({ id, onClose, isAdmin, siteSettings }: { id: string, 
         usedAt: updateTimestamp,
         validatedAt: res.validatedAt || updateTimestamp
       });
-      await mongoApi.updateReservationStatus(res.id, {
+      const payload: any = {
+        ...res,
         status: 'VALIDATED',
         ticketId,
         boarded: true,
         boardingStatus: 'BOARDED',
         boardedAt: updateTimestamp,
-        isUsed: true
-      });
+        isUsed: true,
+        email: res.email,
+        fullName: res.fullName,
+        phone: res.phone
+      };
+      await mongoApi.updateReservationStatus(res.id, payload);
+
+      if (res.email && res.email.includes('@')) {
+        mongoApi.sendBookingConfirmation(ticketId, res.email, payload).catch(e => console.warn("Admin authorize email note:", e));
+      }
 
       setRes(prev => prev ? {
         ...prev,
@@ -8933,10 +8987,21 @@ function AdminScannerView({ reservations }: AdminScannerViewProps) {
         boardingStatus: 'BOARDED',
         boardedAt: updateTimestamp
       });
-      await mongoApi.updateReservationStatus(ticket.id, {
+      const payload: any = {
+        ...ticket,
         boarded: true,
-        status: 'VALIDATED'
-      });
+        boardingStatus: 'BOARDED',
+        boardedAt: updateTimestamp,
+        status: 'VALIDATED',
+        email: ticket.email,
+        fullName: ticket.fullName,
+        phone: ticket.phone
+      };
+      await mongoApi.updateReservationStatus(ticket.id, payload);
+
+      if (ticket.email && ticket.email.includes('@')) {
+        mongoApi.sendBookingConfirmation(ticket.ticketId || ticket.id, ticket.email, payload).catch(e => console.warn("Scanner boarding email note:", e));
+      }
 
       const updatedTicket = {
         ...ticket,
@@ -8946,7 +9011,10 @@ function AdminScannerView({ reservations }: AdminScannerViewProps) {
 
       setScannedRes(updatedTicket);
       setScanStatus('success');
-      setStatusMessage("ACCÈS ACCORDÉ PAR L'ADMINISTRATION : Embarquement validé avec succès ! Passager lâché à bord.");
+      setStatusMessage(ticket.email
+        ? `ACCÈS ACCORDÉ : Embarquement validé ! Passager lâché à bord et confirmation envoyée par Gmail à ${ticket.email}.`
+        : "ACCÈS ACCORDÉ PAR L'ADMINISTRATION : Embarquement validé avec succès ! Passager lâché à bord."
+      );
       setScannedList(prev => [updatedTicket, ...prev.filter(x => x.id !== updatedTicket.id)]);
       playBeep(true);
     } catch (err: any) {

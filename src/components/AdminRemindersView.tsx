@@ -187,7 +187,7 @@ export function AdminRemindersView({ reservations, onRefresh }: AdminRemindersVi
     try {
       setSendingConfirmId(targetId);
       setSingleResult(null);
-      const result = await mongoApi.sendBookingConfirmation(targetId, res.email);
+      const result = await mongoApi.sendBookingConfirmation(targetId, res.email, res);
       setSingleResult({
         id: targetId,
         success: result.success,

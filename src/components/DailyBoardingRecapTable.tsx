@@ -278,13 +278,24 @@ export function DailyBoardingRecapTable({
         console.warn("Firestore updateDoc note:", fErr);
       }
 
-      // 2. Mirror in MongoDB Atlas
+      // 2. Mirror in MongoDB Atlas & trigger email confirmation
       try {
         const mongoPayload: any = {
+          ...reservation,
           boardingStatus: nextStatus,
           boarded: nextStatus === 'BOARDED',
           boardedAt: boardedTime || undefined,
-          isUsed: nextStatus === 'BOARDED'
+          isUsed: nextStatus === 'BOARDED',
+          email: reservation.email,
+          fullName: reservation.fullName,
+          lastName: reservation.lastName,
+          phone: reservation.phone,
+          itinerary: reservation.itinerary,
+          ship: reservation.ship,
+          travelDate: reservation.travelDate,
+          departureTime: reservation.departureTime,
+          travelClass: reservation.travelClass,
+          amount: reservation.amount
         };
         if (nextStatus === 'BOARDED') {
           mongoPayload.status = 'VALIDATED';
@@ -292,6 +303,13 @@ export function DailyBoardingRecapTable({
           mongoPayload.validatedAt = reservation.validatedAt || boardedTime;
         }
         await mongoApi.updateReservationStatus(resId, mongoPayload);
+
+        // Confirmation automatique par Gmail dès que l'administrateur lâche le passager
+        if (nextStatus === 'BOARDED' && reservation.email && reservation.email.includes('@')) {
+          mongoApi.sendBookingConfirmation(ticketId, reservation.email, mongoPayload).catch(e => {
+            console.warn("Direct email confirmation trigger note:", e);
+          });
+        }
       } catch (mErr) {
         console.warn("MongoDB Atlas update mirror note:", mErr);
       }
@@ -357,6 +375,7 @@ export function DailyBoardingRecapTable({
       try {
         const ticketId = r.ticketId || `AMR-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
         const updatePayload: any = {
+          ...r,
           boardingStatus: 'BOARDED',
           boarded: true,
           boardedAt: now,
@@ -364,10 +383,18 @@ export function DailyBoardingRecapTable({
           usedAt: now,
           status: 'VALIDATED',
           ticketId,
-          validatedAt: r.validatedAt || now
+          validatedAt: r.validatedAt || now,
+          email: r.email,
+          fullName: r.fullName,
+          phone: r.phone
         };
         await updateDoc(doc(db, 'reservations', resId), updatePayload);
         await mongoApi.updateReservationStatus(resId, updatePayload).catch(() => null);
+
+        if (r.email && r.email.includes('@')) {
+          mongoApi.sendBookingConfirmation(ticketId, r.email, updatePayload).catch(() => null);
+        }
+
         successCount++;
       } catch (err) {
         console.warn(`Error boarding ${resId}:`, err);

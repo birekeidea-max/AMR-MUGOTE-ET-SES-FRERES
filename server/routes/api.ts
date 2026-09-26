@@ -558,39 +558,69 @@ router.put('/reservations/:id', async (req: Request, res: Response) => {
     }
 
     if (!reservation) {
+      try {
+        const ticketId = updateData.ticketId || (id.startsWith('AMR-') ? id : `AMR-${Math.random().toString(36).substring(2, 8).toUpperCase()}`);
+        reservation = await Reservation.create({
+          ...updateData,
+          ticketId,
+          firestoreId: id,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        });
+      } catch (createErr) {
+        console.warn("Could not create reservation in MongoDB during status update:", createErr);
+      }
+    }
+
+    if (!reservation && !updateData.email) {
       return res.status(404).json({ error: "Réservation introuvable." });
     }
 
-    // Si le statut passe à VALIDATED, envoyer automatiquement la confirmation et le billet officiel par email
-    if (updateData.status === 'VALIDATED' && reservation.email && reservation.email.includes('@')) {
+    // Détection de validation ou de lâcher / embarquement
+    const isValidationOrBoarding = 
+      updateData.status === 'VALIDATED' || 
+      updateData.boardingStatus === 'BOARDED' || 
+      updateData.boarded === true ||
+      updateData.isUsed === true;
+
+    const recipientEmail = (updateData.email || reservation?.email || req.body?.email || '').trim();
+
+    // Dès que l'administrateur valide le billet ou lâche le passager, envoyer directement la confirmation par Gmail
+    if (isValidationOrBoarding && recipientEmail && recipientEmail.includes('@')) {
       emailService.sendBookingConfirmation({
-        fullName: reservation.fullName,
-        lastName: reservation.lastName,
-        email: reservation.email,
-        phone: reservation.phone,
-        ticketId: reservation.ticketId || updateData.ticketId,
-        itinerary: reservation.itinerary,
-        ship: reservation.ship,
-        travelDate: reservation.travelDate,
-        departureTime: reservation.departureTime,
-        travelClass: reservation.travelClass,
-        passengersCount: reservation.passengersCount,
-        amount: reservation.amount,
-        status: 'VALIDATED'
+        fullName: updateData.fullName || reservation?.fullName || 'Passager',
+        lastName: updateData.lastName || reservation?.lastName,
+        email: recipientEmail,
+        phone: updateData.phone || reservation?.phone,
+        ticketId: updateData.ticketId || reservation?.ticketId || id,
+        itinerary: updateData.itinerary || reservation?.itinerary || 'Goma ⇄ Bukavu',
+        ship: updateData.ship || reservation?.ship || 'Mugote 1',
+        travelDate: updateData.travelDate || reservation?.travelDate || new Date().toISOString().split('T')[0],
+        departureTime: updateData.departureTime || reservation?.departureTime || '07h30',
+        travelClass: updateData.travelClass || reservation?.travelClass || '2ème Classe',
+        passengersCount: updateData.passengersCount || reservation?.passengersCount || 1,
+        amount: updateData.amount || reservation?.amount || 20,
+        status: updateData.status || reservation?.status || 'VALIDATED',
+        boardingStatus: updateData.boardingStatus || (updateData.boarded ? 'BOARDED' : reservation?.boardingStatus),
+        boarded: updateData.boarded === true || updateData.boardingStatus === 'BOARDED' || reservation?.boarded === true
       }).then(async (cRes) => {
         if (cRes.success) {
-          await Reservation.updateOne({ _id: reservation._id }, {
-            $set: { confirmationEmailSent: true, confirmationEmailSentAt: new Date() }
-          });
-          console.log(`✅ [MongoDB API] Billet électronique validé envoyé par email à ${reservation.email}`);
+          if (reservation?._id) {
+            await Reservation.updateOne({ _id: reservation._id }, {
+              $set: { confirmationEmailSent: true, confirmationEmailSentAt: new Date() }
+            });
+          }
+          console.log(`✅ [MongoDB API] Email officiel de confirmation / lâcher de passager envoyé à ${recipientEmail}`);
+        } else {
+          console.log(`ℹ️ [MongoDB API] Notification email (${cRes.error || 'simulé'}) pour ${recipientEmail}`);
         }
       }).catch(err => console.warn("Validated reservation email notice:", err));
     }
 
     // Diffusion de l'événement Real-Time
-    realtimeHub.emitEvent('reservation:updated', 'updated', reservation, 'reservations');
+    realtimeHub.emitEvent('reservation:updated', 'updated', reservation || updateData, 'reservations');
 
-    res.json(reservation);
+    res.json(reservation || updateData);
   } catch (err: any) {
     console.error("Error updating reservation in MongoDB:", err);
     res.status(500).json({ error: err.message, stack: err.stack });
@@ -1957,17 +1987,39 @@ router.post('/notifications/send-confirmation/:id', async (req: Request, res: Re
       });
     }
 
+    const payload = req.body || {};
+    const targetEmail = (overrideEmail || payload.email || reservation?.email || '').trim();
+
     if (!reservation) {
-      return res.status(404).json({ error: `Réservation introuvable pour ${id}` });
+      if (targetEmail && targetEmail.includes('@')) {
+        reservation = {
+          fullName: payload.fullName || 'Passager',
+          lastName: payload.lastName || '',
+          email: targetEmail,
+          phone: payload.phone || '',
+          ticketId: payload.ticketId || id,
+          itinerary: payload.itinerary || 'Goma ⇄ Bukavu',
+          ship: payload.ship || 'Mugote 1',
+          travelDate: payload.travelDate || new Date().toISOString().split('T')[0],
+          departureTime: payload.departureTime || '07h30',
+          travelClass: payload.travelClass || '2ème Classe',
+          passengersCount: payload.passengersCount || 1,
+          amount: payload.amount || 20,
+          status: payload.status || 'VALIDATED',
+          boardingStatus: payload.boardingStatus,
+          boarded: payload.boarded
+        } as any;
+      } else {
+        return res.status(404).json({ error: `Réservation introuvable pour ${id}` });
+      }
     }
 
-    const targetEmail = (overrideEmail || reservation.email || '').trim();
     if (!targetEmail || !targetEmail.includes('@')) {
       return res.status(400).json({ error: "Aucune adresse email valide fournie pour l'envoi du billet." });
     }
 
     // Mise à jour de l'email si fourni en override
-    if (overrideEmail && overrideEmail !== reservation.email) {
+    if (overrideEmail && reservation.email && overrideEmail !== reservation.email) {
       reservation.email = targetEmail;
     }
 
@@ -1976,7 +2028,7 @@ router.post('/notifications/send-confirmation/:id', async (req: Request, res: Re
       lastName: reservation.lastName,
       email: targetEmail,
       phone: reservation.phone,
-      ticketId: reservation.ticketId,
+      ticketId: reservation.ticketId || payload.ticketId || id,
       itinerary: reservation.itinerary,
       ship: reservation.ship,
       travelDate: reservation.travelDate,
@@ -1984,7 +2036,9 @@ router.post('/notifications/send-confirmation/:id', async (req: Request, res: Re
       travelClass: reservation.travelClass,
       passengersCount: reservation.passengersCount,
       amount: reservation.amount,
-      status: reservation.status
+      status: payload.status || reservation.status || 'VALIDATED',
+      boardingStatus: payload.boardingStatus || reservation.boardingStatus,
+      boarded: payload.boarded ?? reservation.boarded
     });
 
     if (sendRes.success) {

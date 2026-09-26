@@ -292,8 +292,10 @@ class EmailService {
     departureTime?: string;
     travelClass?: string;
     passengersCount?: number;
-    amount?: number;
+    amount?: number | string;
     status?: string;
+    boardingStatus?: string;
+    boarded?: boolean;
     transactionId?: string;
   }): Promise<EmailSendResult> {
     if (!reservation.email || !reservation.email.includes('@')) {
@@ -315,7 +317,35 @@ class EmailService {
     const travelClass = reservation.travelClass || '2ème Classe';
     const passengersCount = Number(reservation.passengersCount || 1);
     const amount = reservation.amount ? `${reservation.amount}.00 $` : '20.00 $';
-    const statusText = (reservation.status === 'VALIDATED' || reservation.status === 'CONFIRMED') ? 'VALIDÉ & ACTIF' : 'EN ATTENTE / CONFIRMÉ';
+
+    const isBoarded = reservation.boardingStatus === 'BOARDED' || reservation.boarded === true;
+    const isValidated = reservation.status === 'VALIDATED';
+
+    let statusText = 'CONFIRMÉ & ACTIF';
+    let subject = `⚓ Billet Officiel & Confirmation : ${itinerary} - N° ${ticketId} [AMR MUGOTE]`;
+    let mainHeading = "Confirmation de Billet & Enregistrement";
+    let statusBadgeColor = "#065f46";
+    let statusBgColor = "#ecfdf5";
+    let statusBorderColor = "#10b981";
+    let actionNotice = `Nous confirmons avec plaisir l'enregistrement de votre réservation sur nos lignes régulières du Lac Kivu. Votre billet électronique a été généré avec succès.`;
+
+    if (isBoarded) {
+      statusText = '🚢 PASSAGER LÂCHÉ & EMBARQUÉ À BORD • VALIDÉ';
+      subject = `🚢 Passager Lâché & Embarqué à Bord - Billet ${ticketId} (${itinerary}) [AMR MUGOTE]`;
+      mainHeading = "Passager Lâché & Embarquement Validé";
+      statusBadgeColor = "#065f46";
+      statusBgColor = "#d1fae5";
+      statusBorderColor = "#059669";
+      actionNotice = `L'administrateur a <strong>officiellement lâché votre passager et autorisé son embarquement à bord</strong> du navire <strong>${ship}</strong>. Votre titre de transport est validé et en règle dans notre registre portuaire.`;
+    } else if (isValidated) {
+      statusText = '⚓ BILLET OFFICIEL VALIDÉ PAR L\'ADMINISTRATION';
+      subject = `⚓ Billet Officiel Validé par l'Administration - N° ${ticketId} (${itinerary}) [AMR MUGOTE]`;
+      mainHeading = "Billet Officiel Validé par l'Administration";
+      statusBadgeColor = "#065f46";
+      statusBgColor = "#ecfdf5";
+      statusBorderColor = "#10b981";
+      actionNotice = `L'administrateur a <strong>validé votre billet officiel</strong> sur nos lignes régulières du Lac Kivu. Votre titre de transport est maintenant actif et prêt pour l'embarquement.`;
+    }
 
     // Calcul de l'heure conseillée d'embarquement (45 min avant)
     let boardingAdvice = "Arrivée recommandée 45 minutes avant le départ";
@@ -336,8 +366,6 @@ class EmailService {
       // ignore
     }
 
-    const subject = `⚓ Billet Officiel & Confirmation de Réservation : ${itinerary} - N° ${ticketId} [AMR MUGOTE]`;
-
     const html = `
 <!DOCTYPE html>
 <html lang="fr">
@@ -354,12 +382,12 @@ class EmailService {
     .subtitle { margin: 8px 0 0 0; color: #94a3b8; font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; }
 
     .content { padding: 32px 28px; }
-    .greeting { font-size: 16px; color: #1e293b; margin-bottom: 22px; line-height: 1.6; }
+    .greeting { font-size: 15px; color: #1e293b; margin-bottom: 22px; line-height: 1.6; }
     
     .ticket-hero { background: #f8fafc; border: 2px solid #001233; border-radius: 16px; padding: 24px; margin-bottom: 24px; position: relative; }
     .ticket-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px dashed #cbd5e1; padding-bottom: 14px; margin-bottom: 18px; }
     .ticket-id { font-size: 20px; font-weight: 900; color: #001233; font-family: monospace; letter-spacing: 1px; }
-    .ticket-status { background: #ecfdf5; border: 1px solid #10b981; color: #065f46; padding: 4px 12px; border-radius: 9999px; font-size: 11px; font-weight: 900; text-transform: uppercase; }
+    .ticket-status { background: ${statusBgColor}; border: 1px solid ${statusBorderColor}; color: ${statusBadgeColor}; padding: 4px 12px; border-radius: 9999px; font-size: 10px; font-weight: 900; text-transform: uppercase; }
 
     .route-banner { background: #001233; color: #ffffff; border-radius: 12px; padding: 18px; text-align: center; margin-bottom: 18px; }
     .route-title { font-size: 22px; font-weight: 900; color: #ffffff; margin-bottom: 4px; }
@@ -371,9 +399,6 @@ class EmailService {
     .detail-val { font-size: 13px; font-weight: 800; color: #0f172a; }
 
     .boarding-box { background: #fef3c7; border-left: 4px solid #d97706; padding: 16px 18px; border-radius: 0 10px 10px 0; margin-bottom: 24px; font-size: 13px; color: #78350f; line-height: 1.5; font-weight: 600; }
-
-    .action-box { text-align: center; margin: 28px 0; }
-    .btn-ticket { display: inline-block; background: #001233; color: #ffffff !important; font-size: 13px; font-weight: 900; text-transform: uppercase; letter-spacing: 1px; padding: 14px 28px; border-radius: 12px; text-decoration: none; box-shadow: 0 4px 12px rgba(0, 18, 51, 0.3); }
 
     .guidelines { background: #f1f5f9; border-radius: 14px; padding: 20px; margin-bottom: 24px; }
     .guidelines h4 { margin: 0 0 12px 0; font-size: 13px; font-weight: 800; text-transform: uppercase; color: #0f172a; }
@@ -396,7 +421,7 @@ class EmailService {
     <div class="content">
       <p class="greeting">
         Bonjour <strong>${passengerName}</strong>,<br>
-        Nous confirmons avec plaisir l'enregistrement de votre réservation sur nos lignes régulières du Lac Kivu. Votre billet électronique a été généré avec succès.
+        ${actionNotice}
       </p>
 
       <div class="ticket-hero">
@@ -442,13 +467,13 @@ class EmailService {
       </div>
 
       <div class="boarding-box">
-        ⚠️ <strong>Consigne d'Embarquement :</strong> ${boardingAdvice}. Les portes d'accès aux quais et le pointage ferment 15 minutes avant le largage des amarres pour les formalités de sécurité maritime.
+        ⚠️ <strong>Consigne d'Embarquement :</strong> ${boardingAdvice}. Les contrôleurs au port disposent de la synchronisation en temps réel de votre billet validé.
       </div>
 
       <div class="guidelines">
         <h4>📋 Formalités de Voyage sur le Lac Kivu</h4>
         <ul>
-          <li><strong>Présentation du Billet :</strong> Vous pouvez présenter ce billet directement sur l'écran de votre téléphone (QR code) ou une version papier imprimée aux contrôleurs au quai.</li>
+          <li><strong>Présentation du Billet :</strong> Vous pouvez présenter ce billet directement sur l'écran de votre téléphone (depuis l'onglet "Mes Billets" de l'application) ou au format papier imprimé.</li>
           <li><strong>Pièce d'Identité :</strong> Une pièce d'identité valide (Carte d'électeur, Passeport ou Permis) est requise pour tout embarquement.</li>
           <li><strong>Ports d'Accès :</strong> Port Ihusi à Bukavu / Port Public SNCC à Goma.</li>
           <li><strong>Bagages :</strong> Les bagages doivent être étiquetés avant le chargement dans les cales du navire.</li>

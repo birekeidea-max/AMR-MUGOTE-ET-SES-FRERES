@@ -317,14 +317,14 @@ export const mongoApi = {
     body: JSON.stringify({ email })
   }),
 
-  sendBookingConfirmation: (ticketOrId: string, email?: string) => apiRequest<{
+  sendBookingConfirmation: (ticketOrId: string, email?: string, fullData?: any) => apiRequest<{
     success: boolean;
     message: string;
     sendRes: any;
     reservation: any;
   }>(`/notifications/send-confirmation/${encodeURIComponent(ticketOrId)}`, {
     method: 'POST',
-    body: JSON.stringify({ email })
+    body: JSON.stringify({ email, ...(fullData || {}) })
   }),
 
   configureSmtp: (data: {
