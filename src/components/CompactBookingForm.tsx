@@ -19,6 +19,8 @@ import {
 } from 'lucide-react';
 import { mongoApi } from '../services/api';
 import { TravelClass } from '../types';
+import { db } from '../lib/firebase';
+import { collection, addDoc } from 'firebase/firestore';
 
 export interface CompactBookingFormProps {
   isModal?: boolean;
@@ -160,15 +162,35 @@ export function CompactBookingForm({
     };
 
     try {
-      // Sauvegarde via mongoApi / backend / Firestore
+      // Sauvegarde via mongoApi / backend et Firestore
+      let mongoId: string | undefined;
       try {
-        await mongoApi.createReservation(reservationPayload);
+        const mongoRes = await mongoApi.createReservation(reservationPayload);
+        mongoId = mongoRes?._id || (mongoRes as any)?.id;
       } catch (saveErr) {
         console.warn("Sauvegarde API échouée, conservation en local:", saveErr);
       }
 
-      setCreatedReservation({
+      // Sauvegarde Firestore en temps réel
+      let firestoreId = '';
+      try {
+        const docRef = await addDoc(collection(db, 'reservations'), {
+          ...reservationPayload,
+          mongoId: mongoId || null
+        });
+        firestoreId = docRef.id;
+      } catch (fErr) {
+        console.warn("Sauvegarde Firestore fallback:", fErr);
+      }
+
+      const finalRecord = {
         ...reservationPayload,
+        id: firestoreId || mongoId || reservationPayload.ticketId,
+        _id: mongoId
+      };
+
+      setCreatedReservation({
+        ...finalRecord,
         passengerName: reservationPayload.fullName,
         totalPrice: totalPriceUSD,
         totalPriceCDF,
@@ -177,7 +199,7 @@ export function CompactBookingForm({
       });
       setIsSuccess(true);
       if (onSuccess) {
-        onSuccess(reservationPayload);
+        onSuccess(finalRecord);
       }
     } catch (err: any) {
       setErrorMsg(err?.message || "Erreur lors de l'enregistrement de la réservation.");

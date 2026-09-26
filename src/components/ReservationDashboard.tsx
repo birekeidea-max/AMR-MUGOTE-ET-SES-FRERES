@@ -35,6 +35,8 @@ import {
 } from 'lucide-react';
 import { mongoApi } from '../services/api';
 import { TravelClass } from '../types';
+import { db } from '../lib/firebase';
+import { collection, addDoc } from 'firebase/firestore';
 
 export interface ReservationDashboardProps {
   user?: any;
@@ -194,9 +196,24 @@ export function ReservationDashboard({
     };
 
     try {
-      await mongoApi.createReservation(newReservation as any);
+      let mongoId: string | undefined;
+      try {
+        const mongoRes = await mongoApi.createReservation(newReservation as any);
+        mongoId = mongoRes?._id || (mongoRes as any)?.id;
+      } catch (err) {
+        console.warn("Sauvegarde API automatique locale:", err);
+      }
+
+      try {
+        await addDoc(collection(db, 'reservations'), {
+          ...newReservation,
+          mongoId: mongoId || null
+        });
+      } catch (fErr) {
+        console.warn("Sauvegarde Firestore fallback:", fErr);
+      }
     } catch (err) {
-      console.warn("Sauvegarde API automatique locale:", err);
+      console.warn("Sauvegarde globale:", err);
     }
 
     // Ajouter à l'activité récente

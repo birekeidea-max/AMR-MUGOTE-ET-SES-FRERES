@@ -255,28 +255,43 @@ export function DailyBoardingRecapTable({
     const isCurrentlyBoarded = reservation.boardingStatus === 'BOARDED';
     const nextStatus = isCurrentlyBoarded ? 'PENDING' : 'BOARDED';
     const boardedTime = nextStatus === 'BOARDED' ? Date.now() : null;
+    const ticketId = reservation.ticketId || `AMR-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
 
     setActionLoadingId(resId);
     try {
       // 1. Update in Firestore
       try {
-        await updateDoc(doc(db, 'reservations', resId), {
+        const updatePayload: any = {
           boardingStatus: nextStatus,
+          boarded: nextStatus === 'BOARDED',
           boardedAt: boardedTime,
           isUsed: nextStatus === 'BOARDED',
           usedAt: boardedTime
-        });
+        };
+        if (nextStatus === 'BOARDED') {
+          updatePayload.status = 'VALIDATED';
+          updatePayload.ticketId = ticketId;
+          updatePayload.validatedAt = reservation.validatedAt || boardedTime;
+        }
+        await updateDoc(doc(db, 'reservations', resId), updatePayload);
       } catch (fErr) {
         console.warn("Firestore updateDoc note:", fErr);
       }
 
       // 2. Mirror in MongoDB Atlas
       try {
-        await mongoApi.updateReservationStatus(resId, {
+        const mongoPayload: any = {
           boardingStatus: nextStatus,
+          boarded: nextStatus === 'BOARDED',
           boardedAt: boardedTime || undefined,
           isUsed: nextStatus === 'BOARDED'
-        });
+        };
+        if (nextStatus === 'BOARDED') {
+          mongoPayload.status = 'VALIDATED';
+          mongoPayload.ticketId = ticketId;
+          mongoPayload.validatedAt = reservation.validatedAt || boardedTime;
+        }
+        await mongoApi.updateReservationStatus(resId, mongoPayload);
       } catch (mErr) {
         console.warn("MongoDB Atlas update mirror note:", mErr);
       }
@@ -288,8 +303,14 @@ export function DailyBoardingRecapTable({
             return {
               ...item,
               boardingStatus: nextStatus,
+              boarded: nextStatus === 'BOARDED',
               boardedAt: boardedTime || undefined,
-              isUsed: nextStatus === 'BOARDED'
+              isUsed: nextStatus === 'BOARDED',
+              ...(nextStatus === 'BOARDED' ? {
+                status: 'VALIDATED' as const,
+                ticketId,
+                validatedAt: item.validatedAt || boardedTime
+              } : {})
             };
           }
           return item;
@@ -334,17 +355,19 @@ export function DailyBoardingRecapTable({
       const now = Date.now();
 
       try {
-        await updateDoc(doc(db, 'reservations', resId), {
+        const ticketId = r.ticketId || `AMR-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+        const updatePayload: any = {
           boardingStatus: 'BOARDED',
+          boarded: true,
           boardedAt: now,
           isUsed: true,
-          usedAt: now
-        });
-        await mongoApi.updateReservationStatus(resId, {
-          boardingStatus: 'BOARDED',
-          boardedAt: now,
-          isUsed: true
-        }).catch(() => null);
+          usedAt: now,
+          status: 'VALIDATED',
+          ticketId,
+          validatedAt: r.validatedAt || now
+        };
+        await updateDoc(doc(db, 'reservations', resId), updatePayload);
+        await mongoApi.updateReservationStatus(resId, updatePayload).catch(() => null);
         successCount++;
       } catch (err) {
         console.warn(`Error boarding ${resId}:`, err);

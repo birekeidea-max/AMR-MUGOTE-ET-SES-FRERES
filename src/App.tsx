@@ -280,8 +280,9 @@ const SYSTEM_PROMPT = `Tu es l'assistant IA officiel de ETS AMR MUGOTE ET SES FR
 
 // --- Shared PDF Generator ---
 const generateTicket = async (res: Reservation, siteSettings: any) => {
-  if (res.status !== 'VALIDATED') {
-    alert("Accès refusé : Ce billet est en attente de validation par l'administrateur. Conformément au règlement officiel, le client ne peut jamais obtenir son billet tant que l'administration ne l'a pas validé.");
+  const isAuthorized = res.status === 'VALIDATED' || (res as any).boardingStatus === 'BOARDED' || (res as any).boarded === true;
+  if (!isAuthorized) {
+    alert("Accès en attente : Ce billet n'a pas encore été validé ou lâché par l'administrateur. Dès que l'administrateur aura cliqué sur lâcher le billet ou embarqué dans la base de données, vous pourrez le télécharger automatiquement.");
     return;
   }
 
@@ -478,11 +479,13 @@ const generateTicket = async (res: Reservation, siteSettings: any) => {
     pdf.text("Ce billet est digital et infalsifiable. Toute reproduction est interdite.", w/2, footerY, { align: 'center' });
     pdf.text("Veuillez vous présenter au port 45 minutes avant le départ minimum.", w/2, footerY + 3, { align: 'center' });
 
-    pdf.save(`billet-mugote-${res.ticketId}.pdf`);
+    const safeTicketId = res.ticketId || `AMR-${(res.id || Math.random().toString(36).substring(2, 8)).substring(0, 8).toUpperCase()}`;
+    pdf.save(`billet-mugote-${safeTicketId}.pdf`);
   } catch (err) {
     console.error("PDF Fail", err);
     // Simple fallback if image loading fails the whole process
-    pdf.save(`billet-mugote-${res.ticketId}.pdf`);
+    const safeTicketId = res.ticketId || `AMR-${(res.id || Math.random().toString(36).substring(2, 8)).substring(0, 8).toUpperCase()}`;
+    pdf.save(`billet-mugote-${safeTicketId}.pdf`);
   }
 };
 
@@ -1659,6 +1662,7 @@ export default function App() {
         isOpen={isTravelerScannerOpen} 
         onClose={() => setIsTravelerScannerOpen(false)} 
         siteSettings={siteSettings} 
+        onDownloadTicket={(ticket) => generateTicket(ticket, siteSettings)}
       />
 
       {/* Bouton de contrôle flottant (PWA) */}
@@ -6184,31 +6188,66 @@ function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlock
                             ? "bg-emerald-50 text-emerald-600 border-emerald-200" 
                             : "bg-slate-100 text-slate-400 border-slate-200"
                         )}>
-                          {res.boardingStatus === 'BOARDED' ? '🚢 EMBARQUÉ' : 'Non embarqué'}
+                          {res.boardingStatus === 'BOARDED' ? '🚢 EMBARQUÉ (LÂCHÉ)' : 'Non embarqué'}
                         </span>
-                        {res.status === 'VALIDATED' && (
-                          <button
-                            onClick={async () => {
-                              const isCurrentlyBoarded = res.boardingStatus === 'BOARDED';
-                              const newStatus = isCurrentlyBoarded ? 'PENDING' : 'BOARDED';
-                              try {
-                                await updateDoc(doc(db, 'reservations', res.id!), {
-                                  boardingStatus: newStatus,
-                                  boardedAt: newStatus === 'BOARDED' ? Date.now() : null
-                                });
-                              } catch (err: any) {
-                                console.warn("Could not update boarding status in table", err);
+                        <button
+                          onClick={async () => {
+                            const isCurrentlyBoarded = res.boardingStatus === 'BOARDED';
+                            const newStatus = isCurrentlyBoarded ? 'PENDING' : 'BOARDED';
+                            const now = Date.now();
+                            const ticketId = res.ticketId || `AMR-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+                            try {
+                              if (newStatus === 'BOARDED') {
+                                const payload: any = {
+                                  status: 'VALIDATED',
+                                  boardingStatus: 'BOARDED',
+                                  boarded: true,
+                                  boardedAt: now,
+                                  isUsed: true,
+                                  usedAt: now,
+                                  ticketId,
+                                  validatedAt: res.validatedAt || now
+                                };
+                                await updateDoc(doc(db, 'reservations', res.id!), payload);
+                                try {
+                                  await mongoApi.updateReservationStatus(res.id!, payload);
+                                } catch (mErr) {
+                                  console.warn("Mongo status sync:", mErr);
+                                }
+                              } else {
+                                const revertPayload: any = {
+                                  boardingStatus: 'PENDING',
+                                  boarded: false,
+                                  boardedAt: null,
+                                  isUsed: false,
+                                  usedAt: null
+                                };
+                                await updateDoc(doc(db, 'reservations', res.id!), revertPayload);
+                                try {
+                                  await mongoApi.updateReservationStatus(res.id!, revertPayload);
+                                } catch (mErr) {
+                                  console.warn("Mongo status revert:", mErr);
+                                }
                               }
-                            }}
-                            className="text-[8px] font-black uppercase tracking-widest text-[#0047AB] hover:underline"
-                          >
-                            {res.boardingStatus === 'BOARDED' ? 'Débarquer' : 'Embarquer'}
-                          </button>
-                        )}
+                            } catch (err: any) {
+                              console.warn("Could not update boarding status in table", err);
+                              alert("Erreur lors de la mise à jour : " + err.message);
+                            }
+                          }}
+                          className={cn(
+                            "px-3 py-1 rounded-lg text-[8px] font-black uppercase tracking-wider transition-all cursor-pointer shadow-xs",
+                            res.boardingStatus === 'BOARDED'
+                              ? "bg-slate-100 hover:bg-rose-50 text-slate-600 hover:text-rose-700 border border-slate-200"
+                              : "bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold"
+                          )}
+                          title={res.boardingStatus === 'BOARDED' ? "Annuler l'embarquement" : "Lâcher le billet et marquer le voyageur comme embarqué"}
+                        >
+                          {res.boardingStatus === 'BOARDED' ? 'Débarquer' : '🚢 Lâcher / Embarquer'}
+                        </button>
                       </div>
                     </td>
                     <td className="px-10 py-8 text-right">
-                      <div className="flex justify-end gap-3 flex-wrap">
+                      <div className="flex justify-end gap-2 sm:gap-3 flex-wrap items-center">
                         {(res as any).cancellationRequested && (res as any).cancellationStatus === 'pending' ? (
                           <div className="flex items-center gap-2 bg-rose-50 p-2 rounded-xl border border-rose-100">
                              <p className="text-[8px] font-black text-rose-600 uppercase px-2 italic">Annulation demandée</p>
@@ -6230,21 +6269,85 @@ function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlock
                             {res.status === 'PENDING' && (
                               <>
                                 <button 
-                                  onClick={() => handleAction(res.id!, 'VALIDATED')} 
-                                  className="px-4 py-2 flex items-center gap-2 bg-emerald-500 text-white hover:bg-emerald-600 transition-all rounded-xl shadow-md text-[9px] font-black uppercase tracking-widest cursor-pointer active:scale-95"
+                                  onClick={async () => {
+                                    const now = Date.now();
+                                    const ticketId = res.ticketId || `AMR-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+                                    try {
+                                      const payload: any = {
+                                        status: 'VALIDATED',
+                                        boardingStatus: 'BOARDED',
+                                        boarded: true,
+                                        boardedAt: now,
+                                        isUsed: true,
+                                        usedAt: now,
+                                        ticketId,
+                                        validatedAt: now
+                                      };
+                                      await updateDoc(doc(db, 'reservations', res.id!), payload);
+                                      try {
+                                        await mongoApi.updateReservationStatus(res.id!, payload);
+                                      } catch (mErr) {
+                                        console.warn("Mongo sync note:", mErr);
+                                      }
+                                      alert("Billet lâché et validé dans la base de données ! Le statut du passager est maintenant embarqué.");
+                                    } catch (err: any) {
+                                      alert("Erreur lors du lâcher du billet: " + err.message);
+                                    }
+                                  }}
+                                  className="px-3.5 py-2 flex items-center gap-1.5 bg-[#001E2B] text-[#00ED64] hover:bg-black transition-all rounded-xl shadow-md text-[9px] font-black uppercase tracking-widest cursor-pointer border border-[#00ED64]/50 active:scale-95"
+                                  title="Valider et lâcher immédiatement le voyageur comme embarqué"
                                 >
-                                  <CheckCircle2 size={14} /> Valider
+                                  <Check size={13} className="text-[#00ED64]" /> 🚢 Lâcher / Embarquer
+                                </button>
+                                <button 
+                                  onClick={() => handleAction(res.id!, 'VALIDATED')} 
+                                  className="px-3 py-2 flex items-center gap-1.5 bg-emerald-500 text-white hover:bg-emerald-600 transition-all rounded-xl shadow-md text-[9px] font-black uppercase tracking-widest cursor-pointer active:scale-95"
+                                >
+                                  <CheckCircle2 size={13} /> Valider
                                 </button>
                                 <button 
                                   onClick={() => handleAction(res.id!, 'REJECTED')} 
-                                  className="px-4 py-2 flex items-center gap-2 bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white transition-all rounded-xl shadow-sm border border-rose-100 text-[9px] font-black uppercase tracking-widest cursor-pointer active:scale-95"
+                                  className="px-3 py-2 flex items-center gap-1.5 bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white transition-all rounded-xl border border-rose-100 text-[9px] font-black uppercase tracking-widest cursor-pointer active:scale-95"
                                 >
-                                  <X size={14} /> Rejeter
+                                  <X size={13} /> Rejeter
                                 </button>
                               </>
                             )}
                             {res.status === 'VALIDATED' && (
                               <>
+                                {res.boardingStatus !== 'BOARDED' && (
+                                  <button
+                                    onClick={async () => {
+                                      const now = Date.now();
+                                      const ticketId = res.ticketId || `AMR-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+                                      try {
+                                        const payload: any = {
+                                          status: 'VALIDATED',
+                                          boardingStatus: 'BOARDED',
+                                          boarded: true,
+                                          boardedAt: now,
+                                          isUsed: true,
+                                          usedAt: now,
+                                          ticketId,
+                                          validatedAt: res.validatedAt || now
+                                        };
+                                        await updateDoc(doc(db, 'reservations', res.id!), payload);
+                                        try {
+                                          await mongoApi.updateReservationStatus(res.id!, payload);
+                                        } catch (mErr) {
+                                          console.warn("Mongo sync note:", mErr);
+                                        }
+                                        alert("Passager lâché à bord et statut mis à jour dans la base de données !");
+                                      } catch (err: any) {
+                                        alert("Erreur lors de l'enregistrement de l'embarquement : " + err.message);
+                                      }
+                                    }}
+                                    className="px-3 py-2 flex items-center gap-1.5 bg-emerald-600 text-white hover:bg-emerald-700 transition-all rounded-xl shadow-md text-[9px] font-black uppercase tracking-widest cursor-pointer active:scale-95"
+                                    title="Lâcher le voyageur et marquer embarqué"
+                                  >
+                                    <Check size={13} /> Lâcher / Embarquer
+                                  </button>
+                                )}
                                 <button onClick={() => generatePDF(res)} className="px-4 py-2 bg-maritime text-white hover:bg-maritime-dark transition-all rounded-xl text-[9px] font-extrabold uppercase tracking-widest shadow-md flex items-center gap-2 cursor-pointer">
                                   <Printer size={14} /> Imprimer
                                 </button>
@@ -7642,26 +7745,123 @@ function MyTickets({
   const [searchRef, setSearchRef] = useState('');
   const [isSearching, setIsSearching] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // Helper to merge and sort reservations
+  const updateTicketsList = (newDocs: Reservation[]) => {
+    setTickets(prev => {
+      const map = new Map<string, Reservation>();
+      // First populate existing
+      prev.forEach(t => {
+        const key = t.id || (t as any)._id || t.ticketId;
+        if (key) map.set(key, t);
+      });
+      // Then merge new
+      newDocs.forEach(t => {
+        const key = t.id || (t as any)._id || t.ticketId;
+        if (key) {
+          const existing = map.get(key);
+          map.set(key, { ...existing, ...t });
+        }
+      });
+      const result = Array.from(map.values());
+      result.sort((a, b) => {
+        const timeA = typeof a.createdAt === 'number' ? a.createdAt : ((a.createdAt as any)?.seconds ? (a.createdAt as any).seconds * 1000 : 0);
+        const timeB = typeof b.createdAt === 'number' ? b.createdAt : ((b.createdAt as any)?.seconds ? (b.createdAt as any).seconds * 1000 : 0);
+        return timeB - timeA;
+      });
+      return result;
+    });
+    setLoading(false);
+  };
 
   useEffect(() => {
     if (!user) {
       setLoading(false);
       return;
     }
-    const q = query(
+
+    let isSubscribed = true;
+    setLoading(true);
+
+    // 1. Real-time Firestore query by userId (NO compound orderBy to prevent index errors)
+    const qUser = query(
       collection(db, 'reservations'), 
-      where('userId', '==', user.uid),
-      orderBy('createdAt', 'desc')
+      where('userId', '==', user.uid)
     );
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      setTickets(snapshot.docs.map(doc => ({ ...doc.data() as Reservation, id: doc.id })));
-      setLoading(false);
+    const unsubUser = onSnapshot(qUser, (snapshot) => {
+      if (!isSubscribed) return;
+      const docs = snapshot.docs.map(doc => ({ ...doc.data() as Reservation, id: doc.id }));
+      updateTicketsList(docs);
     }, (error) => {
-      console.warn("MyTickets query failed gracefully:", error);
+      console.warn("MyTickets user query note:", error);
       setLoading(false);
     });
-    return unsubscribe;
+
+    // 2. Secondary Firestore query by email if available
+    let unsubEmail: (() => void) | undefined;
+    if (user.email) {
+      const cleanEmail = user.email.toLowerCase().trim();
+      const qEmail = query(
+        collection(db, 'reservations'),
+        where('email', '==', cleanEmail)
+      );
+      unsubEmail = onSnapshot(qEmail, (snapshot) => {
+        if (!isSubscribed) return;
+        const docs = snapshot.docs.map(doc => ({ ...doc.data() as Reservation, id: doc.id }));
+        updateTicketsList(docs);
+      }, (error) => {
+        console.warn("MyTickets email query note:", error);
+      });
+    }
+
+    // 3. Fallback / Periodic MongoDB Atlas synchronization
+    const syncMongo = async () => {
+      try {
+        const mongoRes = await mongoApi.getReservations({ userId: user.uid });
+        if (isSubscribed && Array.isArray(mongoRes) && mongoRes.length > 0) {
+          updateTicketsList(mongoRes);
+        }
+      } catch (mErr) {
+        // silent fallback
+      }
+    };
+    syncMongo();
+    const interval = setInterval(syncMongo, 3500);
+
+    return () => {
+      isSubscribed = false;
+      unsubUser();
+      if (unsubEmail) unsubEmail();
+      clearInterval(interval);
+    };
   }, [user]);
+
+  const handleManualRefresh = async () => {
+    if (!user) return;
+    setIsRefreshing(true);
+    try {
+      // 1. Fetch from Firestore
+      const qUser = query(collection(db, 'reservations'), where('userId', '==', user.uid));
+      const snap = await getDocs(qUser);
+      const docs = snap.docs.map(d => ({ ...d.data() as Reservation, id: d.id }));
+      updateTicketsList(docs);
+
+      // 2. Fetch from MongoDB
+      const mongoRes = await mongoApi.getReservations({ userId: user.uid });
+      if (Array.isArray(mongoRes)) {
+        updateTicketsList(mongoRes);
+      }
+      setToastMessage("Statut de vos billets synchronisé en direct avec la base de données !");
+      setTimeout(() => setToastMessage(null), 3000);
+    } catch (err: any) {
+      console.warn("Manual refresh err:", err);
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   const handleGuestSearch = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -7702,8 +7902,30 @@ function MyTickets({
     }
   };
 
+  const handleDownloadTicket = async (res: Reservation) => {
+    const isAuthorized = res.status === 'VALIDATED' || (res as any).boardingStatus === 'BOARDED' || (res as any).boarded === true;
+    if (!isAuthorized) {
+      alert("Votre réservation est actuellement en cours de traitement par l'administration. Dès que l'administrateur aura cliqué sur lâcher le billet ou embarqué dans la base de données, vous pourrez le télécharger automatiquement d'un simple clic !");
+      return;
+    }
+
+    const tKey = res.id || res.ticketId || 'TICKET';
+    setDownloadingId(tKey);
+    setToastMessage(`📥 Téléchargement automatique du billet #${res.ticketId || res.id} lancé !`);
+    setTimeout(() => setToastMessage(null), 4000);
+
+    try {
+      await generateTicket(res, siteSettings);
+    } catch (err: any) {
+      console.error("PDF generation failed:", err);
+      alert("Erreur lors de la génération du billet : " + err.message);
+    } finally {
+      setDownloadingId(null);
+    }
+  };
+
   const generateTicketPDF = async (res: Reservation) => {
-    generateTicket(res, siteSettings);
+    handleDownloadTicket(res);
   };
 
   const handleRequestCancellation = async (resId: string) => {
@@ -7723,23 +7945,47 @@ function MyTickets({
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6 sm:space-y-8">
+      {/* Toast notification feedback */}
+      {toastMessage && (
+        <div className="fixed top-20 right-4 z-50 bg-slate-900 text-white px-5 py-3 rounded-2xl shadow-2xl border border-emerald-500 flex items-center gap-3 animate-bounce">
+          <CheckCircle2 size={18} className="text-emerald-400 shrink-0" />
+          <span className="text-xs font-black uppercase tracking-wide">{toastMessage}</span>
+        </div>
+      )}
+
       {/* Header and Quick Scanner Action */}
       <div className="border-b border-slate-200 pb-4 sm:pb-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-left">
         <div>
-          <h2 className="text-xl sm:text-2xl font-extrabold tracking-tighter uppercase mb-1 italic text-maritime">Mes Billets de Voyage</h2>
-          <p className="text-[9px] sm:text-[10px] uppercase tracking-widest text-slate-400 font-bold">
-            Consultez votre statut d'embarquement en temps réel • Validation réservée aux agents administratifs
+          <div className="flex items-center gap-2">
+            <h2 className="text-xl sm:text-2xl font-extrabold tracking-tighter uppercase mb-1 italic text-maritime">Mes Billets de Voyage</h2>
+            <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[8px] font-black uppercase tracking-widest border border-emerald-300">
+              Temps Réel
+            </span>
+          </div>
+          <p className="text-[9px] sm:text-[10px] uppercase tracking-widest text-slate-500 font-bold">
+            Statut synchronisé instantanément avec la capitainerie • Cliquez sur votre billet pour le télécharger automatiquement
           </p>
         </div>
-        {onOpenScanner && (
+        <div className="flex items-center gap-2 w-full sm:w-auto">
           <button
-            onClick={onOpenScanner}
-            className="w-full sm:w-auto px-5 py-3 bg-[#0b132b] hover:bg-slate-900 text-white rounded-2xl text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2.5 shadow-lg shadow-black/20 hover:scale-105 active:scale-95 transition cursor-pointer"
+            onClick={handleManualRefresh}
+            disabled={isRefreshing}
+            className="px-3.5 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-2xl text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 border border-slate-300 transition cursor-pointer active:scale-95 disabled:opacity-50"
+            title="Actualiser en direct les statuts"
           >
-            <QrCode size={16} className="text-white" />
-            <span>Scanner QR / Vérifier Statut</span>
+            <RotateCw size={14} className={isRefreshing ? "animate-spin text-emerald-600" : "text-slate-600"} />
+            <span className="hidden sm:inline">Actualiser</span>
           </button>
-        )}
+          {onOpenScanner && (
+            <button
+              onClick={onOpenScanner}
+              className="flex-1 sm:flex-initial px-5 py-3 bg-[#0b132b] hover:bg-slate-900 text-white rounded-2xl text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2.5 shadow-lg shadow-black/20 hover:scale-105 active:scale-95 transition cursor-pointer"
+            >
+              <QrCode size={16} className="text-white" />
+              <span>Scanner QR / Vérifier Statut</span>
+            </button>
+          )}
+        </div>
       </div>
 
       {!user ? (
@@ -7768,17 +8014,22 @@ function MyTickets({
           <div className="bg-slate-100/90 border border-slate-300 rounded-2xl p-4 flex items-start gap-3 text-left">
             <ShieldCheck size={18} className="text-slate-800 shrink-0 mt-0.5" />
             <p className="text-[11px] font-medium text-slate-800 leading-relaxed">
-              <strong>Règle d'embarquement officiel :</strong> Vous pouvez vérifier le statut de votre billet ci-dessous à tout moment. Seul le <strong>compte administratif</strong> au quai peut scanner pour <strong>autoriser définitivement votre embarquement</strong> physique à bord du navire.
+              <strong>Statut en direct de vos billets :</strong> Dès que l'administrateur clique sur <strong>"Lâcher le billet"</strong> ou <strong>"Embarqué"</strong> dans la base de données, le statut de votre billet passe instantanément à l'état autorisé, et vous pouvez <strong>directement cliquer sur votre billet pour le télécharger automatiquement</strong> au format officiel PDF.
             </p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
         {loading ? (
-          <div className="col-span-2 text-center py-10 sm:py-16 text-slate-400 animate-pulse uppercase text-[8px] sm:text-[10px] font-bold tracking-widest">Chargement...</div>
+          <div className="col-span-2 text-center py-10 sm:py-16 text-slate-400 animate-pulse uppercase text-[8px] sm:text-[10px] font-bold tracking-widest">Chargement de vos billets...</div>
         ) : tickets.length === 0 ? (
-          <div className="col-span-2 text-center py-10 sm:py-16 text-slate-400 uppercase text-[8px] sm:text-[10px] font-bold tracking-widest border border-dashed border-slate-200 rounded-xl mx-4">Aucun billet trouvé.</div>
+          <div className="col-span-2 text-center py-10 sm:py-16 text-slate-400 uppercase text-[8px] sm:text-[10px] font-bold tracking-widest border border-dashed border-slate-200 rounded-xl mx-4">Aucun billet trouvé pour ce compte.</div>
         ) : (
           tickets.map(res => {
+            const isBoarded = (res as any).boardingStatus === 'BOARDED' || (res as any).boarded === true;
+            const isValidated = res.status === 'VALIDATED';
+            const isReadyToDownload = isBoarded || isValidated;
+            const isDownloadingThis = downloadingId === (res.id || res.ticketId);
+
             let classCardStyle = "bg-white/80 backdrop-blur-md border-slate-300/80 shadow-md hover:border-slate-500 hover:shadow-xl";
             let classStubStyle = "bg-slate-100/60 backdrop-blur-sm border-slate-200/80";
             
@@ -7794,12 +8045,51 @@ function MyTickets({
             }
 
             return (
-              <div key={res.id} className={cn("border rounded-2xl overflow-hidden flex flex-col sm:flex-row transition-all hover:shadow-xl group mx-0 sm:mx-0 relative", classCardStyle)}>
-                <div className={cn("w-full sm:w-28 flex flex-row sm:flex-col items-center justify-center p-4 border-b sm:border-b-0 sm:border-r gap-4 sm:gap-0", classStubStyle)}>
-                  {res.status === 'VALIDATED' ? (
+              <div 
+                key={res.id || res.ticketId} 
+                onClick={() => {
+                  handleDownloadTicket(res);
+                }}
+                className={cn(
+                  "border rounded-2xl overflow-hidden flex flex-col sm:flex-row transition-all duration-200 mx-0 sm:mx-0 relative group",
+                  classCardStyle,
+                  isReadyToDownload 
+                    ? "cursor-pointer hover:border-emerald-500 hover:ring-2 hover:ring-emerald-400/50 hover:shadow-2xl hover:scale-[1.01]" 
+                    : "opacity-95"
+                )}
+                title={isReadyToDownload ? "Cliquez sur ce billet pour le télécharger automatiquement en PDF" : "Billet en attente de validation par l'administration"}
+              >
+                {/* Left QR Code / Ticket Stub */}
+                <div 
+                  onClick={(e) => {
+                    if (isReadyToDownload) {
+                      e.stopPropagation();
+                      handleDownloadTicket(res);
+                    }
+                  }}
+                  className={cn(
+                    "w-full sm:w-32 flex flex-row sm:flex-col items-center justify-center p-4 border-b sm:border-b-0 sm:border-r gap-3 sm:gap-2 text-center transition-all",
+                    classStubStyle,
+                    isReadyToDownload ? "cursor-pointer hover:bg-emerald-50/60 group/stub" : ""
+                  )}
+                  title={isReadyToDownload ? "Cliquer sur le QR Code pour télécharger automatiquement votre e-billet" : "Billet en attente de validation"}
+                >
+                  {isReadyToDownload ? (
                     <>
-                      <QRCodeSVG value={`https://${window.location.host}/?verify=${res.id}`} size={64} className="sm:size-16" />
-                      <p className="text-[7px] font-black uppercase tracking-widest text-slate-700 sm:mt-3 text-center">DGM Verify</p>
+                      <div className="relative">
+                        <QRCodeSVG value={`https://${window.location.host}/?verify=${res.id || res.ticketId}`} size={64} className="sm:size-16" />
+                        <div className="absolute inset-0 bg-emerald-950/0 group-hover/stub:bg-emerald-950/20 rounded-lg flex items-center justify-center opacity-0 group-hover/stub:opacity-100 transition-opacity">
+                          <Download size={20} className="text-white drop-shadow" />
+                        </div>
+                      </div>
+                      <div className="space-y-0.5">
+                        <p className="text-[7px] font-black uppercase tracking-widest text-emerald-800 flex items-center justify-center gap-1">
+                          <Download size={9} /> {isBoarded ? 'EMBARQUÉ ✓' : 'TÉLÉCHARGER'}
+                        </p>
+                        <p className="text-[6px] text-slate-500 font-bold uppercase tracking-wider">
+                          DGM • Clic = PDF
+                        </p>
+                      </div>
                     </>
                   ) : (
                     <div className="flex flex-col items-center justify-center text-center p-1 sm:p-2">
@@ -7810,12 +8100,15 @@ function MyTickets({
                         En Attente Admin
                       </p>
                       <p className="text-[5.5px] sm:text-[6.5px] text-amber-700/80 font-semibold mt-0.5 leading-none">
-                        Non Validé
+                        Lâcher en attente
                       </p>
                     </div>
                   )}
                 </div>
-                <div className="flex-1 p-4 sm:p-6 space-y-4">
+
+                {/* Main Card Body */}
+                <div className="flex-1 p-4 sm:p-6 space-y-3.5">
+                  {/* Top Passenger & Status */}
                   <div className="flex justify-between items-start">
                     <div className="min-w-0 flex-1 pr-2">
                       <div className="flex items-center gap-3">
@@ -7847,110 +8140,175 @@ function MyTickets({
                         )}
                       </div>
                     </div>
-                    <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                      <span className={cn(
-                        "text-[7px] font-black uppercase tracking-widest px-2 py-0.5 border rounded-sm",
-                        res.status === 'VALIDATED' ? "bg-emerald-50 text-emerald-700 border-emerald-300" : 
-                        res.status === 'PENDING' ? "bg-slate-100 text-slate-700 border-slate-300" : 
-                        "bg-red-50 text-red-600 border-red-200"
-                      )}>
-                        {res.status === 'VALIDATED' ? 'PAYÉ' : res.status}
-                      </span>
-                      {((res as any).boardingStatus === 'BOARDED' || (res as any).boarded === true) ? (
-                        <span className="text-[7px] font-black uppercase tracking-widest px-2 py-0.5 bg-emerald-100 text-emerald-800 border border-emerald-300 rounded-md flex items-center gap-1 shadow-sm">
-                          <CheckCircle2 size={10} className="text-emerald-600" />
-                          EMBARQUÉ
+
+                    <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
+                      {isBoarded ? (
+                        <span className="text-[7.5px] sm:text-[8.5px] font-black uppercase tracking-widest px-2.5 py-1 bg-emerald-600 text-white rounded-lg flex items-center gap-1.5 shadow-md shadow-emerald-600/30 animate-pulse">
+                          <CheckCircle2 size={12} className="text-white" />
+                          🚢 EMBARQUÉ (LÂCHÉ)
                         </span>
-                      ) : res.status === 'VALIDATED' ? (
-                        <span className="text-[7px] font-black uppercase tracking-widest px-2 py-0.5 bg-slate-900 text-white rounded-md flex items-center gap-1">
+                      ) : isValidated ? (
+                        <span className="text-[7.5px] sm:text-[8.5px] font-black uppercase tracking-widest px-2.5 py-1 bg-slate-900 text-white rounded-lg flex items-center gap-1.5 shadow-sm">
                           <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                          PRÊT EMBARQUEMENT
+                          🟢 PRÊT EMBARQUEMENT
                         </span>
                       ) : (
-                        <span className="text-[7px] font-bold uppercase tracking-widest px-1.5 py-0.5 bg-slate-100 text-slate-700 border border-slate-300 rounded-md">
-                          NON ÉLIGIBLE
+                        <span className="text-[7.5px] font-black uppercase tracking-widest px-2 py-0.5 bg-amber-50 text-amber-800 border border-amber-300 rounded-md flex items-center gap-1">
+                          <Lock size={10} className="text-amber-600" />
+                          EN ATTENTE LÂCHER ADMIN
+                        </span>
+                      )}
+
+                      <span className={cn(
+                        "text-[7px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-sm border",
+                        isReadyToDownload ? "bg-emerald-50 text-emerald-700 border-emerald-300" : "bg-slate-100 text-slate-700 border-slate-300"
+                      )}>
+                        {isBoarded ? 'PAYÉ & EMBARQUÉ' : isValidated ? 'PAYÉ & VALIDÉ' : res.status || 'EN ATTENTE'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Dynamic Status Banner */}
+                  {isBoarded ? (
+                    <div className="bg-emerald-50/90 border border-emerald-300 rounded-xl p-2.5 flex items-center justify-between gap-2 shadow-xs">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
+                        <div className="min-w-0">
+                          <p className="text-[8.5px] sm:text-[9.5px] font-black text-emerald-950 uppercase tracking-tight truncate">
+                            Billet lâché & passager marqué embarqué dans la base de données !
+                          </p>
+                          <p className="text-[7px] sm:text-[7.5px] text-emerald-800 font-semibold truncate">
+                            Votre place est confirmée à bord. Cliquez sur le billet pour le télécharger.
+                          </p>
+                        </div>
+                      </div>
+                      <span className="px-2 py-1 bg-emerald-600 text-white text-[7px] sm:text-[7.5px] font-black uppercase tracking-wider rounded-lg flex items-center gap-1 shrink-0 animate-pulse">
+                        <Download size={9} /> Clic = Télécharger
+                      </span>
+                    </div>
+                  ) : isValidated ? (
+                    <div className="bg-sky-50/90 border border-sky-300 rounded-xl p-2.5 flex items-center justify-between gap-2 shadow-xs">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <CheckCircle2 size={16} className="text-sky-600 shrink-0" />
+                        <div className="min-w-0">
+                          <p className="text-[8.5px] sm:text-[9.5px] font-black text-sky-950 uppercase tracking-tight truncate">
+                            Billet validé par l'administrateur • Prêt pour embarquement
+                          </p>
+                          <p className="text-[7px] sm:text-[7.5px] text-sky-800 font-semibold truncate">
+                            Cliquez sur le billet pour télécharger automatiquement votre e-billet PDF.
+                          </p>
+                        </div>
+                      </div>
+                      <span className="px-2 py-1 bg-sky-700 text-white text-[7px] sm:text-[7.5px] font-black uppercase tracking-wider rounded-lg flex items-center gap-1 shrink-0">
+                        <Download size={9} /> Télécharger PDF
+                      </span>
+                    </div>
+                  ) : null}
+
+                  {/* Route & Price Footer */}
+                  <div className="flex items-end justify-between pt-3 sm:pt-4 border-t border-slate-200/80 gap-2">
+                    <div className="text-left min-w-0">
+                      <p className="text-[7px] sm:text-[8px] font-bold text-slate-500 uppercase tracking-widest mb-0.5">Itinéraire</p>
+                      <p className="text-[9px] sm:text-[11px] font-black text-slate-900 uppercase truncate">{res.itinerary}</p>
+                    </div>
+                    <div className="text-right flex-shrink-0">
+                      <p className="text-[7px] sm:text-[8px] font-bold text-slate-500 uppercase tracking-widest mb-0.5">Total</p>
+                      <p className="text-sm sm:text-base font-black text-slate-900 mono tracking-tighter">{res.amount}$</p>
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      {res.email && (
+                        <button
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            try {
+                              const ticketKey = res.ticketId || res.id || (res as any)._id;
+                              const resp = await mongoApi.sendDepartureReminder(ticketKey);
+                              alert(resp.message || `Rappel d'heure de départ expédié à ${res.email}`);
+                            } catch (err: any) {
+                              alert("Erreur envoi rappel: " + err.message);
+                            }
+                          }}
+                          className="px-2.5 sm:px-3 py-1 bg-black hover:bg-slate-900 text-white border border-slate-700 text-[6.5px] sm:text-[7.5px] font-bold uppercase tracking-wider rounded-lg transition-colors flex items-center gap-1 shadow-sm"
+                          title="Recevoir le rappel de départ sur votre compte Gmail"
+                        >
+                          <Mail size={10} className="text-white" />
+                          {(res as any).reminderEmailSent ? "Rappel Gmail ✓" : "Rappel Gmail"}
+                        </button>
+                      )}
+
+                      {/* Direct 1-Click Ticket Download Button */}
+                      {isReadyToDownload && !(res as any).cancellationRequested ? (
+                        <button 
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDownloadTicket(res);
+                          }}
+                          disabled={isDownloadingThis}
+                          className="px-3.5 sm:px-4 py-2 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-[8px] sm:text-[9px] font-black uppercase tracking-wider rounded-xl transition-all shadow-md shadow-emerald-600/30 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                          title="Cliquer pour télécharger automatiquement le billet officiel"
+                        >
+                          {isDownloadingThis ? (
+                            <>
+                              <RotateCw size={12} className="animate-spin" />
+                              <span>Téléchargement...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Download size={12} className="animate-bounce" />
+                              <span>Télécharger Billet</span>
+                            </>
+                          )}
+                        </button>
+                      ) : !(res as any).cancellationRequested ? (
+                        <button 
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            alert("Ce billet n'est pas encore validé par l'administrateur. Dès qu'il aura cliqué sur lâcher le billet ou embarqué dans la base de données, vous pourrez directement le télécharger ici en un clic !");
+                          }}
+                          className="px-2.5 sm:px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 text-[6.5px] sm:text-[7.5px] font-bold rounded-lg transition-all flex-shrink-0 flex items-center justify-center gap-1 cursor-pointer"
+                          title="Billet bloqué jusqu'à ce que l'administrateur le lâche dans la base de données"
+                        >
+                          <Lock size={9} className="text-amber-600" />
+                          <span>En Attente Lâcher Admin</span>
+                        </button>
+                      ) : null}
+
+                      {['VALIDATED', 'PENDING'].includes(res.status) && !(res as any).cancellationRequested && !isBoarded && (
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleRequestCancellation(res.id!);
+                          }}
+                          className="px-3 sm:px-4 py-1.5 border border-rose-200 text-rose-500 text-[7px] sm:text-[8px] font-bold uppercase tracking-widest rounded-lg hover:bg-rose-50 transition-all flex-shrink-0"
+                        >
+                          Annuler
+                        </button>
+                      )}
+                      {(res as any).cancellationRequested && (res as any).cancellationStatus === 'pending' && (
+                        <span className="px-3 py-1.5 bg-rose-50 text-rose-500 text-[6px] sm:text-[7px] font-black uppercase tracking-widest rounded-lg border border-rose-100 flex items-center gap-1">
+                          <Clock size={8} /> En attente d'annulation
+                        </span>
+                      )}
+                      {(res as any).cancellationStatus === 'approved' && (
+                        <span className="px-3 py-1.5 bg-rose-100 text-rose-700 text-[6px] sm:text-[7px] font-black uppercase tracking-widest rounded-lg border border-rose-200">
+                          Annulation Approuvée
                         </span>
                       )}
                     </div>
                   </div>
-                <div className="flex items-end justify-between pt-3 sm:pt-4 border-t border-slate-200/80 gap-2">
-                  <div className="text-left min-w-0">
-                    <p className="text-[7px] sm:text-[8px] font-bold text-slate-500 uppercase tracking-widest mb-0.5">Itinéraire</p>
-                    <p className="text-[9px] sm:text-[11px] font-black text-slate-900 uppercase truncate">{res.itinerary}</p>
-                  </div>
-                  <div className="text-right flex-shrink-0">
-                    <p className="text-[7px] sm:text-[8px] font-bold text-slate-500 uppercase tracking-widest mb-0.5">Total</p>
-                    <p className="text-sm sm:text-base font-black text-slate-900 mono tracking-tighter">{res.amount}$</p>
-                  </div>
-                  <div className="flex flex-col gap-2">
-                    {res.email && (
-                      <button
-                        onClick={async () => {
-                          try {
-                            const ticketKey = res.ticketId || res.id || (res as any)._id;
-                            const resp = await mongoApi.sendDepartureReminder(ticketKey);
-                            alert(resp.message || `Rappel d'heure de départ expédié à ${res.email}`);
-                          } catch (e: any) {
-                            alert("Erreur envoi rappel: " + e.message);
-                          }
-                        }}
-                        className="px-2.5 sm:px-3 py-1 bg-black hover:bg-slate-900 text-white border border-slate-700 text-[6.5px] sm:text-[7.5px] font-bold uppercase tracking-wider rounded-lg transition-colors flex items-center gap-1 shadow-sm"
-                        title="Recevoir le rappel de départ sur votre compte Gmail"
-                      >
-                        <Mail size={10} className="text-white" />
-                        {(res as any).reminderEmailSent ? "Rappel Gmail ✓" : "Rappel Gmail"}
-                      </button>
-                    )}
-                    {res.status === 'VALIDATED' && !(res as any).cancellationRequested ? (
-                      <button 
-                        onClick={() => generateTicketPDF(res)}
-                        className="px-3 sm:px-4 py-1.5 bg-[#0b132b] text-white text-[7px] sm:text-[8px] font-black uppercase tracking-widest rounded-lg hover:bg-black transition-all flex-shrink-0 shadow-md flex items-center justify-center gap-1 cursor-pointer"
-                      >
-                        <Download size={10} />
-                        Billet
-                      </button>
-                    ) : !(res as any).cancellationRequested ? (
-                      <button 
-                        type="button"
-                        onClick={() => alert("Ce billet n'est pas encore validé par l'administrateur. Conformément au règlement officiel, tant que le billet n'est pas validé chez l'admin, le client ne peut jamais avoir son billet.")}
-                        className="px-2.5 sm:px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 text-[6.5px] sm:text-[7.5px] font-bold rounded-lg transition-all flex-shrink-0 flex items-center justify-center gap-1 cursor-pointer"
-                        title="Billet bloqué jusqu'à validation par l'administration"
-                      >
-                        <Lock size={9} className="text-amber-600" />
-                        <span>En Attente Admin</span>
-                      </button>
-                    ) : null}
-                    {['VALIDATED', 'PENDING'].includes(res.status) && !(res as any).cancellationRequested && (
-                      <button 
-                        onClick={() => handleRequestCancellation(res.id!)}
-                        className="px-3 sm:px-4 py-1.5 border border-rose-200 text-rose-500 text-[7px] sm:text-[8px] font-bold uppercase tracking-widest rounded-lg hover:bg-rose-50 transition-all flex-shrink-0"
-                      >
-                        Annuler
-                      </button>
-                    )}
-                    {(res as any).cancellationRequested && (res as any).cancellationStatus === 'pending' && (
-                      <span className="px-3 py-1.5 bg-rose-50 text-rose-500 text-[6px] sm:text-[7px] font-black uppercase tracking-widest rounded-lg border border-rose-100 flex items-center gap-1">
-                        <Clock size={8} /> En attente d'annulation
-                      </span>
-                    )}
-                    {(res as any).cancellationStatus === 'approved' && (
-                      <span className="px-3 py-1.5 bg-rose-100 text-rose-700 text-[6px] sm:text-[7px] font-black uppercase tracking-widest rounded-lg border border-rose-200">
-                        Annulation Approuvée
-                      </span>
-                    )}
-                  </div>
                 </div>
               </div>
-            </div>
-          );
-        })
+            );
+          })
+          )}
+        </div>
+        </>
         )}
-      </div>
-      </>
-      )}
-    </motion.div>
-  );
-}
+      </motion.div>
+    );
+  }
 
 function VerificationView({ id, onClose, isAdmin, siteSettings }: { id: string, onClose: () => void, isAdmin?: boolean, siteSettings?: any }) {
   const [res, setRes] = useState<Reservation | null>(null);
@@ -8004,19 +8362,34 @@ function VerificationView({ id, onClose, isAdmin, siteSettings }: { id: string, 
     setAuthorizing(true);
     try {
       const updateTimestamp = Date.now();
+      const ticketId = res.ticketId || `AMR-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
       await updateDoc(doc(db, 'reservations', res.id), {
+        status: 'VALIDATED',
+        ticketId,
         boardingStatus: 'BOARDED',
-        boardedAt: updateTimestamp
+        boarded: true,
+        boardedAt: updateTimestamp,
+        isUsed: true,
+        usedAt: updateTimestamp,
+        validatedAt: res.validatedAt || updateTimestamp
       });
       await mongoApi.updateReservationStatus(res.id, {
+        status: 'VALIDATED',
+        ticketId,
         boarded: true,
-        status: 'VALIDATED'
+        boardingStatus: 'BOARDED',
+        boardedAt: updateTimestamp,
+        isUsed: true
       });
 
       setRes(prev => prev ? {
         ...prev,
+        status: 'VALIDATED',
+        ticketId,
         boardingStatus: 'BOARDED' as const,
-        boardedAt: updateTimestamp
+        boarded: true,
+        boardedAt: updateTimestamp,
+        isUsed: true
       } : null);
 
       setAuthorizedSuccess(true);

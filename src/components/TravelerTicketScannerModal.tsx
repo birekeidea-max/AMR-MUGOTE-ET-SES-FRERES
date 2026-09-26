@@ -13,7 +13,8 @@ import {
   User, 
   Ticket,
   Lock,
-  QrCode
+  QrCode,
+  Download
 } from 'lucide-react';
 import { Html5QrcodeScanner } from 'html5-qrcode';
 import { db } from '../lib/firebase';
@@ -25,9 +26,10 @@ interface TravelerTicketScannerModalProps {
   isOpen: boolean;
   onClose: () => void;
   siteSettings?: any;
+  onDownloadTicket?: (ticket: Reservation) => void;
 }
 
-export function TravelerTicketScannerModal({ isOpen, onClose, siteSettings }: TravelerTicketScannerModalProps) {
+export function TravelerTicketScannerModal({ isOpen, onClose, siteSettings, onDownloadTicket }: TravelerTicketScannerModalProps) {
   const [manualInput, setManualInput] = useState('');
   const [scannedTicket, setScannedTicket] = useState<Reservation | null>(null);
   const [loading, setLoading] = useState(false);
@@ -401,6 +403,18 @@ export function TravelerTicketScannerModal({ isOpen, onClose, siteSettings }: Tr
                   </div>
                 </div>
               </div>
+
+              {/* 1-Click Ticket Download Button if authorized */}
+              {(isPaid || isBoarded) && onDownloadTicket && (
+                <button
+                  type="button"
+                  onClick={() => onDownloadTicket(scannedTicket)}
+                  className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-black text-xs uppercase tracking-wider rounded-2xl shadow-lg shadow-emerald-600/30 transition flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <Download size={16} className="animate-bounce" />
+                  <span>Télécharger ce Billet Officiel (PDF)</span>
+                </button>
+              )}
 
               {/* Strict Notice: Read-only for traveler */}
               <div className="p-3 bg-slate-100 rounded-xl flex items-center justify-between text-[10px] text-slate-500 font-bold">
