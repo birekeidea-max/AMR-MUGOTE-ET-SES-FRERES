@@ -1212,7 +1212,10 @@ export default function App() {
                 <Ship size={20} className="text-white" />
               </div>
               <div className="text-left">
-                <h1 className="text-base sm:text-lg font-black tracking-tight uppercase text-white leading-tight">
+                <h1 
+                  style={{ fontFamily: '"Times New Roman", Times, serif' }}
+                  className="text-base sm:text-lg font-bold tracking-normal uppercase text-white leading-tight"
+                >
                   ETS AMR MUGOTE
                 </h1>
                 <p className="text-[9px] font-black tracking-widest text-slate-300 uppercase">
@@ -1328,7 +1331,12 @@ export default function App() {
                   <Ship className="text-white" size={22} />
                 </div>
                 <div>
-                  <span className="font-black text-white tracking-tight text-base uppercase">ETS AMR MUGOTE</span>
+                  <span 
+                    style={{ fontFamily: '"Times New Roman", Times, serif' }}
+                    className="font-bold text-white tracking-normal text-base uppercase"
+                  >
+                    ETS AMR MUGOTE
+                  </span>
                   <span className="text-[10px] text-slate-400 font-bold block">Bukavu ⇄ Goma</span>
                 </div>
               </div>

@@ -454,109 +454,115 @@ export function DailyBoardingRecapTable({
   const isSelectedToday = selectedDate === getTodayStr();
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3.5">
       {/* Toast Alert */}
       {toastMessage && (
-        <div className="fixed bottom-6 right-6 z-50 bg-[#001E2B] text-white border-2 border-[#00ED64] px-5 py-3.5 rounded-2xl shadow-2xl flex items-center gap-3 animate-fade-in text-xs font-bold">
-          <Sparkles size={16} className="text-[#00ED64] shrink-0" />
+        <div className="fixed bottom-6 right-6 z-50 bg-[#001E2B] text-white border-2 border-[#00ED64] px-4 py-2.5 rounded-xl shadow-2xl flex items-center gap-2.5 animate-fade-in text-xs font-bold">
+          <Sparkles size={15} className="text-[#00ED64] shrink-0" />
           <span>{toastMessage}</span>
         </div>
       )}
 
-      {/* Main Header Card with Signature MongoDB / Database Styling */}
-      <div className="bg-[#001E2B] border-2 border-[#00ED64]/40 rounded-3xl p-6 sm:p-7 shadow-2xl shadow-[#00ED64]/10 relative overflow-hidden text-white">
+      {/* Main Header Card with Signature MongoDB / Database Styling - Compact & Refined */}
+      <div className="bg-[#001E2B] border border-[#00ED64]/40 rounded-2xl p-4 sm:p-5 shadow-xl relative overflow-hidden text-white">
         {/* Glowing Top Line */}
-        <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-[#00ED64] via-[#00684A] to-[#00ED64]" />
+        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-[#00ED64] via-[#00684A] to-[#00ED64]" />
 
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5">
-          <div className="space-y-2">
-            <div className="flex items-center gap-3">
-              <span className="p-3 bg-[#00ED64]/15 text-[#00ED64] rounded-2xl border border-[#00ED64]/30 shadow-lg shadow-[#00ED64]/20">
-                <Calendar size={26} />
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2.5">
+              <span className="p-2 bg-[#00ED64]/15 text-[#00ED64] rounded-xl border border-[#00ED64]/30 shadow-sm shrink-0">
+                <Calendar size={20} />
               </span>
               <div>
-                <div className="flex flex-wrap items-center gap-2.5">
-                  <h2 className="text-xl sm:text-2xl font-black tracking-tight text-white">
-                    Tableau Récapitulatif Journalier des Départs & Embarquement
-                  </h2>
-                  <span className="text-[9px] font-black bg-[#00ED64] text-[#001E2B] px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h1 
+                    style={{ fontFamily: '"Times New Roman", Times, serif' }} 
+                    className="text-lg sm:text-xl font-bold uppercase tracking-wider text-amber-300 leading-tight"
+                  >
+                    ETS AMR MUGOTE
+                  </h1>
+                  <span className="text-[8.5px] font-black bg-[#00ED64] text-[#001E2B] px-2 py-0.5 rounded-full uppercase tracking-wider">
                     {sourceContext === 'mongodb' ? 'MongoDB Atlas' : 'Base de Données'}
                   </span>
                 </div>
-                <p className="text-xs text-[#00ED64]/80 font-medium mt-0.5">
-                  Gestion chronologique ordonnée par date de voyage • Lâcher et pointage direct des passagers à quai
+                <h2 className="text-xs sm:text-sm font-bold text-white mt-0.5">
+                  Tableau Récapitulatif Journalier des Départs & Embarquement
+                </h2>
+                <p className="text-[10px] text-[#00ED64]/80 font-medium">
+                  Gestion chronologique par date • Lâcher et pointage direct des passagers à quai
                 </p>
               </div>
             </div>
           </div>
 
           {/* Quick Action Tools */}
-          <div className="flex flex-wrap items-center gap-2.5">
+          <div className="flex flex-wrap items-center gap-2">
             <button
               onClick={handleCopyTextManifest}
-              className="px-3.5 py-2.5 bg-[#002B3B] hover:bg-[#00384D] text-[#00ED64] border border-[#00ED64]/30 rounded-xl text-xs font-bold flex items-center gap-2 transition cursor-pointer shadow-sm"
+              className="px-3 py-1.5 bg-[#002B3B] hover:bg-[#00384D] text-[#00ED64] border border-[#00ED64]/30 rounded-lg text-xs font-bold flex items-center gap-1.5 transition cursor-pointer shadow-sm"
               title="Copier la liste complète du jour pour WhatsApp ou la radio"
             >
-              <Copy size={14} />
-              <span className="hidden sm:inline">Copier le</span> Manifeste
+              <Copy size={13} />
+              <span className="hidden sm:inline">Copier</span> Manifeste
             </button>
 
             <button
               onClick={handlePrintDailyManifest}
-              className="px-4 py-2.5 bg-gradient-to-r from-[#00ED64] to-[#00c853] hover:brightness-110 text-[#001E2B] font-black rounded-xl text-xs flex items-center gap-2 transition cursor-pointer shadow-lg shadow-[#00ED64]/20 active:scale-95"
+              className="px-3.5 py-1.5 bg-gradient-to-r from-[#00ED64] to-[#00c853] hover:brightness-110 text-[#001E2B] font-black rounded-lg text-xs flex items-center gap-1.5 transition cursor-pointer shadow-md shadow-[#00ED64]/20 active:scale-95"
             >
-              <Printer size={14} />
-              <span>Imprimer le Manifeste</span>
+              <Printer size={13} />
+              <span>Imprimer Manifeste</span>
             </button>
 
             {onRefresh && (
               <button
                 onClick={onRefresh}
-                className="p-2.5 bg-[#002B3B] hover:bg-[#00384D] text-slate-300 border border-white/10 rounded-xl transition cursor-pointer"
+                className="p-1.5 bg-[#002B3B] hover:bg-[#00384D] text-slate-300 border border-white/10 rounded-lg transition cursor-pointer"
                 title="Actualiser les données"
               >
-                <RefreshCw size={15} />
+                <RefreshCw size={14} />
               </button>
             )}
           </div>
         </div>
 
         {/* Date Selector Ribbon ("Chaque jour à part") */}
-        <div className="mt-6 pt-6 border-t border-[#00ED64]/20 space-y-3">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <span className="text-[10px] font-black uppercase tracking-widest text-[#00ED64] flex items-center gap-1.5">
-              <Clock size={13} />
-              Sélectionnez le Jour de Voyage à Contrôler (Chaque jour à part) :
+        <div className="mt-3.5 pt-3.5 border-t border-[#00ED64]/20 space-y-2">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <span className="text-[9px] font-black uppercase tracking-widest text-[#00ED64] flex items-center gap-1">
+              <Clock size={12} />
+              Jour de Voyage à Contrôler :
             </span>
 
             {/* Direct Date Picker Input */}
-            <div className="flex items-center gap-2">
-              <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
+            <div className="flex items-center gap-1.5">
+              <label className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">
                 Autre Date :
               </label>
               <input
                 type="date"
                 value={selectedDate}
                 onChange={(e) => setSelectedDate(e.target.value)}
-                className="bg-[#002B3B] text-white border border-[#00ED64]/40 rounded-xl px-3 py-1.5 text-xs font-bold focus:outline-none focus:border-[#00ED64]"
+                className="bg-[#002B3B] text-white border border-[#00ED64]/40 rounded-lg px-2.5 py-1 text-xs font-bold focus:outline-none focus:border-[#00ED64]"
               />
             </div>
           </div>
 
           {/* Quick Date Chips Carousel */}
-          <div className="flex gap-2.5 overflow-x-auto pb-2 scrollbar-thin">
+          <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
             {/* Today Button */}
             <button
               onClick={() => setSelectedDate(getTodayStr())}
-              className={`px-4 py-2.5 rounded-2xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-2 shrink-0 cursor-pointer ${
+              className={`px-3 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-1.5 shrink-0 cursor-pointer ${
                 isSelectedToday
-                  ? 'bg-[#00ED64] text-[#001E2B] shadow-lg shadow-[#00ED64]/30 scale-102 border-2 border-[#00ED64]'
+                  ? 'bg-[#00ED64] text-[#001E2B] shadow-md shadow-[#00ED64]/30 border border-[#00ED64]'
                   : 'bg-[#002B3B]/80 text-white border border-white/10 hover:border-[#00ED64]/50'
               }`}
             >
-              <span className="relative flex h-2 w-2">
+              <span className="relative flex h-1.5 w-1.5">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
               </span>
               <span>Aujourd'hui ({getTodayStr()})</span>
             </button>
@@ -568,15 +574,15 @@ export function DailyBoardingRecapTable({
                 <button
                   key={date}
                   onClick={() => setSelectedDate(date)}
-                  className={`px-3.5 py-2 rounded-2xl text-xs font-extrabold uppercase tracking-wider transition-all flex items-center gap-2.5 shrink-0 cursor-pointer ${
+                  className={`px-2.5 py-1 rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-1.5 shrink-0 cursor-pointer ${
                     isSelected
-                      ? 'bg-white text-[#001E2B] shadow-lg shadow-white/20 border-2 border-[#00ED64] scale-102'
+                      ? 'bg-white text-[#001E2B] shadow-md shadow-white/20 border border-[#00ED64]'
                       : 'bg-[#002B3B]/60 text-slate-300 border border-white/10 hover:bg-[#002B3B] hover:text-white'
                   }`}
                 >
-                  <Calendar size={13} className={isSelected ? 'text-[#00684A]' : 'text-[#00ED64]'} />
+                  <Calendar size={12} className={isSelected ? 'text-[#00684A]' : 'text-[#00ED64]'} />
                   <span>{date}</span>
-                  <span className={`px-2 py-0.5 rounded-full text-[9px] font-black ${
+                  <span className={`px-1.5 py-0.2 rounded-full text-[9px] font-black ${
                     isSelected ? 'bg-[#001E2B] text-[#00ED64]' : 'bg-white/10 text-white'
                   }`}>
                     {totalPax} PAX ({boardedPax} à bord)
@@ -588,69 +594,69 @@ export function DailyBoardingRecapTable({
         </div>
       </div>
 
-      {/* Daily Progress & Metric Cards for Selected Date */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
-        <div className="bg-white p-4 rounded-2xl border-2 border-slate-200 shadow-sm space-y-1">
-          <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
-            <Users size={13} className="text-blue-600" />
+      {/* Daily Progress & Metric Cards for Selected Date - Compact */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5">
+        <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-xs space-y-0.5">
+          <span className="text-[9px] font-black uppercase tracking-wider text-slate-400 flex items-center gap-1">
+            <Users size={12} className="text-blue-600" />
             Total Voyageurs (PAX)
           </span>
-          <div className="text-2xl font-black text-slate-900">
-            {dayStats.totalPax} <span className="text-xs font-bold text-slate-400">passagers</span>
+          <div className="text-lg sm:text-xl font-black text-slate-900 leading-tight">
+            {dayStats.totalPax} <span className="text-[10px] font-bold text-slate-400">passagers</span>
           </div>
-          <span className="text-[10px] font-bold text-slate-500 block">
+          <span className="text-[9px] font-bold text-slate-500 block">
             sur {dayStats.totalRes} réservation(s)
           </span>
         </div>
 
-        <div className="bg-emerald-50/80 p-4 rounded-2xl border-2 border-emerald-300 shadow-sm space-y-1">
-          <span className="text-[10px] font-black uppercase tracking-wider text-emerald-800 flex items-center gap-1.5">
-            <CheckCircle2 size={13} className="text-emerald-600" />
-            Lâchés / Déjà à Bord
+        <div className="bg-emerald-50/80 p-3 rounded-xl border border-emerald-300 shadow-xs space-y-0.5">
+          <span className="text-[9px] font-black uppercase tracking-wider text-emerald-800 flex items-center gap-1">
+            <CheckCircle2 size={12} className="text-emerald-600" />
+            Lâchés / À Bord
           </span>
-          <div className="text-2xl font-black text-emerald-900">
-            {dayStats.boardedPax} <span className="text-xs font-bold text-emerald-700">PAX</span>
+          <div className="text-lg sm:text-xl font-black text-emerald-900 leading-tight">
+            {dayStats.boardedPax} <span className="text-[10px] font-bold text-emerald-700">PAX</span>
           </div>
-          <span className="text-[10px] font-black text-emerald-700 block">
-            {dayStats.percentBoarded}% du navire complété
+          <span className="text-[9px] font-black text-emerald-700 block">
+            {dayStats.percentBoarded}% complété
           </span>
         </div>
 
-        <div className="bg-amber-50/80 p-4 rounded-2xl border-2 border-amber-300 shadow-sm space-y-1">
-          <span className="text-[10px] font-black uppercase tracking-wider text-amber-800 flex items-center gap-1.5">
-            <Clock size={13} className="text-amber-600" />
+        <div className="bg-amber-50/80 p-3 rounded-xl border border-amber-300 shadow-xs space-y-0.5">
+          <span className="text-[9px] font-black uppercase tracking-wider text-amber-800 flex items-center gap-1">
+            <Clock size={12} className="text-amber-600" />
             À Lâcher / En Attente
           </span>
-          <div className="text-2xl font-black text-amber-900">
-            {dayStats.pendingPax} <span className="text-xs font-bold text-amber-700">PAX</span>
+          <div className="text-lg sm:text-xl font-black text-amber-900 leading-tight">
+            {dayStats.pendingPax} <span className="text-[10px] font-bold text-amber-700">PAX</span>
           </div>
-          <span className="text-[10px] font-bold text-amber-700 block">
-            En attente d'embarquement
+          <span className="text-[9px] font-bold text-amber-700 block">
+            En attente quai
           </span>
         </div>
 
-        <div className="bg-indigo-50/80 p-4 rounded-2xl border-2 border-indigo-200 shadow-sm space-y-1">
-          <span className="text-[10px] font-black uppercase tracking-wider text-indigo-800 flex items-center gap-1.5">
-            <UserCheck size={13} className="text-indigo-600" />
-            Réservations Validées
+        <div className="bg-indigo-50/80 p-3 rounded-xl border border-indigo-200 shadow-xs space-y-0.5">
+          <span className="text-[9px] font-black uppercase tracking-wider text-indigo-800 flex items-center gap-1">
+            <UserCheck size={12} className="text-indigo-600" />
+            Billets Validés
           </span>
-          <div className="text-2xl font-black text-indigo-950">
-            {dayStats.validatedPax} <span className="text-xs font-bold text-indigo-700">PAX</span>
+          <div className="text-lg sm:text-xl font-black text-indigo-950 leading-tight">
+            {dayStats.validatedPax} <span className="text-[10px] font-bold text-indigo-700">PAX</span>
           </div>
-          <span className="text-[10px] font-bold text-indigo-600 block">
-            Prêts pour embarquement
+          <span className="text-[9px] font-bold text-indigo-600 block">
+            Prêts embarquement
           </span>
         </div>
 
-        <div className="bg-slate-900 text-white p-4 rounded-2xl border-2 border-slate-800 shadow-sm space-y-1 col-span-2 sm:col-span-1">
-          <span className="text-[10px] font-black uppercase tracking-wider text-gold flex items-center gap-1.5">
-            <DollarSign size={13} className="text-gold" />
+        <div className="bg-slate-900 text-white p-3 rounded-xl border border-slate-800 shadow-xs space-y-0.5 col-span-2 sm:col-span-1">
+          <span className="text-[9px] font-black uppercase tracking-wider text-gold flex items-center gap-1">
+            <DollarSign size={12} className="text-gold" />
             Recette du Jour
           </span>
-          <div className="text-2xl font-black text-gold">
-            {dayStats.totalRevenue} $ <span className="text-xs font-bold text-slate-300">USD</span>
+          <div className="text-lg sm:text-xl font-black text-gold leading-tight">
+            {dayStats.totalRevenue} $ <span className="text-[10px] font-bold text-slate-300">USD</span>
           </div>
-          <span className="text-[10px] font-bold text-slate-400 block">
+          <span className="text-[9px] font-bold text-slate-400 block">
             Paiements vérifiés
           </span>
         </div>
@@ -658,17 +664,17 @@ export function DailyBoardingRecapTable({
 
       {/* Boarding Progress Bar */}
       {dayStats.totalPax > 0 && (
-        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-2">
-          <div className="flex items-center justify-between text-xs font-black">
-            <span className="uppercase tracking-wider text-slate-700 flex items-center gap-2">
-              <Anchor size={14} className="text-[#00684A]" />
-              Taux d'embarquement / passagers lâchés pour le {formatDateFr(selectedDate)}
+        <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-xs space-y-1.5">
+          <div className="flex items-center justify-between text-xs font-bold">
+            <span className="uppercase tracking-wider text-slate-700 flex items-center gap-1.5 text-[11px]">
+              <Anchor size={13} className="text-[#00684A]" />
+              Taux d'embarquement pour le {formatDateFr(selectedDate)}
             </span>
-            <span className="text-emerald-700 font-mono">
+            <span className="text-emerald-700 font-mono text-xs font-black">
               {dayStats.boardedPax} / {dayStats.totalPax} PAX ({dayStats.percentBoarded}%)
             </span>
           </div>
-          <div className="w-full h-3 bg-slate-100 rounded-full overflow-hidden border border-slate-200">
+          <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden border border-slate-200">
             <div 
               className="h-full bg-gradient-to-r from-emerald-500 to-[#00ED64] transition-all duration-500 rounded-full"
               style={{ width: `${dayStats.percentBoarded}%` }}
@@ -677,32 +683,32 @@ export function DailyBoardingRecapTable({
         </div>
       )}
 
-      {/* Operational Controls & Filter Toolbar */}
-      <div className="bg-white p-5 rounded-2xl border-2 border-slate-200 shadow-sm space-y-4">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      {/* Operational Controls & Filter Toolbar - Compact */}
+      <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-xs space-y-2">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-2.5">
           {/* Search Box */}
           <div className="relative flex-1">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={17} />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
             <input
               type="text"
               placeholder="Rechercher par nom, téléphone, N° billet, navire..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:border-[#00684A] focus:bg-white transition-all"
+              className="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium text-slate-800 focus:outline-none focus:border-[#00684A] focus:bg-white transition-all"
             />
           </div>
 
           {/* Quick Ship & Time Filter */}
-          <div className="flex flex-wrap items-center gap-2.5">
+          <div className="flex flex-wrap items-center gap-2">
             {uniqueTimes.length > 0 && (
               <select
                 value={selectedDepartureTime}
                 onChange={(e) => setSelectedDepartureTime(e.target.value)}
-                className="px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 focus:outline-none focus:border-[#00684A]"
+                className="px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-700 focus:outline-none focus:border-[#00684A]"
               >
-                <option value="ALL">Tous les départs ({uniqueTimes.length})</option>
+                <option value="ALL">Tous départs ({uniqueTimes.length})</option>
                 {uniqueTimes.map(time => (
-                  <option key={time} value={time}>Départ de {time}</option>
+                  <option key={time} value={time}>Départ {time}</option>
                 ))}
               </select>
             )}
@@ -711,9 +717,9 @@ export function DailyBoardingRecapTable({
               <select
                 value={selectedShip}
                 onChange={(e) => setSelectedShip(e.target.value)}
-                className="px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 focus:outline-none focus:border-[#00684A]"
+                className="px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-700 focus:outline-none focus:border-[#00684A]"
               >
-                <option value="ALL">Tous les navires ({uniqueShips.length})</option>
+                <option value="ALL">Tous navires ({uniqueShips.length})</option>
                 {uniqueShips.map(ship => (
                   <option key={ship} value={ship}>{ship}</option>
                 ))}
@@ -724,34 +730,34 @@ export function DailyBoardingRecapTable({
             <button
               onClick={handleBatchBoardAllValidated}
               disabled={batchLoading || dayStats.pendingPax === 0}
-              className="px-4 py-2.5 bg-[#001E2B] hover:bg-[#003B2B] text-[#00ED64] border border-[#00ED64]/40 rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-2 transition cursor-pointer disabled:opacity-40 shadow-sm active:scale-95"
+              className="px-3 py-1.5 bg-[#001E2B] hover:bg-[#003B2B] text-[#00ED64] border border-[#00ED64]/40 rounded-lg text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 transition cursor-pointer disabled:opacity-40 shadow-xs active:scale-95"
               title="Lâcher tous les passagers validés du jour en une seule fois"
             >
-              <UserCheck size={14} />
-              <span>{batchLoading ? 'Lâcher en cours...' : 'Lâcher Tous les Validés'}</span>
+              <UserCheck size={13} />
+              <span>{batchLoading ? 'Lâcher...' : 'Lâcher Tous'}</span>
             </button>
           </div>
         </div>
 
         {/* Filter Status Chips */}
-        <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-100">
-          <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 mr-1 flex items-center gap-1">
-            <Filter size={12} /> Filtres :
+        <div className="flex flex-wrap items-center gap-1.5 pt-1.5 border-t border-slate-100">
+          <span className="text-[9px] font-black uppercase tracking-widest text-slate-400 mr-1 flex items-center gap-1">
+            <Filter size={11} /> Filtres :
           </span>
 
           {[
             { id: 'ALL', label: `Tous (${dayReservations.length})` },
-            { id: 'TO_BOARD', label: `À Lâcher / En attente (${dayStats.pendingPax})`, badgeColor: 'bg-amber-100 text-amber-800' },
-            { id: 'BOARDED', label: `Déjà Lâchés / Embarqués (${dayStats.boardedPax})`, badgeColor: 'bg-emerald-100 text-emerald-800' },
-            { id: 'VALIDATED', label: `Validés uniquement (${dayStats.validatedPax})` },
-            { id: 'PENDING', label: `Paiement en attente` }
+            { id: 'TO_BOARD', label: `À Lâcher (${dayStats.pendingPax})` },
+            { id: 'BOARDED', label: `Lâchés (${dayStats.boardedPax})` },
+            { id: 'VALIDATED', label: `Validés (${dayStats.validatedPax})` },
+            { id: 'PENDING', label: `En attente` }
           ].map(f => (
             <button
               key={f.id}
               onClick={() => setFilterStatus(f.id as any)}
-              className={`px-3 py-1.5 rounded-xl text-[10px] font-extrabold uppercase tracking-wider transition-all cursor-pointer ${
+              className={`px-2.5 py-1 rounded-lg text-[9px] font-bold uppercase tracking-wider transition-all cursor-pointer ${
                 filterStatus === f.id
-                  ? 'bg-[#001E2B] text-[#00ED64] shadow-sm'
+                  ? 'bg-[#001E2B] text-[#00ED64] shadow-xs'
                   : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
               }`}
             >
@@ -761,46 +767,45 @@ export function DailyBoardingRecapTable({
         </div>
       </div>
 
-      {/* Main Passenger Boarding Manifest Table (Sorted in Order) */}
-      <div className="bg-white rounded-3xl border-2 border-slate-200 shadow-xl overflow-hidden">
+      {/* Main Passenger Boarding Manifest Table (Sorted in Order) - Compact */}
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-md overflow-hidden">
         {/* Table Title Bar */}
-        <div className="bg-slate-50 border-b border-slate-200 px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <ArrowUpDown size={16} className="text-[#00684A]" />
-            <h3 className="text-xs font-black uppercase tracking-wider text-slate-800">
-              Liste Ordonnée des Voyageurs du {formatDateFr(selectedDate)} ({filteredReservations.length} affichés)
+        <div className="bg-slate-50 border-b border-slate-200 px-4 py-2 flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+          <div className="flex items-center gap-1.5">
+            <ArrowUpDown size={14} className="text-[#00684A]" />
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800">
+              Liste Ordonnée des Voyageurs du {formatDateFr(selectedDate)} ({filteredReservations.length})
             </h3>
           </div>
-          <span className="text-[10px] font-bold text-slate-500">
-            Tri automatique : Heure de départ ➔ Navire ➔ Nom du passager
+          <span className="text-[9px] font-medium text-slate-500">
+            Tri : Heure ➔ Navire ➔ Passager
           </span>
         </div>
 
         {filteredReservations.length === 0 ? (
-          <div className="p-12 text-center space-y-3">
-            <div className="w-16 h-16 bg-slate-100 text-slate-400 rounded-3xl flex items-center justify-center mx-auto">
-              <Users size={32} />
+          <div className="p-8 text-center space-y-2">
+            <div className="w-12 h-12 bg-slate-100 text-slate-400 rounded-2xl flex items-center justify-center mx-auto">
+              <Users size={24} />
             </div>
-            <h4 className="text-base font-black text-slate-700">
+            <h4 className="text-sm font-bold text-slate-700">
               Aucun voyageur trouvé pour cette date
             </h4>
             <p className="text-xs text-slate-400 max-w-md mx-auto">
-              Aucune réservation ne correspond aux critères pour le <strong>{selectedDate}</strong>. 
-              Sélectionnez une autre date dans le sélecteur ci-dessus.
+              Aucune réservation ne correspond aux critères pour le <strong>{selectedDate}</strong>.
             </p>
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
+            <table className="w-full text-left border-collapse text-xs">
               <thead>
-                <tr className="bg-slate-50/80 border-b border-slate-200 text-[10px] font-black uppercase tracking-wider text-slate-500">
-                  <th className="px-4 py-3.5 text-center w-12">N° Ordre</th>
-                  <th className="px-5 py-3.5">Heure & Navire</th>
-                  <th className="px-5 py-3.5">Voyageur (Nom & Contact)</th>
-                  <th className="px-5 py-3.5">Liaison / Classe</th>
-                  <th className="px-4 py-3.5 text-center">Billet & Montant</th>
-                  <th className="px-5 py-3.5 text-center">Statut d'Embarquement</th>
-                  <th className="px-6 py-3.5 text-right">Action Immédiate ("Lâcher")</th>
+                <tr className="bg-slate-100/80 border-b border-slate-200 text-[9px] font-black uppercase tracking-wider text-slate-600">
+                  <th className="px-2.5 py-2 text-center w-10">N°</th>
+                  <th className="px-3 py-2">Heure & Navire</th>
+                  <th className="px-3 py-2">Voyageur (Nom & Contact)</th>
+                  <th className="px-3 py-2">Liaison / Classe</th>
+                  <th className="px-2.5 py-2 text-center">Billet & Montant</th>
+                  <th className="px-3 py-2 text-center">Embarquement</th>
+                  <th className="px-3 py-2 text-right">Action ("Lâcher")</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-xs">
@@ -815,53 +820,53 @@ export function DailyBoardingRecapTable({
                     <tr 
                       key={resId || index} 
                       className={`transition-colors hover:bg-slate-50/80 ${
-                        isBoarded ? 'bg-emerald-50/30' : ''
+                        isBoarded ? 'bg-emerald-50/25' : ''
                       }`}
                     >
                       {/* Chronological order index */}
-                      <td className="px-4 py-4 text-center font-mono font-black text-slate-400">
-                        <span className="w-7 h-7 rounded-lg bg-slate-100 flex items-center justify-center mx-auto text-[11px] text-slate-700">
+                      <td className="px-2.5 py-2 text-center font-mono font-bold text-slate-400">
+                        <span className="w-5 h-5 rounded bg-slate-100 flex items-center justify-center mx-auto text-[10px] text-slate-700">
                           #{index + 1}
                         </span>
                       </td>
 
                       {/* Departure Time & Ship */}
-                      <td className="px-5 py-4">
+                      <td className="px-3 py-2">
                         <div className="space-y-0.5">
-                          <div className="flex items-center gap-1.5">
-                            <Clock size={13} className="text-[#00684A]" />
-                            <span className="font-mono font-black text-sm text-slate-900">
+                          <div className="flex items-center gap-1">
+                            <Clock size={11} className="text-[#00684A]" />
+                            <span className="font-mono font-bold text-xs text-slate-900">
                               {res.departureTime || '07:30'}
                             </span>
                           </div>
-                          <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-600">
-                            <Ship size={12} className="text-slate-400" />
+                          <div className="flex items-center gap-1 text-[9.5px] font-medium text-slate-600">
+                            <Ship size={10} className="text-slate-400" />
                             <span>{res.ship || 'Mugote'}</span>
                           </div>
                         </div>
                       </td>
 
                       {/* Passenger Name & Contact */}
-                      <td className="px-5 py-4">
-                        <div className="flex items-center gap-3">
-                          <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-black text-xs ${
+                      <td className="px-3 py-2">
+                        <div className="flex items-center gap-2">
+                          <div className={`w-6 h-6 rounded-lg flex items-center justify-center font-bold text-[10px] shrink-0 ${
                             isBoarded 
                               ? 'bg-emerald-500 text-white' 
                               : 'bg-slate-200 text-slate-700'
                           }`}>
                             {(res.fullName || 'V')[0].toUpperCase()}
                           </div>
-                          <div>
-                            <div className="font-black text-slate-900 uppercase">
+                          <div className="min-w-0">
+                            <div className="font-bold text-slate-900 text-xs truncate max-w-[170px]">
                               {res.fullName} {res.lastName || ''}
                             </div>
-                            <div className="flex items-center gap-2 text-[10px] text-slate-500 font-mono mt-0.5">
-                              <span className="flex items-center gap-1">
-                                <Phone size={10} />
+                            <div className="flex items-center gap-1.5 text-[9.5px] text-slate-500 font-mono">
+                              <span className="flex items-center gap-0.5">
+                                <Phone size={9} />
                                 {res.phone || 'N/A'}
                               </span>
                               {res.identityNum && (
-                                <span className="bg-slate-100 px-1.5 py-0.2 rounded text-[9px]">
+                                <span className="bg-slate-100 px-1 py-0.2 rounded text-[8.5px]">
                                   ID: {res.identityNum}
                                 </span>
                               )}
@@ -871,16 +876,16 @@ export function DailyBoardingRecapTable({
                       </td>
 
                       {/* Itinerary & Class & PAX */}
-                      <td className="px-5 py-4">
-                        <div className="space-y-1">
-                          <div className="font-extrabold text-slate-800 text-[11px] flex items-center gap-1">
-                            <span>{res.itinerary || 'GOMA - BUKAVU'}</span>
+                      <td className="px-3 py-2">
+                        <div className="space-y-0.5">
+                          <div className="font-bold text-slate-800 text-[10.5px]">
+                            {res.itinerary || 'GOMA - BUKAVU'}
                           </div>
-                          <div className="flex items-center gap-1.5">
-                            <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-700 font-bold text-[9px] uppercase">
+                          <div className="flex items-center gap-1">
+                            <span className="px-1.5 py-0.2 rounded bg-slate-100 text-slate-700 font-medium text-[8.5px] uppercase">
                               {res.travelClass || 'Standard'}
                             </span>
-                            <span className="px-2 py-0.5 rounded bg-blue-50 text-blue-700 font-black text-[9px]">
+                            <span className="px-1.5 py-0.2 rounded bg-blue-50 text-blue-700 font-bold text-[8.5px]">
                               {paxCount} PAX
                             </span>
                           </div>
@@ -888,81 +893,79 @@ export function DailyBoardingRecapTable({
                       </td>
 
                       {/* Ticket ID & Amount */}
-                      <td className="px-4 py-4 text-center">
-                        <div className="space-y-1">
-                          <span className="font-mono text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded block truncate max-w-[110px] mx-auto">
+                      <td className="px-2.5 py-2 text-center">
+                        <div className="space-y-0.5">
+                          <span className="font-mono text-[9px] font-medium text-slate-500 bg-slate-100 px-1.5 py-0.2 rounded block truncate max-w-[95px] mx-auto">
                             {res.ticketId || (resId ? resId.slice(0, 8).toUpperCase() : 'TICKET')}
                           </span>
-                          <span className="font-mono font-black text-xs text-slate-900 block">
+                          <span className="font-mono font-bold text-xs text-slate-900 block">
                             {res.amount}$
                           </span>
-                          <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-full inline-block ${
+                          <span className={`text-[7.5px] font-bold uppercase px-1.5 py-0.2 rounded-full inline-block ${
                             isValidated 
                               ? 'bg-emerald-100 text-emerald-800' 
                               : 'bg-amber-100 text-amber-800'
                           }`}>
-                            {isValidated ? 'Payé' : 'En attente'}
+                            {isValidated ? 'Payé' : 'Attente'}
                           </span>
                         </div>
                       </td>
 
                       {/* Boarding Status with Timestamp */}
-                      <td className="px-5 py-4 text-center">
-                        <div className="inline-flex flex-col items-center gap-1">
-                          <span className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 border shadow-sm ${
+                      <td className="px-3 py-2 text-center">
+                        <div className="inline-flex flex-col items-center gap-0.5">
+                          <span className={`px-2 py-0.5 rounded-lg text-[9px] font-bold uppercase tracking-wider flex items-center gap-1 border shadow-2xs ${
                             isBoarded
                               ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
                               : 'bg-amber-50 text-amber-800 border-amber-300'
                           }`}>
                             {isBoarded ? (
                               <>
-                                <CheckCircle2 size={13} className="text-emerald-600" />
-                                <span>🚢 À BORD / LÂCHÉ</span>
+                                <CheckCircle2 size={11} className="text-emerald-600" />
+                                <span>À BORD</span>
                               </>
                             ) : (
                               <>
-                                <Clock size={13} className="text-amber-600" />
-                                <span>Non embarqué</span>
+                                <Clock size={11} className="text-amber-600" />
+                                <span>En attente</span>
                               </>
                             )}
                           </span>
 
                           {isBoarded && res.boardedAt && (
-                            <span className="text-[9px] text-slate-400 font-mono">
-                              Pointé à {new Date(res.boardedAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+                            <span className="text-[8.5px] text-slate-400 font-mono">
+                              {new Date(res.boardedAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
                             </span>
                           )}
                         </div>
                       </td>
 
                       {/* Direct Action "Lâcher directement" */}
-                      <td className="px-6 py-4 text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          <button
-                            onClick={() => handleToggleBoarding(res)}
-                            disabled={isLoadingThis}
-                            className={`px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-1.5 shadow-md cursor-pointer active:scale-95 disabled:opacity-50 ${
-                              isBoarded
-                                ? 'bg-slate-100 hover:bg-rose-50 hover:text-rose-700 text-slate-600 border border-slate-200'
-                                : 'bg-[#001E2B] hover:bg-[#003B2B] text-[#00ED64] border-2 border-[#00ED64]/60 shadow-emerald-500/20 hover:scale-102'
-                            }`}
-                            title={isBoarded ? "Annuler le lâcher / Débarquer" : "Lâcher et autoriser l'accès au bateau"}
-                          >
-                            {isLoadingThis ? (
-                              <RefreshCw size={13} className="animate-spin" />
-                            ) : isBoarded ? (
-                              <>
-                                <X size={13} />
-                                <span>Débarquer</span>
-                              </>
-                            ) : (
-                              <>
-                                <Check size={14} className="text-[#00ED64]" />
-                                <span>Lâcher / Embarquer</span>
-                              </>
-                            )}
-                          </button>
-                        </div>
+                      <td className="px-3 py-2 text-right">
+                        <button
+                          onClick={() => handleToggleBoarding(res)}
+                          disabled={isLoadingThis}
+                          className={`px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all inline-flex items-center gap-1 shadow-xs cursor-pointer active:scale-95 disabled:opacity-50 ${
+                            isBoarded
+                              ? 'bg-slate-100 hover:bg-rose-50 hover:text-rose-700 text-slate-600 border border-slate-200'
+                              : 'bg-[#001E2B] hover:bg-[#003B2B] text-[#00ED64] border border-[#00ED64]/60 shadow-emerald-500/10'
+                          }`}
+                          title={isBoarded ? "Annuler le lâcher / Débarquer" : "Lâcher et autoriser l'accès au bateau"}
+                        >
+                          {isLoadingThis ? (
+                            <RefreshCw size={11} className="animate-spin" />
+                          ) : isBoarded ? (
+                            <>
+                              <X size={11} />
+                              <span>Débarquer</span>
+                            </>
+                          ) : (
+                            <>
+                              <Check size={12} className="text-[#00ED64]" />
+                              <span>Lâcher</span>
+                            </>
+                          )}
+                        </button>
                       </td>
                     </tr>
                   );
