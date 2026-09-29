@@ -76,6 +76,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { MongoMigrationView } from './components/MongoMigrationView';
 import { AdminRemindersView } from './components/AdminRemindersView';
 import { DailyBoardingRecapTable } from './components/DailyBoardingRecapTable';
+import { FinanceRevenueView } from './components/FinanceRevenueView';
 import { FerryhopperBookingEngine } from './components/FerryhopperBookingEngine';
 import { HomeView } from './components/HomeView';
 import { PlatformAuthGate } from './components/PlatformAuthGate';
@@ -126,6 +127,7 @@ import SchedulesAndTariffs from './components/SchedulesAndTariffs';
 import AdminTarifsView from './components/AdminTarifsView';
 import { TravelerTicketScannerModal } from './components/TravelerTicketScannerModal';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { Navbar } from './components/Navbar';
 
 // --- Safe localStorage Polyfill for sandboxed iframe environments ---
 let safeLocalStorage: Storage;
@@ -886,17 +888,6 @@ export default function App() {
   const [schedules, setSchedules] = useState<any[]>([]);
   const [currency, setCurrency] = useState<'USD' | 'CDF'>('USD');
 
-  // Ref et défilement fluide de la barre de navigation
-  const navScrollRef = useRef<HTMLDivElement>(null);
-  const scrollNav = (direction: 'left' | 'right') => {
-    if (navScrollRef.current) {
-      navScrollRef.current.scrollBy({
-        left: direction === 'left' ? -280 : 280,
-        behavior: 'smooth'
-      });
-    }
-  };
-
   // MANDATORY: Test connection to Firestore on boot
   useEffect(() => {
     async function testConnection() {
@@ -1306,94 +1297,19 @@ export default function App() {
           </div>
 
           {/* ========================================================= */}
-          {/* BARRE DE NAVIGATION EN BLEU MARINE                        */}
-          {/* Dashboard masqué aux clients, Flotte & Journal retirés    */}
+          {/* BARRE DE NAVIGATION ÉPURÉE & COMPACTE (NAVBAR)            */}
           {/* ========================================================= */}
-          <div className="w-full border-t border-[#001f35] mt-2.5 pt-2 bg-[#00243d]">
-            <div className="max-w-7xl mx-auto px-2 sm:px-4 flex items-center gap-1 sm:gap-2">
-              <button 
-                type="button"
-                onClick={() => scrollNav('left')}
-                className="p-2 sm:p-2.5 rounded-xl bg-[#001f35] hover:bg-[#003154] text-white border border-slate-700 shadow-xs transition shrink-0 cursor-pointer active:scale-90"
-                title="Défiler vers la gauche"
-              >
-                <ChevronLeft size={18} className="stroke-[2.5]" />
-              </button>
-
-              <nav 
-                ref={navScrollRef}
-                className="flex-1 overflow-x-auto scroll-smooth no-scrollbar touch-pan-x flex items-center gap-2.5 py-1 px-1"
-              >
-                {[
-                  { id: 'home', label: 'ACCUEIL', icon: Anchor, sub: 'Goma ⇄ Bukavu' },
-                  { id: 'booking', label: 'RÉSERVER UN BILLET', icon: Ticket, highlight: true, sub: 'Formulaire' },
-                  { id: 'tickets', label: 'MES BILLETS & QR', icon: QrCode, sub: 'Embarquement' },
-                  { id: 'tarifs', label: 'HORAIRES & TARIFS', icon: Clock, sub: '07h30 & 18h00' },
-                  { id: 'map', label: 'PORTS & LOCALISATION', icon: MapPin, sub: 'Goma • Beach Muhanzi' },
-                  { id: 'dashboard', label: 'BASE DE DONNÉES', icon: Database, sub: 'Secret requis' }
-                ].map((item) => {
-                  const isDashboard = item.id === 'dashboard';
-                  const isActive = currentPage === item.id;
-                  const Icon = item.icon;
-
-                  return (
-                    <button
-                      key={item.id}
-                      onClick={(e) => {
-                        e.currentTarget.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
-                        if (isDashboard) {
-                          setIsAdminUnlocked(false);
-                          setCurrentPage('dashboard');
-                        } else {
-                          setCurrentPage(item.id as Page);
-                        }
-                      }}
-                      className={cn(
-                        "px-4 sm:px-5 py-2.5 sm:py-3 rounded-2xl font-black uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap flex items-center gap-2.5 border shadow-sm shrink-0 active:scale-95",
-                        isActive
-                          ? "bg-white text-[#002b49] border-white shadow-lg scale-102"
-                          : item.highlight
-                          ? "bg-[#003e66] hover:bg-[#004d80] text-white border-blue-400/50 shadow-sm font-black"
-                          : isDashboard
-                          ? "bg-slate-900 text-slate-200 hover:bg-black border-slate-700"
-                          : "bg-[#001f35] text-slate-200 hover:text-white hover:bg-[#003154] border-slate-700/60"
-                      )}
-                    >
-                      <div className={cn(
-                        "p-1.5 rounded-xl flex items-center justify-center shrink-0",
-                        isActive 
-                          ? "bg-[#002b49]/10 text-[#002b49]" 
-                          : item.highlight 
-                          ? "bg-white/20 text-white" 
-                          : "bg-white/10 text-white"
-                      )}>
-                        <Icon size={17} className="stroke-[2.5]" />
-                      </div>
-                      <div className="text-left">
-                        <div className="text-xs sm:text-sm font-black leading-tight">{item.label}</div>
-                        <div className={cn(
-                          "text-[9px] font-bold lowercase tracking-normal",
-                          isActive ? "text-[#002b49]/80" : "text-slate-300"
-                        )}>
-                          {item.sub}
-                        </div>
-                      </div>
-                    </button>
-                  );
-                })}
-              </nav>
-
-              {/* Bouton défilement vers la droite */}
-              <button 
-                type="button"
-                onClick={() => scrollNav('right')}
-                className="p-2 sm:p-2.5 rounded-xl bg-[#001f35] hover:bg-[#003154] text-white border border-slate-700 shadow-xs transition shrink-0 cursor-pointer active:scale-90"
-                title="Défiler vers la droite"
-              >
-                <ChevronRight size={18} className="stroke-[2.5]" />
-              </button>
-            </div>
-          </div>
+          <Navbar 
+            activeId={currentPage}
+            onTabChange={(id) => {
+              if (id === 'dashboard') {
+                setIsAdminUnlocked(false);
+                setCurrentPage('dashboard');
+              } else {
+                setCurrentPage(id as Page);
+              }
+            }}
+          />
         </header>
       </div>
 
@@ -1421,17 +1337,16 @@ export default function App() {
               </button>
             </div>
             
-            <div className="flex-1 space-y-2.5 overflow-y-auto no-scrollbar">
+            <div className="flex-1 space-y-1 overflow-y-auto no-scrollbar py-2">
               {[
-                { id: 'home', label: 'ACCUEIL', icon: Anchor },
-                { id: 'booking', label: 'RÉSERVER UN BILLET', icon: Ticket },
-                { id: 'tickets', label: 'MES BILLETS', icon: QrCode },
-                { id: 'tarifs', label: 'HORAIRES & TARIFS', icon: Clock },
-                { id: 'map', label: 'PORTS & LOCALISATION', icon: MapPin },
-                { id: 'dashboard', label: 'BASE DE DONNÉES & ADMIN', icon: Database }
+                { id: 'home', label: 'Accueil' },
+                { id: 'booking', label: 'Réserver un billet' },
+                { id: 'tickets', label: 'Mes billets' },
+                { id: 'tarifs', label: 'Horaires & Tarifs' },
+                { id: 'map', label: 'Ports & Localisation' },
+                { id: 'dashboard', label: 'Base de données' }
               ].map(item => {
                 const isDashboard = item.id === 'dashboard';
-                const Icon = item.icon;
                 const isActive = currentPage === item.id;
                 return (
                   <button 
@@ -1446,16 +1361,14 @@ export default function App() {
                       }
                     }}
                     className={cn(
-                      "w-full px-5 py-4 rounded-2xl text-left font-black uppercase tracking-wider transition-all duration-200 relative overflow-hidden flex items-center justify-between cursor-pointer border",
+                      "w-full px-4 py-3 rounded-lg text-left text-sm font-medium transition-colors duration-150 flex items-center justify-between cursor-pointer",
                       isActive 
-                        ? "bg-white text-[#002b49] border-white shadow-xl"
-                        : "text-slate-200 hover:text-white hover:bg-white/10 border-white/20 bg-[#0b132b]"
+                        ? "text-white font-semibold bg-white/10 border-l-2 border-amber-400 pl-3.5"
+                        : "text-slate-300 hover:text-white hover:bg-white/[0.04]"
                     )}
                   >
-                    <div className="flex items-center gap-3 relative z-10">
-                      {Icon && <Icon size={18} className={isActive ? "text-[#002b49]" : "text-white"} />}
-                      <span>{item.label}</span>
-                    </div>
+                    <span>{item.label}</span>
+                    {isActive && <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />}
                   </button>
                 );
               })}
@@ -1622,19 +1535,6 @@ export default function App() {
               <span className="text-amber-300/80 font-medium">
                 Goma • Bukavu • Lac Kivu (RDC)
               </span>
-              <span className="text-white/20">•</span>
-              <button 
-                type="button"
-                onClick={() => {
-                  setIsAdminUnlocked(false);
-                  setCurrentPage('dashboard');
-                }}
-                className="inline-flex items-center gap-1 text-[8pt] text-blue-300 hover:text-white transition-colors cursor-pointer opacity-80 hover:opacity-100"
-                title="Accès sécurisé à la Base de Données (Secret obligatoire)"
-              >
-                <Lock size={10} className="text-[#00ED64]" />
-                <span className="font-bold text-[#00ED64]">Base de Données</span>
-              </button>
             </div>
           </div>
 
@@ -4895,8 +4795,8 @@ function Payment({ reservation, onComplete, siteSettings }: { reservation: Reser
   );
 }
 
-function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlocked, setIsAdminUnlocked, setUser }: { siteSettings?: { homeBg: string, homeDetail: string }, onNavigate: (page: string) => void, schedules: any[], isAdmin: boolean, isAdminUnlocked: boolean, setIsAdminUnlocked: (val: boolean) => void, setUser?: (u: any) => void }) {
-  const [tab, setTab] = useState<'recap' | 'reservations' | 'reminders' | 'tarifs' | 'users' | 'fleet' | 'media' | 'settings' | 'messages' | 'schedules' | 'scanner' | 'mongodb'>('recap');
+function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlocked, setIsAdminUnlocked, setUser }: { siteSettings?: { homeBg: string, homeDetail: string, exchangeRate?: number }, onNavigate: (page: string) => void, schedules: any[], isAdmin: boolean, isAdminUnlocked: boolean, setIsAdminUnlocked: (val: boolean) => void, setUser?: (u: any) => void }) {
+  const [tab, setTab] = useState<'recap' | 'finances' | 'reservations' | 'reminders' | 'tarifs' | 'users' | 'fleet' | 'media' | 'settings' | 'messages' | 'schedules' | 'scanner' | 'mongodb'>('recap');
   const [reservationViewMode, setReservationViewMode] = useState<'daily' | 'all'>('daily');
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [usersList, setUsersList] = useState<any[]>([]);
@@ -5181,14 +5081,22 @@ function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlock
     setAdminLoading(true);
     
     try {
-      const cleanEmail = adminEmailInput.trim().toLowerCase() || getAdminEmail().toLowerCase();
+      const cleanEmail = adminEmailInput.trim().toLowerCase();
       const cleanPassword = adminPasswordInput.trim();
 
-      if (!cleanPassword) {
-        throw new Error("Pour tout accès dans la base de données, le secret de la base de données est obligatoire avant d'entrer dans la base de données.");
+      if (!cleanEmail) {
+        throw new Error("L'adresse email administrateur est requise pour accéder à la base de données.");
       }
 
-      const isValidEmail = !cleanEmail || cleanEmail === getAdminEmail().toLowerCase() || cleanEmail === 'birekeidea@gmail.com' || cleanEmail === 'admin@amrmugote.com';
+      if (!cleanPassword) {
+        throw new Error("Pour tout accès dans la base de données, le secret de la base de données est strictement obligatoire avant d'entrer.");
+      }
+
+      const isValidEmail = cleanEmail === getAdminEmail().toLowerCase() || cleanEmail === 'birekeidea@gmail.com' || cleanEmail === 'admin@amrmugote.com';
+      if (!isValidEmail) {
+        throw new Error("Accès refusé : Adresse e-mail administrateur non autorisée.");
+      }
+
       const isValidKey = cleanPassword === getAdminPassword() || cleanPassword === 'b012000b' || (Boolean((siteSettings as any)?.adminCode) && cleanPassword === (siteSettings as any)?.adminCode);
 
       if (!isValidKey) {
@@ -5737,9 +5645,14 @@ function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlock
       className="space-y-12 relative"
     >
       <button 
-        onClick={() => onNavigate('home')} 
-        className="absolute top-0 right-0 p-3 bg-slate-100 text-slate-400 hover:text-black rounded-xl transition-all z-20"
-        title="Retour Accueil"
+        onClick={() => {
+          setIsAdminUnlocked(false);
+          setAdminPasswordInput('');
+          setAdminEmailInput('');
+          onNavigate('home');
+        }} 
+        className="absolute top-0 right-0 p-3 bg-slate-100 text-slate-400 hover:text-black rounded-xl transition-all z-20 cursor-pointer"
+        title="Fermer et Verrouiller la Base de Données"
       >
         <X size={20} />
       </button>
@@ -5763,7 +5676,7 @@ function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlock
                 Console & Base de Données
               </h3>
               <p className="text-[11px] font-bold text-slate-600 mt-1 uppercase tracking-wider">
-                Le secret de la base de données est obligatoire avant d'entrer
+                Connexion exclusive administrateur avec secret confidentiel
               </p>
             </div>
 
@@ -5772,7 +5685,7 @@ function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlock
               <div className="flex items-center justify-between">
                 <span className="text-[10px] font-black uppercase tracking-wider text-emerald-950 flex items-center gap-1.5">
                   <ShieldCheck size={14} className="text-[#00684A]" />
-                  Règle de Sécurité : Secret Obligatoire
+                  Règle de Sécurité : Authentification Unique
                 </span>
                 <button
                   type="button"
@@ -5784,14 +5697,14 @@ function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlock
               </div>
 
               <p className="text-[11px] text-slate-700 font-medium leading-relaxed">
-                Pour tout accès dans la base de données, <strong>le secret de la base de données est obligatoire avant d'entrer dans la base de données</strong>. Toutes les données (réservations, passagers, flotte, caisse et MongoDB Atlas) sont verrouillées tant que le secret n'a pas été validé.
+                Pour tout accès à la base de données, <strong>le compte administrateur doit être connecté seul avec ses identifiants et son secret confidentiel</strong>. Les champs sont strictement protégés et nécessitent une saisie manuelle à chaque session.
               </p>
 
               {showAccessHelp && (
                 <div className="pt-2.5 border-t border-emerald-200 text-[10px] space-y-1.5 text-slate-700">
                   <div className="flex items-start gap-2">
                     <span className="text-[#00684A] font-bold">1.</span>
-                    <span><strong>Email Administrateur Autorisé :</strong> birekeidea@gmail.com</span>
+                    <span><strong>Email Administrateur :</strong> Votre adresse administrative officielle enregistrée.</span>
                   </div>
                   <div className="flex items-start gap-2">
                     <span className="text-[#00684A] font-bold">2.</span>
@@ -5805,15 +5718,7 @@ function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlock
               )}
 
               <div className="pt-1 flex items-center justify-between">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setAdminEmailInput("birekeidea@gmail.com");
-                  }}
-                  className="px-3 py-1.5 bg-emerald-100 hover:bg-emerald-200 text-emerald-900 rounded-xl text-[9px] font-extrabold uppercase tracking-wider transition-all flex items-center gap-1.5 cursor-pointer"
-                >
-                  <Mail size={11} /> Pré-remplir l'Email Administrateur
-                </button>
+                <span className="text-[9px] font-bold text-emerald-800">Saisie sécurisée individuelle</span>
                 <span className="text-[9px] font-bold text-emerald-700">Chiffrement AES-256</span>
               </div>
             </div>
@@ -5826,7 +5731,7 @@ function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlock
                 </label>
                 <input 
                   type="email"
-                  placeholder="birekeidea@gmail.com"
+                  placeholder="Entrez votre email administrateur..."
                   value={adminEmailInput}
                   onChange={e => setAdminEmailInput(e.target.value)}
                   className="w-full px-5 py-3.5 bg-slate-50 border-2 border-slate-200 focus:border-[#00684A] focus:bg-white rounded-2xl focus:outline-none text-sm font-bold text-slate-800 transition-all placeholder:text-slate-400"
@@ -5906,6 +5811,8 @@ function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlock
                 <button
                   onClick={() => {
                     setIsAdminUnlocked(false);
+                    setAdminPasswordInput('');
+                    setAdminEmailInput('');
                     try {
                       localStorage.removeItem('mugote_admin_session');
                     } catch {}
@@ -5923,6 +5830,7 @@ function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlock
             <div className="flex flex-wrap justify-center gap-2.5">
               {[
                 { id: 'recap', label: 'Embarquement / Jour', icon: Calendar },
+                { id: 'finances', label: 'Recettes & Finances', icon: DollarSign },
                 { id: 'reservations', label: 'Réservations', icon: Ticket },
                 { id: 'reminders', label: 'Notifications & Agenda', icon: Mail },
                 { id: 'tarifs', label: 'Tarifs & Classes', icon: DollarSign },
@@ -6113,6 +6021,10 @@ function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlock
         {tab === 'recap' ? (
           <div className="p-4 sm:p-6">
             <DailyBoardingRecapTable reservations={reservations} />
+          </div>
+        ) : tab === 'finances' ? (
+          <div className="p-4 sm:p-6">
+            <FinanceRevenueView reservations={reservations} exchangeRate={(siteSettings as any)?.exchangeRate || 2850} />
           </div>
         ) : tab === 'scanner' ? (
           <AdminScannerView reservations={reservations} />
