@@ -21,6 +21,7 @@ import { db } from '../lib/firebase';
 import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { Reservation } from '../types';
 import { cn } from '../lib/utils';
+import { qrApi } from '../services/api';
 
 interface TravelerTicketScannerModalProps {
   isOpen: boolean;
@@ -99,7 +100,7 @@ export function TravelerTicketScannerModal({ isOpen, onClose, siteSettings, onDo
 
   const handleLookup = async (lookupKey: string) => {
     if (!lookupKey || !lookupKey.trim()) return;
-    const cleanKey = lookupKey.trim();
+    let cleanKey = lookupKey.trim();
     if (!cleanKey) return;
     if (!db) {
       setErrorMsg("Connexion à la base de données indisponible.");
@@ -109,6 +110,18 @@ export function TravelerTicketScannerModal({ isOpen, onClose, siteSettings, onDo
     setErrorMsg(null);
 
     try {
+      // 0. Résolution rapide si c'est un jeton cryptographique AMR1
+      if (cleanKey.startsWith('AMR1.')) {
+        try {
+          const qrStatus = await qrApi.getQrStatus(cleanKey);
+          if (qrStatus?.success && qrStatus.ticketId) {
+            cleanKey = qrStatus.ticketId;
+          }
+        } catch {
+          // ignore
+        }
+      }
+
       // 1. Check direct doc ID
       const docRef = doc(db, 'reservations', cleanKey);
       const docSnap = await getDoc(docRef);

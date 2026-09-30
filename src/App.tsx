@@ -80,7 +80,7 @@ import { FinanceRevenueView } from './components/FinanceRevenueView';
 import { FerryhopperBookingEngine } from './components/FerryhopperBookingEngine';
 import { HomeView } from './components/HomeView';
 import { PlatformAuthGate } from './components/PlatformAuthGate';
-import { mongoApi } from './services/api';
+import { mongoApi, qrApi } from './services/api';
 import { auth, db, handleFirestoreError, OperationType, uploadToStorage } from './lib/firebase';
 import { 
   signInWithPopup, 
@@ -288,11 +288,36 @@ const generateTicket = async (res: Reservation, siteSettings: any) => {
     return;
   }
 
-  const qrDataUrl = await QRCode.toDataURL(`https://${window.location.host}/?verify=${res.id}`, {
-    margin: 1,
-    width: 250,
-    color: { dark: '#001233', light: '#FFFFFF' }
-  });
+  // Génération du QR Code cryptographique sécurisé (UUID v4 + HMAC-SHA256)
+  let qrDataUrl = '';
+  try {
+    const qrResult = await qrApi.generateQr({
+      ticketId: res.ticketId || res.id || 'AMR-TICKET',
+      reservationId: res.id,
+      passengerName: res.fullName || 'Passager',
+      phone: res.phone,
+      itinerary: res.itinerary,
+      ship: res.ship,
+      travelDate: res.travelDate,
+      departureTime: res.departureTime,
+      travelClass: res.travelClass,
+      passengersCount: res.passengersCount || 1,
+      validityHours: 72
+    });
+    if (qrResult?.data?.qrDataUrl) {
+      qrDataUrl = qrResult.data.qrDataUrl;
+    }
+  } catch (qrErr) {
+    console.warn("Génération QR cryptographique, utilisation du fallback:", qrErr);
+  }
+
+  if (!qrDataUrl) {
+    qrDataUrl = await QRCode.toDataURL(`https://${window.location.host}/?verify=${res.id}`, {
+      margin: 1,
+      width: 250,
+      color: { dark: '#001233', light: '#FFFFFF' }
+    });
+  }
 
   const pdf = new jsPDF({
     orientation: 'p',
@@ -8836,7 +8861,53 @@ function AdminScannerView({ reservations }: AdminScannerViewProps) {
     setStatusMessage('');
 
     try {
-      // 1. Instantly check locally + retrieve freshets snapshot from the database to prevent duplicate bypasses
+      // 0. VÉRIFICATION ATOMIQUE SÉCURISÉE SI JETON CRYPTOGRAPHIQUE AMR1
+      if (cleanId.startsWith('AMR1.')) {
+        try {
+          const verifyResult = await qrApi.verifyQr(cleanId, 'TERMINAL_PORT_ADMIN');
+          if (verifyResult?.success && verifyResult.ticket) {
+            const t = verifyResult.ticket;
+            const resObj: any = {
+              id: t.ticketId,
+              ticketId: t.ticketId,
+              fullName: t.passengerName,
+              itinerary: t.itinerary,
+              ship: t.ship,
+              travelDate: t.travelDate,
+              departureTime: t.departureTime,
+              travelClass: t.travelClass,
+              passengersCount: t.passengersCount,
+              status: 'VALIDATED',
+              boardingStatus: 'BOARDED',
+              boardedAt: t.usedAt ? new Date(t.usedAt).getTime() : Date.now(),
+              amount: 0
+            };
+            setScannedRes(resObj);
+            setScannedList(prev => [resObj, ...prev.filter(p => p.ticketId !== resObj.ticketId)]);
+            setScanStatus('success');
+            setStatusMessage(`EMBARQUEMENT VALIDÉ ATOMIQUEMENT (HMAC) : ${t.passengerName} (${t.passengersCount} PAX, ${t.travelClass}). Statut : À BORD.`);
+            playBeep(true);
+            return;
+          }
+        } catch (qrErr: any) {
+          const errMsg = qrErr?.message || '';
+          if (errMsg.includes('ALERTE') || errMsg.includes('DÉJÀ ÉTÉ') || errMsg.includes('409') || errMsg.includes('ALREADY_USED')) {
+            setScanStatus('alert_reused');
+            setStatusMessage(errMsg || "ALERTE FRAUDE : Ce billet a DÉJÀ ÉTÉ UTILISÉ et validé ! Double scan strictement refusé.");
+            playBeep(false);
+            return;
+          }
+          if (errMsg.includes('expiré') || errMsg.includes('410') || errMsg.includes('EXPIRED')) {
+            setScanStatus('alert_unpaid');
+            setStatusMessage("EMBARQUEMENT REFUSÉ : Ce QR code cryptographique a expiré.");
+            playBeep(false);
+            return;
+          }
+          console.warn("Scan QR sécurisé note:", qrErr);
+        }
+      }
+
+      // 1. Instantly check locally + retrieve freshest snapshot from the database to prevent duplicate bypasses
       const foundInProps = reservations.find(r => r.id === cleanId || r.ticketId === cleanId);
       const targetId = foundInProps?.id || cleanId;
       

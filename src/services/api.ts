@@ -509,3 +509,89 @@ export const mongoApi = {
     };
   }
 };
+
+/**
+ * Service API pour la gestion et validation ultra-sécurisée des QR Codes (Atomic Scan Verification).
+ */
+export const qrApi = {
+  /**
+   * Génère un jeton cryptographique signé et l'image QR Code Base64 DataURL
+   */
+  async generateQr(payload: {
+    ticketId: string;
+    reservationId?: string;
+    passengerName: string;
+    phone?: string;
+    itinerary?: string;
+    ship?: string;
+    travelDate?: string;
+    departureTime?: string;
+    travelClass?: string;
+    passengersCount?: number;
+    validityHours?: number;
+  }) {
+    return apiRequest<{
+      success: boolean;
+      data: {
+        token: string;
+        qrDataUrl: string;
+        ticketId: string;
+        passengerName: string;
+        status: string;
+        expiresAt: string;
+      };
+    }>('/qr/generate', {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+  },
+
+  /**
+   * Valide un scan de QR Code de manière atomique avec protection anti-rejoue et anti-NoSQL injection
+   */
+  async verifyQr(token: string, scannerId: string = 'PORT_SCANNER_1', deviceFingerprint?: string) {
+    return apiRequest<{
+      success: boolean;
+      code: string;
+      message: string;
+      responseTimeMs?: number;
+      ticket?: {
+        ticketId: string;
+        passengerName: string;
+        itinerary: string;
+        ship: string;
+        travelDate: string;
+        departureTime: string;
+        travelClass: string;
+        passengersCount: number;
+        status: string;
+        usedAt: string;
+        scannerId: string;
+      };
+    }>('/qr/verify', {
+      method: 'POST',
+      body: JSON.stringify({
+        token: token.trim(),
+        scannerId,
+        deviceFingerprint
+      })
+    });
+  },
+
+  /**
+   * Consulte le statut d'un jeton sans le consommer
+   */
+  async getQrStatus(token: string) {
+    return apiRequest<{
+      success: boolean;
+      ticketId: string;
+      passengerName: string;
+      status: string;
+      usedAt?: string;
+      expiresAt: string;
+    }>(`/qr/status/${encodeURIComponent(token.trim())}`, {
+      method: 'GET'
+    });
+  }
+};
+

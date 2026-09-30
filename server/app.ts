@@ -6,6 +6,7 @@ import fs from "fs";
 import { GoogleGenAI } from "@google/genai";
 import { connectMongoDB } from "./db";
 import apiRoutes from "./routes/api";
+import qrRoutes from "./routes/qrRoutes";
 import { Reservation as MongoReservation, SiteSettings as MongoSiteSettings } from "./models";
 import admin from "firebase-admin";
 import { getFirestore } from "firebase-admin/firestore";
@@ -82,6 +83,8 @@ export function createExpressApp() {
   });
 
   // Mount Comprehensive MongoDB REST API Routes (with /api and root fallback for Vercel rewrites)
+  app.use('/api/qr', qrRoutes);
+  app.use('/qr', qrRoutes);
   app.use('/api', apiRoutes);
   app.use(apiRoutes);
 
