@@ -19,7 +19,6 @@ export const DEFAULT_NAV_ITEMS: NavItem[] = [
   { id: 'tickets', label: 'Mes billets' },
   { id: 'tarifs', label: 'Horaires & Tarifs' },
   { id: 'map', label: 'Ports & Localisation' },
-  { id: 'dashboard', label: 'Base de données' },
 ];
 
 /**

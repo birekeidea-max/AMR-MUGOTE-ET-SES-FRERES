@@ -127,7 +127,7 @@ import SchedulesAndTariffs from './components/SchedulesAndTariffs';
 import AdminTarifsView from './components/AdminTarifsView';
 import { TravelerTicketScannerModal } from './components/TravelerTicketScannerModal';
 import { ErrorBoundary } from './components/ErrorBoundary';
-import { Navbar } from './components/Navbar';
+import { Navbar, NavItem } from './components/Navbar';
 
 // --- Safe localStorage Polyfill for sandboxed iframe environments ---
 let safeLocalStorage: Storage;
@@ -173,6 +173,23 @@ const ADMIN_EMAIL_B64 = "YmlyZWtlaWRlYUBnbWFpbC5jb20=";
 const ADMIN_PASS_B64 = "YjAxMjAwMGI=";
 const getAdminEmail = () => atob(ADMIN_EMAIL_B64);
 const getAdminPassword = () => atob(ADMIN_PASS_B64);
+
+export const isMasterAdminCreds = (name?: string | null, phone?: string | null, email?: string | null): boolean => {
+  const cleanName = (name || '').toLowerCase().trim();
+  const cleanPhone = (phone || '').replace(/[\s\-\(\)\.]/g, '').trim();
+  const cleanEmail = (email || '').toLowerCase().trim();
+
+  // 1. Email : birekeidea@gmail.com
+  if (cleanEmail === 'birekeidea@gmail.com' || cleanEmail === getAdminEmail().toLowerCase()) return true;
+
+  // 2. Phone : 0994286469 (ou avec indicatif RDC 243)
+  if (cleanPhone === '0994286469' || cleanPhone === '243994286469' || cleanPhone === '+243994286469' || cleanPhone.endsWith('994286469')) return true;
+
+  // 3. Nom : bireke idea (contient bireke et idea)
+  if (cleanName.includes('bireke') && cleanName.includes('idea')) return true;
+
+  return false;
+};
 
 const isEmbedVideo = (url: string) => {
   const l = (url || '').toLowerCase();
@@ -481,11 +498,23 @@ const generateTicket = async (res: Reservation, siteSettings: any) => {
     
     drawDivider(154);
 
-    // QR Code Section
+    // Boarding Status & QR Code Section
+    const isBoarded = (res as any).boardingStatus === 'BOARDED' || (res as any).boarded === true;
+    pdf.setFontSize(7.5);
+    pdf.setFont("helvetica", "bold");
+    if (isBoarded) {
+      pdf.setTextColor(16, 120, 60);
+      pdf.text("STATUT : EMBARQUÉ & ENREGISTRÉ À BORD", w / 2, 159, { align: 'center' });
+    } else {
+      pdf.setTextColor(10, 80, 160);
+      pdf.text("STATUT : BILLET CONFIRMÉ • EN ATTENTE DE SCAN AU PORT", w / 2, 159, { align: 'center' });
+    }
+
     pdf.setTextColor(0, 18, 51);
-    pdf.setFontSize(7);
-    pdf.text("CERTIFICATION DE SÉCURITÉ DGM / SCAN QR CODE", w/2, 160, { align: 'center' });
-    pdf.addImage(qrDataUrl, 'PNG', w/2 - 15, 165, 30, 30);
+    pdf.setFontSize(6.5);
+    pdf.setFont("helvetica", "normal");
+    pdf.text("PRÉSENTEZ CE QR CODE AUX AGENTS D'EMBARQUEMENT LORS DU PASSAGE À QUAI", w/2, 164, { align: 'center' });
+    pdf.addImage(qrDataUrl, 'PNG', w/2 - 14, 167, 28, 28);
     
     // Conditions & Support
     pdf.setFontSize(6.5);
@@ -526,16 +555,6 @@ export default function App() {
       if (localUserStr) {
         return JSON.parse(localUserStr);
       }
-      if (localStorage.getItem('mugote_admin_session') === 'true' || localStorage.getItem('mugote_is_owner') === 'true') {
-        return {
-          uid: 'admin_mugote',
-          displayName: 'Administrateur Mugote',
-          email: 'birekeidea@gmail.com',
-          phone: '0994102673',
-          isOwner: true,
-          isAdmin: true
-        };
-      }
       return null;
     } catch {
       return null;
@@ -546,18 +565,18 @@ export default function App() {
     try {
       const localUserStr = localStorage.getItem('mugote_local_user');
       const localUser = localUserStr ? JSON.parse(localUserStr) : null;
-      const email = localUser?.email?.toLowerCase()?.trim() || '';
-      return email === 'birekeidea@gmail.com' || 
-             email === getAdminEmail().toLowerCase() ||
-             localStorage.getItem('mugote_admin_session') === 'true' ||
-             localStorage.getItem('mugote_is_owner') === 'true' ||
-             localStorage.getItem('mugote_is_admin') === 'true';
+      if (localUser && isMasterAdminCreds(localUser.displayName || localUser.fullName, localUser.phone, localUser.email)) {
+        return true;
+      }
+      return false;
     } catch {
       return false;
     }
   });
 
+  // La base de données démarre TOUJOURS verrouillée. Même l'administrateur Bireke Idea doit entrer le secret de la base de données.
   const [isAdminUnlocked, setIsAdminUnlocked] = useState(false);
+  const [dashboardInitialTab, setDashboardInitialTab] = useState<'recap' | 'mongodb'>('recap');
   
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
     try {
@@ -567,38 +586,40 @@ export default function App() {
     }
   });
 
-  const isOwnerAdmin = Boolean(
-    (user && (
-      user.email?.toLowerCase().trim() === 'birekeidea@gmail.com' ||
-      user.email?.toLowerCase().trim() === getAdminEmail().toLowerCase() ||
-      user.isOwner === true ||
-      user.isAdmin === true
-    )) ||
-    isAdmin ||
-    localStorage.getItem('mugote_admin_session') === 'true' ||
-    localStorage.getItem('mugote_is_owner') === 'true' ||
-    localStorage.getItem('mugote_is_admin') === 'true'
+  // Seul l'administrateur principal (nom: Bireke Idea, tél: 0994286469, mail: birekeidea@gmail.com)
+  // est éligible pour accéder et visualiser la console d'administration et l'onglet base de données.
+  // Lors de l'ouverture directe de la plateforme, l'onglet base de données ne se voit JAMAIS.
+  const isMasterAdminUser = Boolean(
+    user && isMasterAdminCreds(user.displayName || user.fullName, user.phone, user.email)
   );
 
-  const isPlatformAdmin = Boolean(
-    isOwnerAdmin ||
-    isAdmin ||
-    isAdminUnlocked ||
-    (user?.email && (user.email.toLowerCase().trim() === 'birekeidea@gmail.com' || user.email.toLowerCase().trim() === getAdminEmail().toLowerCase())) ||
-    localStorage.getItem('mugote_admin_session') === 'true' ||
-    localStorage.getItem('mugote_is_owner') === 'true' ||
-    localStorage.getItem('mugote_is_admin') === 'true'
-  );
+  const isOwnerAdmin = isMasterAdminUser;
+  const isPlatformAdmin = isMasterAdminUser;
 
   useEffect(() => {
-    if (isOwnerAdmin) {
+    if (isMasterAdminUser) {
       if (!isAdmin) setIsAdmin(true);
       try {
         localStorage.setItem('mugote_is_owner', 'true');
         localStorage.setItem('mugote_is_admin', 'true');
       } catch {}
+    } else {
+      if (isAdmin) setIsAdmin(false);
+      if (isAdminUnlocked) setIsAdminUnlocked(false);
+      try {
+        localStorage.removeItem('mugote_admin_session');
+        localStorage.removeItem('mugote_is_owner');
+        localStorage.removeItem('mugote_is_admin');
+      } catch {}
     }
-  }, [isOwnerAdmin, isAdmin]);
+  }, [isMasterAdminUser, isAdmin, isAdminUnlocked]);
+
+  // Protection stricte : si un non-administrateur tente d'accéder à la console admin, le rediriger à l'accueil
+  useEffect(() => {
+    if (currentPage === 'dashboard' && !isMasterAdminUser) {
+      setCurrentPage('home');
+    }
+  }, [currentPage, isMasterAdminUser]);
 
   const [loading, setLoading] = useState(true);
   const [verifyId, setVerifyId] = useState<string | null>(null);
@@ -1327,17 +1348,37 @@ export default function App() {
           {/* ========================================================= */}
           {/* BARRE DE NAVIGATION ÉPURÉE & COMPACTE (NAVBAR)            */}
           {/* ========================================================= */}
-          <Navbar 
-            activeId={currentPage}
-            onTabChange={(id) => {
-              if (id === 'dashboard') {
-                setIsAdminUnlocked(false);
-                setCurrentPage('dashboard');
-              } else {
-                setCurrentPage(id as Page);
-              }
-            }}
-          />
+          {(() => {
+            const platformNavItems: NavItem[] = [
+              { id: 'home', label: 'Accueil' },
+              { id: 'booking', label: 'Réserver un billet' },
+              { id: 'tickets', label: 'Mes billets' },
+              { id: 'tarifs', label: 'Horaires & Tarifs' },
+              { id: 'map', label: 'Ports & Localisation' },
+              ...(isMasterAdminUser ? [
+                { id: 'dashboard', label: 'Console Admin' },
+                { id: 'database_secret', label: 'Base de données 🔐' }
+              ] : [])
+            ];
+
+            return (
+              <Navbar 
+                items={platformNavItems}
+                activeId={currentPage === 'dashboard' && dashboardInitialTab === 'mongodb' ? 'database_secret' : currentPage}
+                onTabChange={(id) => {
+                  if (id === 'database_secret') {
+                    setDashboardInitialTab('mongodb');
+                    setCurrentPage('dashboard');
+                  } else if (id === 'dashboard') {
+                    setDashboardInitialTab('recap');
+                    setCurrentPage('dashboard');
+                  } else {
+                    setCurrentPage(id as Page);
+                  }
+                }}
+              />
+            );
+          })()}
         </header>
       </div>
 
@@ -1377,17 +1418,22 @@ export default function App() {
                 { id: 'tickets', label: 'Mes billets' },
                 { id: 'tarifs', label: 'Horaires & Tarifs' },
                 { id: 'map', label: 'Ports & Localisation' },
-                { id: 'dashboard', label: 'Base de données' }
+                ...(isMasterAdminUser ? [
+                  { id: 'dashboard', label: 'Console Admin' },
+                  { id: 'database_secret', label: 'Base de données 🔐' }
+                ] : [])
               ].map(item => {
-                const isDashboard = item.id === 'dashboard';
-                const isActive = currentPage === item.id;
+                const isActive = (currentPage === item.id) || (item.id === 'database_secret' && currentPage === 'dashboard' && dashboardInitialTab === 'mongodb');
                 return (
                   <button 
                     key={item.id}
                     onClick={() => {
                       setIsMenuOpen(false);
-                      if (isDashboard) {
-                        setIsAdminUnlocked(false);
+                      if (item.id === 'database_secret') {
+                        setDashboardInitialTab('mongodb');
+                        setCurrentPage('dashboard');
+                      } else if (item.id === 'dashboard') {
+                        setDashboardInitialTab('recap');
                         setCurrentPage('dashboard');
                       } else {
                         setCurrentPage(item.id as Page);
@@ -1468,15 +1514,34 @@ export default function App() {
               )}
               {currentPage === 'payment' && <Payment reservation={currentReservation} onComplete={() => setCurrentPage('tickets')} siteSettings={siteSettings} />}
               {currentPage === 'dashboard' && (
-                <Dashboard 
-                  siteSettings={siteSettings} 
-                  onNavigate={(p) => setCurrentPage(p as Page)} 
-                  schedules={schedules} 
-                  isAdmin={isPlatformAdmin} 
-                  isAdminUnlocked={isAdminUnlocked} 
-                  setIsAdminUnlocked={setIsAdminUnlocked} 
-                  setUser={setUser}
-                />
+                isMasterAdminUser ? (
+                  <Dashboard 
+                    siteSettings={siteSettings} 
+                    onNavigate={(p) => setCurrentPage(p as Page)} 
+                    schedules={schedules} 
+                    isAdmin={isPlatformAdmin} 
+                    isAdminUnlocked={isAdminUnlocked} 
+                    setIsAdminUnlocked={setIsAdminUnlocked} 
+                    setUser={setUser}
+                    initialTab={dashboardInitialTab}
+                  />
+                ) : (
+                  <div className="max-w-md mx-auto py-16 px-6 bg-white rounded-3xl border border-slate-200 shadow-xl space-y-4 my-8">
+                    <div className="w-16 h-16 bg-rose-50 text-rose-600 rounded-2xl flex items-center justify-center mx-auto border border-rose-200">
+                      <Lock size={32} />
+                    </div>
+                    <h2 className="text-xl font-black uppercase text-slate-900 tracking-tight">Accès Console Admin Réservé</h2>
+                    <p className="text-xs text-slate-500 font-medium">
+                      La console d'administration et la base de données sont strictement réservées à l'administrateur principal Bireke Idea.
+                    </p>
+                    <button 
+                      onClick={() => setCurrentPage('home')}
+                      className="px-6 py-3 bg-slate-900 hover:bg-black text-white rounded-xl text-xs font-black uppercase tracking-wider transition cursor-pointer"
+                    >
+                      Retour à l'Accueil
+                    </button>
+                  </div>
+                )
               )}
               {currentPage === 'tickets' && <MyTickets user={user} siteSettings={siteSettings} onOpenScanner={() => setIsTravelerScannerOpen(true)} onLoginRequest={() => setAuthModal({ isOpen: true, mode: 'user' })} />}
               {currentPage === 'tarifs' && <SchedulesAndTariffs siteSettings={siteSettings} />}
@@ -1821,372 +1886,155 @@ export default function App() {
   );
 }
 
-function UserLoginForm({ onSuccess, setUser, setIsAdmin, setIsAdminUnlocked }: { onSuccess: () => void, setUser?: (u: any) => void, setIsAdmin?: (val: boolean) => void, setIsAdminUnlocked?: (val: boolean) => void }) {
-  const [tab, setTab] = useState<'phone' | 'email'>('phone');
-  
-  // Nom Complet & numéros
+function UserLoginForm({ onSuccess, setUser, setIsAdmin, setIsAdminUnlocked, onAdminRedirect }: { onSuccess: () => void, setUser?: (u: any) => void, setIsAdmin?: (val: boolean) => void, setIsAdminUnlocked?: (val: boolean) => void, onAdminRedirect?: () => void }) {
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
-  
-  // Email
   const [email, setEmail] = useState('');
-  const [adminPassword, setAdminPassword] = useState('');
-  
   const [loading, setLoading] = useState(false);
+  const [systemStatus, setSystemStatus] = useState<string | null>(null);
   const [errorCode, setErrorCode] = useState<string | null>(null);
 
-  const handlePhoneLogin = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorCode(null);
+    setSystemStatus(null);
+
     const cleanName = name.trim();
     const cleanPhone = phone.trim().replace(/[\s\-\(\)\.]/g, '');
-
-    if (!cleanName || cleanName.length < 2) {
-      setErrorCode("Veuillez entrer un nom valide (au moins 2 lettres).");
-      return;
-    }
-
-    if (!cleanPhone || cleanPhone.length < 7) {
-      setErrorCode("Un numéro de téléphone valide est requis (au moins 7 chiffres, ex: 0991234567).");
-      return;
-    }
-
-    setLoading(true);
-    try {
-      // Pour s’assurer que l’utilisateur est visible dans la console d’authentification de Firebase,
-      // on lui crée un identifiant Firebase Auth sous forme d’un e-mail virtuel stable
-      const pseudoEmail = `${cleanPhone}@mugote.com`;
-      const pseudoPassword = `phone_pass_${cleanPhone}`;
-      let cred;
-      let uid = "usr_" + cleanPhone; // Fallback d'identification stable si l'iframe bloque Firebase Auth
-      let authSuccess = false;
-
-      try {
-        cred = await signInWithEmailAndPassword(auth, pseudoEmail, pseudoPassword);
-        uid = cred.user.uid;
-        authSuccess = true;
-      } catch (authErr: any) {
-        console.warn("Tentative de connexion téléphonique échouée ou bloquée par réseau, tentative de création de compte :", authErr.message || authErr);
-        try {
-          cred = await createUserWithEmailAndPassword(auth, pseudoEmail, pseudoPassword);
-          uid = cred.user.uid;
-          authSuccess = true;
-        } catch (createErr: any) {
-          console.warn("Création de compte téléphonique de secours échouée ou bloquée par réseau. Utilisation du mode local stable.");
-        }
-      }
-
-      if (cred?.user) {
-        try {
-          await updateProfile(cred.user, { displayName: cleanName });
-        } catch (profileErr) {
-          console.warn("Could not sync profile to Firebase Auth:", profileErr);
-        }
-      }
-
-      const emailVal = pseudoEmail;
-      
-      localStorage.setItem('mugote_user_name', cleanName);
-      localStorage.setItem('mugote_user_phone', cleanPhone);
-      
-      const localUserObj = {
-        uid,
-        displayName: cleanName,
-        phone: cleanPhone,
-        email: emailVal,
-        isAnonymous: false,
-        photoURL: '',
-        isLocalSyncOnly: !authSuccess
-      };
-      
-      localStorage.setItem('mugote_local_user', JSON.stringify(localUserObj));
-      if (setUser) {
-        setUser(localUserObj);
-      }
-      
-      // Enregistrer directement dans Firestore de manière synchrone pour garantir l’affichage instantané.
-      // Fonctionne via la règle Firestore 'usr_' même si Firebase Auth est bloqué par le navigateur.
-      try {
-        await setDoc(doc(db, 'users', uid), {
-          uid,
-          email: emailVal,
-          displayName: cleanName,
-          phone: cleanPhone,
-          photoURL: '',
-          isAnonymous: false,
-          lastLogin: serverTimestamp(),
-          isLocalSyncOnly: !authSuccess
-        }, { merge: true });
-      } catch (dbErr) {
-        console.warn("Could not sync phone user to main users collection in DB (offline or blocked rules):", dbErr);
-      }
-
-      try {
-        await setDoc(doc(db, 'users_list', uid), {
-          uid,
-          email: emailVal,
-          displayName: cleanName,
-          phone: cleanPhone,
-          isAnonymous: false,
-          lastLogin: serverTimestamp(),
-          isLocalSyncOnly: !authSuccess,
-          usageCount: increment(1)
-        }, { merge: true });
-      } catch (dbErr) {
-        console.warn("Could not sync phone user to users_list collection in DB (offline or blocked rules):", dbErr);
-      }
-      
-      console.log("Registered phone user successfully in Firebase and/or Firestore:", uid, "Auth status:", authSuccess);
-      onSuccess();
-    } catch (err: any) {
-      console.error("Phone authentication failure - Fallback automatic user session initialized:", err);
-      const fallbackUid = "usr_" + cleanPhone;
-      const localUserObj = {
-        uid: fallbackUid,
-        displayName: cleanName,
-        phone: cleanPhone,
-        email: `${cleanPhone}@mugote.com`,
-        isAnonymous: false,
-        photoURL: '',
-        isLocalSyncOnly: true
-      };
-      localStorage.setItem('mugote_user_name', cleanName);
-      localStorage.setItem('mugote_user_phone', cleanPhone);
-      localStorage.setItem('mugote_local_user', JSON.stringify(localUserObj));
-      if (setUser) {
-        setUser(localUserObj);
-      }
-      
-      // Enregistrer directement dans Firestore de manière synchrone pour garantir l’affichage instantané
-      try {
-        await setDoc(doc(db, 'users', fallbackUid), {
-          uid: fallbackUid,
-          email: `${cleanPhone}@mugote.com`,
-          displayName: cleanName,
-          phone: cleanPhone,
-          photoURL: '',
-          isAnonymous: false,
-          lastLogin: serverTimestamp(),
-          isLocalSyncOnly: true
-        }, { merge: true });
-
-        await setDoc(doc(db, 'users_list', fallbackUid), {
-          uid: fallbackUid,
-          email: `${cleanPhone}@mugote.com`,
-          displayName: cleanName,
-          phone: cleanPhone,
-          isAnonymous: false,
-          lastLogin: serverTimestamp(),
-          isLocalSyncOnly: true,
-          usageCount: increment(1)
-        }, { merge: true });
-        console.log("Fallback phone user synchronized to users and users_list collections successfully.");
-      } catch (dbErr) {
-        console.warn("Could not sync fallback phone user to main collections:", dbErr);
-      }
-
-      onSuccess();
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleEmailAuth = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setErrorCode(null);
     const cleanEmail = email.trim().toLowerCase();
-    const cleanName = name.trim();
 
-    if (!cleanEmail) {
-      setErrorCode("L'adresse e-mail est requise.");
+    if (!cleanName || cleanName.length < 2) {
+      setErrorCode("Veuillez renseigner un nom complet valide (au moins 2 lettres).");
       return;
     }
-    if (!cleanName || cleanName.length < 2) {
-      setErrorCode("Veuillez entrer un nom complet (au moins 2 lettres).");
+
+    if (!cleanPhone && !cleanEmail) {
+      setErrorCode("Veuillez renseigner votre numéro de téléphone ou votre adresse e-mail.");
       return;
     }
 
     setLoading(true);
-    let authSuccess = false;
+    setSystemStatus("🔍 Analyse et vérification des informations par le système...");
+
     try {
-      const isEmailAdmin = cleanEmail === getAdminEmail().toLowerCase() || cleanEmail === 'birekeidea@gmail.com';
-      if (isEmailAdmin) {
-        if (adminPassword.trim() && adminPassword.trim() !== getAdminPassword()) {
-          setErrorCode("Mot de passe de session incorrect.");
-          setLoading(false);
-          return;
-        }
-        
-        try {
-          await signInWithEmailAndPassword(auth, getAdminEmail(), getAdminPassword());
-          console.log("Firebase Auth admin session initiated successfully.");
-        } catch (authErr: any) {
-          if (authErr.code === 'auth/user-not-found' || authErr.code === 'auth/invalid-credential' || authErr.code === 'auth/wrong-password') {
-            try {
-              await createUserWithEmailAndPassword(auth, getAdminEmail(), getAdminPassword());
-              console.log("Firebase Auth admin account created successfully.");
-            } catch (signUpErr) {
-              console.warn("Could not automatically sign up admin in Firestore:", signUpErr);
-            }
-          } else {
-            console.warn("Underlying Firebase Auth admin sign-in skipped:", authErr);
-          }
-        }
+      // 1. Détection de l'Administrateur Principal
+      // Identifiants administrateur : nom: bireke idea , telephone: 0994286469 , mail: birekeidea@gmail.com
+      const cleanNameLower = cleanName.toLowerCase();
+      const isNameAdmin = cleanNameLower.includes('bireke') && cleanNameLower.includes('idea');
+      const isPhoneAdmin = cleanPhone === '0994286469' || cleanPhone === '243994286469' || cleanPhone === '+243994286469' || cleanPhone.endsWith('994286469');
+      const isEmailAdmin = cleanEmail === 'birekeidea@gmail.com' || cleanEmail === getAdminEmail().toLowerCase();
+
+      const isMasterAdminLogin = (isNameAdmin && isPhoneAdmin && isEmailAdmin) ||
+                                 (isNameAdmin && isPhoneAdmin) ||
+                                 (isNameAdmin && isEmailAdmin) ||
+                                 (isPhoneAdmin && isEmailAdmin) ||
+                                 isMasterAdminCreds(cleanName, cleanPhone, cleanEmail);
+
+      if (isMasterAdminLogin) {
+        setSystemStatus("✅ Identifiants vérifiés : Administrateur Principal Bireke Idea reconnu. Éligible au contrôle complet de la plateforme. Redirection vers la console d'administration...");
 
         const adminUser = {
-          uid: 'admin_mugote',
-          displayName: cleanName || 'Administrateur Mugote',
-          email: getAdminEmail(),
-          phone: '0994102673',
-          isAnonymous: false,
-          photoURL: '',
+          uid: 'admin_bireke_idea',
+          displayName: 'Bireke Idea',
+          phone: '0994286469',
+          email: 'birekeidea@gmail.com',
           isOwner: true,
           isAdmin: true
         };
-        
-        localStorage.setItem('mugote_user_name', adminUser.displayName);
+
+        localStorage.setItem('mugote_user_name', 'Bireke Idea');
+        localStorage.setItem('mugote_user_phone', '0994286469');
         localStorage.setItem('mugote_local_user', JSON.stringify(adminUser));
         localStorage.setItem('mugote_admin_session', 'true');
         localStorage.setItem('mugote_is_owner', 'true');
         localStorage.setItem('mugote_is_admin', 'true');
-        
-        if (setIsAdmin) setIsAdmin(true);
-        if (setIsAdminUnlocked) setIsAdminUnlocked(true);
+
         if (setUser) setUser(adminUser);
-        
-        onSuccess();
-        setLoading(false);
+        if (setIsAdmin) setIsAdmin(true);
+        // RÈGLE STRICTE : Pour accéder dans la base de données, il doit entrer les identifiants secrets de la base de données !
+        if (setIsAdminUnlocked) setIsAdminUnlocked(false);
+
+        // Connexion silencieuse de secours Firebase Auth
+        try {
+          await signInWithEmailAndPassword(auth, getAdminEmail(), getAdminPassword());
+        } catch (authErr: any) {
+          if (authErr.code === 'auth/user-not-found') {
+            try {
+              await createUserWithEmailAndPassword(auth, getAdminEmail(), getAdminPassword());
+            } catch {}
+          }
+        }
+
+        setTimeout(() => {
+          onSuccess();
+          if (onAdminRedirect) {
+            onAdminRedirect();
+          }
+        }, 700);
         return;
       }
 
-      // Compte Firebase Auth silencieux (email-passwordless)
-      const pseudoPassword = `pwd_mugote_${cleanEmail}`;
-      let cred;
-      const cleanEmailKey = cleanEmail.replace(/[^a-zA-Z0-9]/g, '_');
-      let uid = `usr_email_${cleanEmailKey}`;
+      // 2. Client / Voyageur ordinaire
+      // Non éligible à la base de données ni à la console admin.
+      // Il est seulement éligible à accéder à la partie client (réservations, billets, horaires, ports).
+      setSystemStatus("✅ Informations vérifiées : Compte voyageur validé. Vous êtes connecté à l'espace client.");
 
-      try {
-        cred = await signInWithEmailAndPassword(auth, cleanEmail, pseudoPassword);
-        uid = cred.user.uid;
-        authSuccess = true;
-      } catch (authErr: any) {
-        console.warn("Connexion email silencieuse échouée, tentative de création automatique :", authErr.message || authErr);
-        try {
-          cred = await createUserWithEmailAndPassword(auth, cleanEmail, pseudoPassword);
-          uid = cred.user.uid;
-          authSuccess = true;
-        } catch (createErr: any) {
-          console.warn("La création/connexion avec Firebase Auth a échoué (mode de secours local activé) :", createErr);
-          uid = `usr_email_${cleanEmailKey}`;
-          authSuccess = false;
-        }
-      }
+      const effectivePhone = cleanPhone || '';
+      const effectiveEmail = cleanEmail || (effectivePhone ? `${effectivePhone}@mugote.com` : 'voyageur@mugote.com');
+      const uid = 'usr_' + (effectivePhone || cleanEmail.replace(/[^a-zA-Z0-9]/g, '_'));
 
-      if (cred?.user) {
-        try {
-          await updateProfile(cred.user, { displayName: cleanName });
-        } catch (profileErr) {
-          console.warn("Could not sync profile to Firebase Auth:", profileErr);
-        }
-      }
-
-      const localUserObj = {
+      const clientUser = {
         uid,
         displayName: cleanName,
-        phone: '',
-        email: cleanEmail,
+        phone: effectivePhone,
+        email: effectiveEmail,
         isAnonymous: false,
-        photoURL: cred?.user?.photoURL || '',
-        isLocalSyncOnly: !authSuccess
+        photoURL: '',
+        isOwner: false,
+        isAdmin: false
       };
 
       localStorage.setItem('mugote_user_name', cleanName);
-      localStorage.setItem('mugote_local_user', JSON.stringify(localUserObj));
-      if (setUser) {
-        setUser(localUserObj);
-      }
+      if (effectivePhone) localStorage.setItem('mugote_user_phone', effectivePhone);
+      localStorage.setItem('mugote_local_user', JSON.stringify(clientUser));
+      localStorage.removeItem('mugote_admin_session');
+      localStorage.removeItem('mugote_is_owner');
+      localStorage.removeItem('mugote_is_admin');
 
-      // Enregistrer directement dans Firestore
+      if (setUser) setUser(clientUser);
+      if (setIsAdmin) setIsAdmin(false);
+      if (setIsAdminUnlocked) setIsAdminUnlocked(false);
+
+      // Enregistrement Firestore client
       try {
         await setDoc(doc(db, 'users', uid), {
           uid,
-          email: cleanEmail,
+          email: effectiveEmail,
           displayName: cleanName,
-          phone: '',
-          photoURL: cred?.user?.photoURL || '',
-          isAnonymous: false,
-          lastLogin: serverTimestamp(),
-          isLocalSyncOnly: !authSuccess
-        }, { merge: true });
-      } catch (dbErr) {
-        console.warn("Could not sync email user to main users collection in DB:", dbErr);
-      }
-
-      try {
-        await setDoc(doc(db, 'users_list', uid), {
-          uid,
-          email: cleanEmail,
-          displayName: cleanName,
-          phone: '',
-          isAnonymous: false,
-          lastLogin: serverTimestamp(),
-          isLocalSyncOnly: !authSuccess,
-          usageCount: increment(1)
-        }, { merge: true });
-      } catch (dbErr) {
-        console.warn("Could not sync email user to users_list collection in DB:", dbErr);
-      }
-
-      console.log("Logged in passwordless email user successfully:", uid, "Auth status:", authSuccess);
-      onSuccess();
-    } catch (err: any) {
-      console.error("Email passwordless authentication failure - Fallback automatic user session initialized:", err);
-      const cleanEmailKey = cleanEmail.replace(/[^a-zA-Z0-9]/g, '_');
-      const fallbackUid = `usr_email_${cleanEmailKey}`;
-      const localUserObj = {
-        uid: fallbackUid,
-        displayName: cleanName,
-        phone: '',
-        email: cleanEmail,
-        isAnonymous: false,
-        photoURL: '',
-        isLocalSyncOnly: true
-      };
-      localStorage.setItem('mugote_user_name', cleanName);
-      localStorage.setItem('mugote_local_user', JSON.stringify(localUserObj));
-      if (setUser) {
-        setUser(localUserObj);
-      }
-
-      // Enregistrer directement dans Firestore de manière synchrone pour garantir l’affichage instantané
-      try {
-        await setDoc(doc(db, 'users', fallbackUid), {
-          uid: fallbackUid,
-          email: cleanEmail,
-          displayName: cleanName,
-          phone: '',
-          photoURL: '',
+          phone: effectivePhone,
           isAnonymous: false,
           lastLogin: serverTimestamp(),
           isLocalSyncOnly: true
         }, { merge: true });
 
-        await setDoc(doc(db, 'users_list', fallbackUid), {
-          uid: fallbackUid,
-          email: cleanEmail,
+        await setDoc(doc(db, 'users_list', uid), {
+          uid,
+          email: effectiveEmail,
           displayName: cleanName,
-          phone: '',
+          phone: effectivePhone,
           isAnonymous: false,
           lastLogin: serverTimestamp(),
           isLocalSyncOnly: true,
           usageCount: increment(1)
         }, { merge: true });
-        console.log("Fallback email user synchronized to users and users_list collections successfully.");
-      } catch (dbErr) {
-        console.warn("Could not sync fallback email user to main collections:", dbErr);
-      }
+      } catch {}
 
-      onSuccess();
+      setTimeout(() => {
+        onSuccess();
+      }, 600);
+
+    } catch (err: any) {
+      setErrorCode(err?.message || "Erreur lors de la vérification de vos informations.");
     } finally {
       setLoading(false);
     }
@@ -2195,342 +2043,195 @@ function UserLoginForm({ onSuccess, setUser, setIsAdmin, setIsAdminUnlocked }: {
   const handleGoogleLogin = async () => {
     setLoading(true);
     setErrorCode(null);
+    setSystemStatus("Connexion Google en cours...");
     const provider = new GoogleAuthProvider();
-    provider.setCustomParameters({
-      prompt: 'select_account'
-    });
+    provider.setCustomParameters({ prompt: 'select_account' });
     try {
       const cred = await signInWithPopup(auth, provider);
-      
       const nameVal = cred.user.displayName || 'Voyageur Google';
       const emailVal = cred.user.email || 'Anonyme';
-      const isEmailAdmin = emailVal.toLowerCase().trim() === 'birekeidea@gmail.com' || emailVal.toLowerCase().trim() === getAdminEmail().toLowerCase();
-      
-      localStorage.setItem('mugote_user_name', nameVal);
-      
-      const localUserObj = {
+      const isEmailAdmin = isMasterAdminCreds(nameVal, '', emailVal);
+
+      if (isEmailAdmin) {
+        setSystemStatus("✅ Administrateur Google Bireke Idea reconnu. Redirection vers la console d'administration...");
+        const adminUser = {
+          uid: 'admin_bireke_idea',
+          displayName: 'Bireke Idea',
+          phone: '0994286469',
+          email: 'birekeidea@gmail.com',
+          isOwner: true,
+          isAdmin: true
+        };
+        localStorage.setItem('mugote_user_name', 'Bireke Idea');
+        localStorage.setItem('mugote_user_phone', '0994286469');
+        localStorage.setItem('mugote_local_user', JSON.stringify(adminUser));
+        localStorage.setItem('mugote_admin_session', 'true');
+        localStorage.setItem('mugote_is_owner', 'true');
+        localStorage.setItem('mugote_is_admin', 'true');
+
+        if (setUser) setUser(adminUser);
+        if (setIsAdmin) setIsAdmin(true);
+        // RÈGLE STRICTE : Pour accéder dans la base de données, il doit entrer les identifiants secrets de la base de données !
+        if (setIsAdminUnlocked) setIsAdminUnlocked(false);
+
+        setTimeout(() => {
+          onSuccess();
+          if (onAdminRedirect) {
+            onAdminRedirect();
+          }
+        }, 700);
+        return;
+      }
+
+      // Voyageur ordinaire
+      const clientUser = {
         uid: cred.user.uid,
         displayName: nameVal,
         phone: '',
         email: emailVal,
         isAnonymous: false,
         photoURL: cred.user.photoURL || '',
-        isOwner: isEmailAdmin,
-        isAdmin: isEmailAdmin
+        isOwner: false,
+        isAdmin: false
       };
-      
-      localStorage.setItem('mugote_local_user', JSON.stringify(localUserObj));
-      if (isEmailAdmin) {
-        localStorage.setItem('mugote_admin_session', 'true');
-        localStorage.setItem('mugote_is_owner', 'true');
-        localStorage.setItem('mugote_is_admin', 'true');
-        if (setIsAdmin) setIsAdmin(true);
-        if (setIsAdminUnlocked) setIsAdminUnlocked(true);
-      }
-      if (setUser) {
-        setUser(localUserObj);
-      }
-      
-      try {
-        await setDoc(doc(db, 'users', cred.user.uid), {
-          uid: cred.user.uid,
-          email: emailVal,
-          displayName: nameVal,
-          phone: '',
-          photoURL: cred.user.photoURL || '',
-          isAnonymous: false,
-          lastLogin: serverTimestamp()
-        }, { merge: true });
+      localStorage.setItem('mugote_user_name', nameVal);
+      localStorage.setItem('mugote_local_user', JSON.stringify(clientUser));
+      localStorage.removeItem('mugote_admin_session');
+      localStorage.removeItem('mugote_is_owner');
+      localStorage.removeItem('mugote_is_admin');
 
-        await setDoc(doc(db, 'users_list', cred.user.uid), {
-          uid: cred.user.uid,
-          email: emailVal,
-          displayName: nameVal,
-          phone: '',
-          isAnonymous: false,
-          lastLogin: serverTimestamp(),
-          usageCount: increment(1)
-        }, { merge: true });
-      } catch (dbErr) {
-        console.warn("Did not sync authenticated Google user to Firestore (non-blocking):", dbErr);
-      }
-      
-      console.log("Registered or logged Google user successfully:", cred.user.uid);
-      onSuccess();
+      if (setUser) setUser(clientUser);
+      if (setIsAdmin) setIsAdmin(false);
+      if (setIsAdminUnlocked) setIsAdminUnlocked(false);
+
+      setTimeout(() => {
+        onSuccess();
+      }, 600);
     } catch (err: any) {
-      console.error("Google authentication failed:", err);
-      const isIframeOrPopupError = 
-        err.code === 'auth/popup-blocked' || 
-        err.code === 'auth/popup-closed-by-user' || 
-        err.message?.includes('popup-closed-by-user') ||
-        err.message?.includes('Pending promise was never set') ||
-        err.message?.includes('network-request-failed') ||
-        err.code?.includes('network-request-failed') ||
-        err.message?.includes('INTERNAL ASSERTION');
-        
-      if (isIframeOrPopupError) {
-        setErrorCode("REGRETS_IFRAME_GOOGLE_AUTH");
-      } else if (err.code === 'auth/popup-blocked') {
-        setErrorCode("Le popup de connexion Google a été bloqué par votre navigateur. Veuillez autoriser les popups ou ouvrir l'application dans un nouvel onglet.");
-      } else {
-        setErrorCode(err.message || "Impossible de se connecter via Google.");
-      }
+      console.warn("Google auth err:", err);
+      setErrorCode("Connexion Google non disponible dans cet environnement ou fermée.");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="space-y-6">
-      {/* Tab Selector */}
-      <div className="flex bg-slate-100 p-1 rounded-2xl border border-slate-200/50 mb-6 font-sans">
-        <button
-          type="button"
-          onClick={() => { setTab('phone'); setErrorCode(null); }}
-          className={`flex-1 py-3 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all flex items-center justify-center gap-2 ${
-            tab === 'phone'
-              ? 'bg-white text-maritime shadow-sm font-black'
-              : 'text-slate-500 hover:text-slate-800'
-          }`}
-        >
-          <Phone size={12} />
-          Nom & Téléphone
-        </button>
-        <button
-          type="button"
-          onClick={() => { setTab('email'); setErrorCode(null); }}
-          className={`flex-1 py-3 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all flex items-center justify-center gap-2 ${
-            tab === 'email'
-              ? 'bg-white text-maritime shadow-sm font-black'
-              : 'text-slate-500 hover:text-slate-800'
-          }`}
-        >
-          <Mail size={12} />
-          Email
-        </button>
+    <div className="space-y-5">
+      {/* Notice sécurité & authentification */}
+      <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 text-left space-y-1">
+        <div className="flex items-center gap-2 text-slate-800 font-black text-xs uppercase tracking-wider">
+          <ShieldCheck size={16} className="text-emerald-600" />
+          <span>Contrôle & Vérification d'Accès</span>
+        </div>
+        <p className="text-[11px] text-slate-500 font-medium leading-relaxed">
+          Saisissez vos identifiants ci-dessous. Le système vérifie vos informations et authentifie vos droits d'accès : les voyageurs accèdent à l'espace de réservation client, et l'administrateur principal accède à la console d'administration.
+        </p>
       </div>
 
-      {tab === 'phone' ? (
-        /* Traditional Name & Phone Form */
-        <form onSubmit={handlePhoneLogin} className="space-y-6 text-left">
-          <div>
-            <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 ml-1">
-              Votre Nom Complet (Nom & Post-nom)
-            </label>
-            <div className="relative">
-              <span className="absolute left-5 top-4.5 text-slate-300"><User size={16} /></span>
-              <input 
-                required
-                type="text" 
-                value={name} 
-                onChange={e => setName(e.target.value)}
-                className="w-full pl-12 pr-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl focus:outline-none focus:ring-2 ring-maritime/5 text-sm font-bold uppercase tracking-wide placeholder-slate-300"
-                placeholder="Ex: LANDRY MUGOTE"
-              />
-            </div>
-          </div>
-          <div>
-            <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 ml-1">
-              Votre Numéro de Téléphone
-            </label>
-            <div className="relative">
-              <span className="absolute left-5 top-4.5 text-slate-300"><Phone size={16} /></span>
-              <input 
-                required
-                type="text" 
-                value={phone} 
-                onChange={e => setPhone(e.target.value)}
-                className="w-full pl-12 pr-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl focus:outline-none focus:ring-2 ring-maritime/5 text-sm font-bold font-mono tracking-wider placeholder-slate-300"
-                placeholder="Ex: 0991234567"
-              />
-            </div>
-          </div>
-
-          {errorCode && (
-            <div className="p-4 bg-rose-50 border border-rose-150 rounded-2xl space-y-2">
-              <div className="text-rose-600 text-[10px] font-bold uppercase tracking-wider leading-relaxed text-left">
-                {errorCode.includes('network-request-failed') || errorCode.toLowerCase().includes('network') ? (
-                  <>
-                    <span className="block font-black text-rose-800 mb-1">⚠️ Restriction Sécuritaire de l'Iframe</span>
-                    L'aperçu AI Studio interdit les requêtes sécurisées de connexion tiers. Ouvrez l'application dans un nouvel onglet pour contourner ce blocage.
-                    <button 
-                      type="button" 
-                      onClick={() => window.open(window.location.origin + window.location.pathname, '_blank')}
-                      className="block mt-2 font-black text-maritime hover:text-black hover:underline cursor-pointer uppercase text-[9px] tracking-wider"
-                    >
-                      👉 Ouvrir l'application dans un nouvel onglet
-                    </button>
-                  </>
-                ) : (
-                  errorCode
-                )}
-              </div>
-            </div>
-          )}
-
-          <button 
-            type="submit"
-            disabled={loading}
-            className="w-full py-5 bg-maritime text-white font-black rounded-2xl uppercase tracking-[0.25em] text-[10px] sm:text-xs shadow-xl shadow-maritime/20 hover:bg-black transform active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer animate-fade-in animate-pulse"
-          >
-            {loading ? (
-              <>
-                <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1, ease: 'linear' }} className="border-2 border-white/35 border-t-white w-4 h-4 rounded-full" />
-                Accès en cours...
-              </>
-            ) : (
-              <>
-                Se Connecter par Nom/Tél
-                <ChevronRight size={14} />
-              </>
-            )}
-          </button>
-        </form>
-      ) : (
-        /* Email passwordless Form */
-        <form onSubmit={handleEmailAuth} className="space-y-6 text-left">
-          <div>
-            <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 ml-1">
-              Votre Nom Complet (Nom & Post-nom)
-            </label>
-            <div className="relative">
-              <span className="absolute left-5 top-4.5 text-slate-300"><User size={16} /></span>
-              <input 
-                required
-                type="text" 
-                value={name} 
-                onChange={e => setName(e.target.value)}
-                className="w-full pl-12 pr-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl focus:outline-none focus:ring-2 ring-maritime/5 text-sm font-bold uppercase tracking-wide placeholder-slate-300"
-                placeholder="Ex: JEAN LOKO"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 ml-1">
-              Adresse E-mail
-            </label>
-            <div className="relative">
-              <span className="absolute left-5 top-4.5 text-slate-300"><Mail size={16} /></span>
-              <input 
-                required
-                type="email" 
-                value={email} 
-                onChange={e => setEmail(e.target.value)}
-                className="w-full pl-12 pr-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl focus:outline-none focus:ring-2 ring-maritime/5 text-sm font-bold placeholder-slate-300"
-                placeholder="voyageur@compagnie.com"
-              />
-            </div>
-          </div>
-
-          {email.trim().toLowerCase() === getAdminEmail().toLowerCase() && (
-            <motion.div 
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              transition={{ duration: 0.3 }}
-              className="space-y-4 mt-4 text-left overflow-hidden"
-            >
-              <div>
-                <label className="block text-[10px] font-black uppercase tracking-widest text-maritime mb-2 ml-1">
-                  Mot de passe de session (Strictement obligatoire)
-                </label>
-                <div className="relative">
-                  <span className="absolute left-5 top-4.5 text-slate-450"><Lock size={16} /></span>
-                  <input 
-                    required
-                    type="password" 
-                    value={adminPassword} 
-                    onChange={e => setAdminPassword(e.target.value)}
-                    className="w-full pl-12 pr-6 py-4 bg-slate-50 border-2 border-maritime/30 rounded-2xl focus:outline-none focus:ring-2 ring-maritime/5 text-sm font-bold placeholder-slate-300 text-black animate-pulse-subtle"
-                    placeholder="••••••••"
-                  />
-                </div>
-              </div>
-            </motion.div>
-          )}
-
-          {errorCode && (
-            <div className="p-4 bg-rose-50 border border-rose-150 rounded-2xl space-y-2">
-              <div className="text-rose-600 text-[10px] font-bold uppercase tracking-wider leading-relaxed text-left">
-                {errorCode.includes('network-request-failed') || errorCode.toLowerCase().includes('network') ? (
-                  <>
-                    <span className="block font-black text-rose-800 mb-1">⚠️ Restriction Sécuritaire de l'Iframe</span>
-                    L'aperçu AI Studio interdit les requêtes sécurisées de connexion tiers. Ouvrez l'application dans un nouvel onglet pour contourner ce blocage.
-                    <button 
-                      type="button" 
-                      onClick={() => window.open(window.location.origin + window.location.pathname, '_blank')}
-                      className="block mt-2 font-black text-maritime hover:text-black hover:underline cursor-pointer uppercase text-[9px] tracking-wider"
-                    >
-                      👉 Ouvrir l'application dans un nouvel onglet
-                    </button>
-                  </>
-                ) : (
-                  errorCode
-                )}
-              </div>
-            </div>
-          )}
-
-          <button 
-            type="submit"
-            disabled={loading}
-            className="w-full py-5 bg-maritime text-white font-black rounded-2xl uppercase tracking-[0.25em] text-[10px] sm:text-xs shadow-xl shadow-maritime/20 hover:bg-black transform active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer animate-fade-in animate-pulse"
-          >
-            {loading ? (
-              <>
-                <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1, ease: 'linear' }} className="border-2 border-white/35 border-t-white w-4 h-4 rounded-full" />
-                Traitement...
-              </>
-            ) : (
-              <>
-                Se Connecter par Email
-                <ChevronRight size={14} />
-              </>
-            )}
-          </button>
-        </form>
-      )}
-
-      {/* Modern Google Separator & Button */}
-      <div className="flex items-center my-6">
-        <div className="flex-1 border-t border-slate-100"></div>
-        <span className="px-4 text-[9px] font-black tracking-widest text-slate-300 uppercase">OU</span>
-        <div className="flex-1 border-t border-slate-100"></div>
-      </div>
-
-      {errorCode === "REGRETS_IFRAME_GOOGLE_AUTH" && (
-        <div className="p-4 bg-slate-100 border border-slate-300 rounded-2xl space-y-3 mb-4 text-left">
-          <div className="text-slate-900 text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5">
-            <span className="text-sm">⚠️</span> Restriction de Sécurité Iframe Détectée
-          </div>
-          <p className="text-slate-600 text-[10px] uppercase font-bold tracking-wide leading-relaxed">
-            L'aperçu de l'éditeur AI Studio interdit l'authentification Google via Popup dans une Iframe sécurisée. Veuillez ouvrir l'application dans un nouvel onglet pour vous connecter de manière sécurisée et officielle.
-          </p>
-          <div className="grid grid-cols-1 gap-2 pt-1 font-sans">
-            <button 
-              type="button" 
-              onClick={() => window.open(window.location.origin + window.location.pathname, '_blank')}
-              className="py-3 px-4 bg-[#0b132b] text-white font-black rounded-xl uppercase text-[9px] tracking-wider text-center hover:bg-black transition-all cursor-pointer shadow-sm text-ellipsis overflow-hidden"
-            >
-              👉 Nouvel Onglet
-            </button>
+      <form onSubmit={handleSubmit} className="space-y-4 text-left">
+        <div>
+          <label className="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1.5 ml-1">
+            Nom Complet (Nom & Post-nom) <span className="text-rose-500">*</span>
+          </label>
+          <div className="relative">
+            <span className="absolute left-4 top-3.5 text-slate-400"><User size={16} /></span>
+            <input 
+              required
+              type="text" 
+              value={name} 
+              onChange={e => setName(e.target.value)}
+              className="w-full pl-11 pr-4 py-3 bg-white border border-slate-200 focus:border-slate-800 rounded-xl focus:outline-none text-xs font-bold uppercase tracking-wide placeholder-slate-400 shadow-xs"
+              placeholder="Ex: Bireke Idea ou votre nom complet"
+            />
           </div>
         </div>
-      )}
+
+        <div>
+          <label className="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1.5 ml-1">
+            Numéro de Téléphone (Mobile Money / WhatsApp)
+          </label>
+          <div className="relative">
+            <span className="absolute left-4 top-3.5 text-slate-400"><Phone size={16} /></span>
+            <input 
+              type="tel" 
+              value={phone} 
+              onChange={e => setPhone(e.target.value)}
+              className="w-full pl-11 pr-4 py-3 bg-white border border-slate-200 focus:border-slate-800 rounded-xl focus:outline-none text-xs font-bold font-mono tracking-wider placeholder-slate-400 shadow-xs"
+              placeholder="Ex: 0994286469"
+            />
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1.5 ml-1">
+            Adresse E-mail
+          </label>
+          <div className="relative">
+            <span className="absolute left-4 top-3.5 text-slate-400"><Mail size={16} /></span>
+            <input 
+              type="email" 
+              value={email} 
+              onChange={e => setEmail(e.target.value)}
+              className="w-full pl-11 pr-4 py-3 bg-white border border-slate-200 focus:border-slate-800 rounded-xl focus:outline-none text-xs font-bold placeholder-slate-400 shadow-xs"
+              placeholder="Ex: birekeidea@gmail.com"
+            />
+          </div>
+        </div>
+
+        {systemStatus && (
+          <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-800 text-[11px] font-bold flex items-center gap-2">
+            <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+            <span>{systemStatus}</span>
+          </div>
+        )}
+
+        {errorCode && (
+          <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-[11px] font-bold flex items-center gap-2">
+            <AlertCircle size={15} className="text-rose-600 shrink-0" />
+            <span>{errorCode}</span>
+          </div>
+        )}
+
+        <button 
+          type="submit"
+          disabled={loading}
+          className="w-full py-3.5 bg-slate-900 hover:bg-black active:scale-98 text-white font-black rounded-xl uppercase tracking-widest text-xs shadow-md transition-all cursor-pointer flex items-center justify-center gap-2 mt-2 disabled:opacity-50"
+        >
+          {loading ? (
+            <>
+              <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1, ease: 'linear' }} className="border-2 border-white/35 border-t-white w-4 h-4 rounded-full" />
+              <span>Vérification du système...</span>
+            </>
+          ) : (
+            <>
+              <ShieldCheck size={16} className="text-amber-400" />
+              <span>Vérifier mes identifiants & Accéder</span>
+              <ChevronRight size={14} />
+            </>
+          )}
+        </button>
+      </form>
+
+      {/* Google Login Alternative */}
+      <div className="flex items-center my-4">
+        <div className="flex-1 border-t border-slate-200"></div>
+        <span className="px-3 text-[9px] font-black tracking-widest text-slate-400 uppercase">OU</span>
+        <div className="flex-1 border-t border-slate-200"></div>
+      </div>
 
       <button 
         type="button"
         onClick={handleGoogleLogin}
         disabled={loading}
-        className="w-full py-4.5 bg-[#0b132b] hover:bg-black text-white font-black rounded-2xl uppercase tracking-widest text-[10px] sm:text-xs shadow-lg shadow-black/20 flex items-center justify-center gap-3 active:scale-95 transition-all cursor-pointer border border-white/10"
+        className="w-full py-3 bg-white hover:bg-slate-50 text-slate-800 font-bold rounded-xl text-xs shadow-xs border border-slate-200 flex items-center justify-center gap-2.5 active:scale-98 transition-all cursor-pointer"
       >
-        <svg className="w-4 h-4 text-white fill-current shrink-0" viewBox="0 0 24 24">
-          <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-          <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-          <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
-          <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
+        <svg className="w-4 h-4" viewBox="0 0 24 24">
+          <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+          <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+          <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
+          <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
         </svg>
-        Continuer avec Google
+        <span>Continuer avec Google</span>
       </button>
     </div>
   );
@@ -2561,6 +2262,7 @@ function LandingLogin({ siteSettings, onLoginSuccess, setUser, setIsAdmin, setIs
           setUser={setUser} 
           setIsAdmin={setIsAdmin}
           setIsAdminUnlocked={setIsAdminUnlocked}
+          onAdminRedirect={onLoginSuccess}
         />
         <p className="mt-8 text-[9px] font-bold text-slate-400 uppercase tracking-widest leading-relaxed">
           En vous connectant, vous acceptez nos conditions de navigation des Ets AMR MUGOTE.
@@ -2583,16 +2285,16 @@ function LandingLogin({ siteSettings, onLoginSuccess, setUser, setIsAdmin, setIs
   );
 }
 
-function AuthForm({ onSuccess, setUser }: { onSuccess: () => void, setUser?: (u: any) => void }) {
+function AuthForm({ onSuccess, setUser, setIsAdmin, setIsAdminUnlocked, onAdminRedirect }: { onSuccess: () => void, setUser?: (u: any) => void, setIsAdmin?: (val: boolean) => void, setIsAdminUnlocked?: (val: boolean) => void, onAdminRedirect?: () => void }) {
   return (
-    <div className="space-y-8">
-      <div className="text-center">
-        <p className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest leading-relaxed">
-          Saisissez vos identifiants pour vous connecter
-        </p>
-      </div>
-
-      <UserLoginForm onSuccess={onSuccess} setUser={setUser} />
+    <div className="space-y-6">
+      <UserLoginForm 
+        onSuccess={onSuccess} 
+        setUser={setUser} 
+        setIsAdmin={setIsAdmin} 
+        setIsAdminUnlocked={setIsAdminUnlocked} 
+        onAdminRedirect={onAdminRedirect} 
+      />
       
       <div className="pt-4 border-t border-slate-50 text-center">
         <p className="text-[9px] font-bold text-slate-400 uppercase tracking-[0.3em]">Mugote Maritime Services</p>
@@ -2715,38 +2417,29 @@ function AuthModal({ isOpen, onClose, mode = 'user', setUser, setIsAdmin, setIsA
         animate={{ opacity: 1, scale: 1, y: 0 }}
         className="bg-white w-full max-w-md rounded-[32px] overflow-hidden shadow-2xl relative z-10 p-8 md:p-12"
       >
-        <button onClick={onClose} className="absolute top-6 right-6 p-2 hover:bg-slate-100 rounded-full transition-colors">
+        <button onClick={onClose} className="absolute top-6 right-6 p-2 hover:bg-slate-100 rounded-full transition-colors cursor-pointer text-slate-400 hover:text-black">
           <X size={20} />
         </button>
 
-        <div className="text-center mb-8">
-          <div className={cn(
-            "w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4",
-            mode === 'admin' ? "bg-red-50" : "bg-maritime/5"
-          )}>
-            {mode === 'admin' ? <Lock className="text-red-600" size={32} /> : <Ship className="text-maritime" size={32} />}
+        <div className="text-center mb-6">
+          <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-3 bg-slate-900 text-white shadow-md">
+            <Ship size={26} />
           </div>
-          <h2 className="text-2xl font-black uppercase tracking-tight italic">
-            {mode === 'admin' ? "Espace Admin" : "Profil Voyageur"}
+          <h2 className="text-xl sm:text-2xl font-black uppercase tracking-tight text-slate-900">
+            Connexion & Authentification
           </h2>
-          <p className="text-slate-500 text-[10px] font-medium mt-1 uppercase tracking-widest text-center">
-            {mode === 'admin' ? "Authentification requise" : "Gérez vos réservations Mugote"}
+          <p className="text-slate-500 text-[10px] font-bold mt-1 uppercase tracking-widest text-center">
+            Vérification de l'éligibilité et des accès
           </p>
         </div>
 
-        {mode === 'admin' ? (
-          <AdminAuthForm 
-            onSuccess={() => {
-              if (onAdminSuccess) onAdminSuccess();
-              onClose();
-            }} 
-            setIsAdmin={setIsAdmin} 
-            setIsAdminUnlocked={setIsAdminUnlocked} 
-            setUser={setUser}
-          />
-        ) : (
-          <AuthForm onSuccess={onClose} setUser={setUser} />
-        )}
+        <UserLoginForm 
+          onSuccess={onClose} 
+          setUser={setUser} 
+          setIsAdmin={setIsAdmin} 
+          setIsAdminUnlocked={setIsAdminUnlocked} 
+          onAdminRedirect={onAdminSuccess} 
+        />
       </motion.div>
     </div>
   );
@@ -4828,8 +4521,14 @@ function Payment({ reservation, onComplete, siteSettings }: { reservation: Reser
   );
 }
 
-function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlocked, setIsAdminUnlocked, setUser }: { siteSettings?: { homeBg: string, homeDetail: string, exchangeRate?: number }, onNavigate: (page: string) => void, schedules: any[], isAdmin: boolean, isAdminUnlocked: boolean, setIsAdminUnlocked: (val: boolean) => void, setUser?: (u: any) => void }) {
-  const [tab, setTab] = useState<'recap' | 'finances' | 'reservations' | 'reminders' | 'tarifs' | 'users' | 'fleet' | 'media' | 'settings' | 'messages' | 'schedules' | 'scanner' | 'mongodb'>('recap');
+function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlocked, setIsAdminUnlocked, setUser, initialTab }: { siteSettings?: { homeBg: string, homeDetail: string, exchangeRate?: number }, onNavigate: (page: string) => void, schedules: any[], isAdmin: boolean, isAdminUnlocked: boolean, setIsAdminUnlocked: (val: boolean) => void, setUser?: (u: any) => void, initialTab?: 'recap' | 'mongodb' }) {
+  const [tab, setTab] = useState<'recap' | 'finances' | 'reservations' | 'reminders' | 'tarifs' | 'users' | 'fleet' | 'media' | 'settings' | 'messages' | 'schedules' | 'scanner' | 'mongodb'>(initialTab || 'recap');
+
+  useEffect(() => {
+    if (initialTab) {
+      setTab(initialTab);
+    }
+  }, [initialTab]);
   const [reservationViewMode, setReservationViewMode] = useState<'daily' | 'all'>('daily');
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [usersList, setUsersList] = useState<any[]>([]);
@@ -4838,7 +4537,7 @@ function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlock
   const [boatForm, setBoatForm] = useState({ id: '', name: '', capacity: 0, description: '', imageUrl: '', lat: -2.4930, lng: 28.8590, status: 'À quai' });
   const [editMediaId, setEditMediaId] = useState<string | null>(null);
   const [adminCode, setAdminCode] = useState('');
-  const [adminEmailInput, setAdminEmailInput] = useState('');
+  const [adminEmailInput, setAdminEmailInput] = useState('birekeidea@gmail.com');
   const [adminPasswordInput, setAdminPasswordInput] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showAccessHelp, setShowAccessHelp] = useState(false);
@@ -5513,6 +5212,13 @@ function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlock
 
       if (action === 'VALIDATED') {
         updateFields.ticketId = ticketId;
+        // La réservation est confirmée et le billet est émis pour le client,
+        // mais le billet sera déclaré EMBARQUÉ uniquement lors du scan par les agents d'embarquement
+        updateFields.boardingStatus = 'TO_BOARD';
+        updateFields.boarded = false;
+        updateFields.isUsed = false;
+        updateFields.boardedAt = null;
+        updateFields.usedAt = null;
       }
 
       // Only add validatedBy if auth.currentUser exists and has a uid to avoid Firestore undefined errors
@@ -5524,12 +5230,32 @@ function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlock
 
       const targetRes = reservations.find(r => r.id === resId);
 
+      // Pré-génération du QR Code cryptographique sécurisé pour les agents d'embarquement
+      if (action === 'VALIDATED') {
+        qrApi.generateQr({
+          ticketId,
+          reservationId: resId,
+          passengerName: targetRes?.fullName || 'Passager',
+          phone: targetRes?.phone,
+          itinerary: targetRes?.itinerary,
+          ship: targetRes?.ship,
+          travelDate: targetRes?.travelDate,
+          departureTime: targetRes?.departureTime,
+          travelClass: targetRes?.travelClass,
+          passengersCount: targetRes?.passengersCount || 1,
+          validityHours: 72
+        }).catch(err => console.warn("QR pre-generation note:", err));
+      }
+
       // Synchronisation vers MongoDB Atlas avec transmission des données passager pour notification
       try {
         await mongoApi.updateReservationStatus(resId, {
           ...(targetRes || {}),
           status: action,
           ticketId: action === 'VALIDATED' ? ticketId : '',
+          boardingStatus: action === 'VALIDATED' ? 'TO_BOARD' : (targetRes?.boardingStatus || 'PENDING'),
+          boarded: false,
+          isUsed: false,
           validatedBy: auth.currentUser?.uid || 'Administration AMR MUGOTE',
           email: targetRes?.email,
           fullName: targetRes?.fullName,
@@ -5545,7 +5271,9 @@ function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlock
           await mongoApi.sendBookingConfirmation(ticketId || resId, targetRes.email, {
             ...targetRes,
             status: 'VALIDATED',
-            ticketId: ticketId || resId
+            ticketId: ticketId || resId,
+            boardingStatus: 'TO_BOARD',
+            boarded: false
           });
           console.log(`Confirmation email sent to ${targetRes.email}`);
         } catch (e) {
@@ -5554,8 +5282,8 @@ function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlock
       }
 
       alert(action === 'VALIDATED' 
-        ? (targetRes?.email ? `Billet validé avec succès ! Une confirmation officielle a été envoyée par email à ${targetRes.email}.` : "Billet validé avec succès !")
-        : "Billet rejeté avec succès."
+        ? `Réservation confirmée avec succès ! Le billet officiel #${ticketId} a été émis pour le client dans la base de données. Le client peut désormais recevoir son billet. Il sera déclaré EMBARQUÉ dès que les agents au port auront scanné son QR code.`
+        : "Réservation rejetée avec succès."
       );
     } catch (error) {
       console.error("Action failed", error);
@@ -6235,57 +5963,16 @@ function Dashboard({ siteSettings, onNavigate, schedules, isAdmin, isAdminUnlock
                             {res.status === 'PENDING' && (
                               <>
                                 <button 
-                                  onClick={async () => {
-                                    const now = Date.now();
-                                    const ticketId = res.ticketId || `AMR-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
-                                    try {
-                                      const payload: any = {
-                                        ...res,
-                                        status: 'VALIDATED',
-                                        boardingStatus: 'BOARDED',
-                                        boarded: true,
-                                        boardedAt: now,
-                                        isUsed: true,
-                                        usedAt: now,
-                                        ticketId,
-                                        validatedAt: now,
-                                        email: res.email,
-                                        fullName: res.fullName,
-                                        phone: res.phone
-                                      };
-                                      await updateDoc(doc(db, 'reservations', res.id!), payload);
-                                      try {
-                                        await mongoApi.updateReservationStatus(res.id!, payload);
-                                      } catch (mErr) {
-                                        console.warn("Mongo sync note:", mErr);
-                                      }
-
-                                      if (res.email && res.email.includes('@')) {
-                                        mongoApi.sendBookingConfirmation(ticketId, res.email, payload).catch(e => console.warn("Direct boarding email note:", e));
-                                      }
-
-                                      alert(res.email 
-                                        ? `Billet lâché et validé ! Une confirmation a été envoyée par email à ${res.email}. Le passager est maintenant embarqué.`
-                                        : "Billet lâché et validé dans la base de données ! Le statut du passager est maintenant embarqué."
-                                      );
-                                    } catch (err: any) {
-                                      alert("Erreur lors du lâcher du billet: " + err.message);
-                                    }
-                                  }}
-                                  className="px-3.5 py-2 flex items-center gap-1.5 bg-[#001E2B] text-[#00ED64] hover:bg-black transition-all rounded-xl shadow-md text-[9px] font-black uppercase tracking-widest cursor-pointer border border-[#00ED64]/50 active:scale-95"
-                                  title="Valider et lâcher immédiatement le voyageur comme embarqué"
-                                >
-                                  <Check size={13} className="text-[#00ED64]" /> 🚢 Lâcher / Embarquer
-                                </button>
-                                <button 
                                   onClick={() => handleAction(res.id!, 'VALIDATED')} 
-                                  className="px-3 py-2 flex items-center gap-1.5 bg-emerald-500 text-white hover:bg-emerald-600 transition-all rounded-xl shadow-md text-[9px] font-black uppercase tracking-widest cursor-pointer active:scale-95"
+                                  className="px-3.5 py-2 flex items-center gap-1.5 bg-emerald-600 text-white hover:bg-emerald-700 transition-all rounded-xl shadow-md text-[9px] font-black uppercase tracking-widest cursor-pointer active:scale-95"
+                                  title="Confirmer la réservation et émettre le billet officiel pour le client"
                                 >
-                                  <CheckCircle2 size={13} /> Valider
+                                  <CheckCircle2 size={13} /> Confirmer la Réservation
                                 </button>
                                 <button 
                                   onClick={() => handleAction(res.id!, 'REJECTED')} 
                                   className="px-3 py-2 flex items-center gap-1.5 bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white transition-all rounded-xl border border-rose-100 text-[9px] font-black uppercase tracking-widest cursor-pointer active:scale-95"
+                                  title="Rejeter cette demande de réservation"
                                 >
                                   <X size={13} /> Rejeter
                                 </button>
@@ -8087,10 +7774,10 @@ function MyTickets({
                         <Lock size={20} />
                       </div>
                       <p className="text-[6.5px] sm:text-[7.5px] font-black uppercase tracking-tight text-amber-800 leading-tight">
-                        En Attente Admin
+                        En Attente
                       </p>
                       <p className="text-[5.5px] sm:text-[6.5px] text-amber-700/80 font-semibold mt-0.5 leading-none">
-                        Lâcher en attente
+                        Confirmation admin
                       </p>
                     </div>
                   )}
@@ -8135,25 +7822,25 @@ function MyTickets({
                       {isBoarded ? (
                         <span className="text-[7.5px] sm:text-[8.5px] font-black uppercase tracking-widest px-2.5 py-1 bg-emerald-600 text-white rounded-lg flex items-center gap-1.5 shadow-md shadow-emerald-600/30 animate-pulse">
                           <CheckCircle2 size={12} className="text-white" />
-                          🚢 EMBARQUÉ (LÂCHÉ)
+                          🚢 EMBARQUÉ (À BORD)
                         </span>
                       ) : isValidated ? (
-                        <span className="text-[7.5px] sm:text-[8.5px] font-black uppercase tracking-widest px-2.5 py-1 bg-slate-900 text-white rounded-lg flex items-center gap-1.5 shadow-sm">
+                        <span className="text-[7.5px] sm:text-[8.5px] font-black uppercase tracking-widest px-2.5 py-1 bg-sky-900 text-white rounded-lg flex items-center gap-1.5 shadow-sm">
                           <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                          🟢 PRÊT EMBARQUEMENT
+                          🟢 CONFIRMÉ • EN ATTENTE SCAN
                         </span>
                       ) : (
                         <span className="text-[7.5px] font-black uppercase tracking-widest px-2 py-0.5 bg-amber-50 text-amber-800 border border-amber-300 rounded-md flex items-center gap-1">
                           <Lock size={10} className="text-amber-600" />
-                          EN ATTENTE LÂCHER ADMIN
+                          EN ATTENTE CONFIRMATION
                         </span>
                       )}
 
                       <span className={cn(
                         "text-[7px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-sm border",
-                        isReadyToDownload ? "bg-emerald-50 text-emerald-700 border-emerald-300" : "bg-slate-100 text-slate-700 border-slate-300"
+                        isBoarded ? "bg-emerald-50 text-emerald-700 border-emerald-300" : isReadyToDownload ? "bg-sky-50 text-sky-700 border-sky-300" : "bg-slate-100 text-slate-700 border-slate-300"
                       )}>
-                        {isBoarded ? 'PAYÉ & EMBARQUÉ' : isValidated ? 'PAYÉ & VALIDÉ' : res.status || 'EN ATTENTE'}
+                        {isBoarded ? 'EMBARQUÉ & SÉCURISÉ' : isValidated ? 'BILLET CONFIRMÉ' : res.status || 'EN ATTENTE'}
                       </span>
                     </div>
                   </div>
@@ -8165,15 +7852,15 @@ function MyTickets({
                         <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
                         <div className="min-w-0">
                           <p className="text-[8.5px] sm:text-[9.5px] font-black text-emerald-950 uppercase tracking-tight truncate">
-                            Billet lâché & passager marqué embarqué dans la base de données !
+                            Billet scanné & passager embarqué à bord du navire !
                           </p>
                           <p className="text-[7px] sm:text-[7.5px] text-emerald-800 font-semibold truncate">
-                            Votre place est confirmée à bord. Cliquez sur le billet pour le télécharger.
+                            Contrôle de passage validé. Bon voyage sur le Lac Kivu avec ETS AMR MUGOTE !
                           </p>
                         </div>
                       </div>
-                      <span className="px-2 py-1 bg-emerald-600 text-white text-[7px] sm:text-[7.5px] font-black uppercase tracking-wider rounded-lg flex items-center gap-1 shrink-0 animate-pulse">
-                        <Download size={9} /> Clic = Télécharger
+                      <span className="px-2 py-1 bg-emerald-600 text-white text-[7px] sm:text-[7.5px] font-black uppercase tracking-wider rounded-lg flex items-center gap-1 shrink-0">
+                        <Download size={9} /> E-Billet PDF
                       </span>
                     </div>
                   ) : isValidated ? (
@@ -8182,10 +7869,10 @@ function MyTickets({
                         <CheckCircle2 size={16} className="text-sky-600 shrink-0" />
                         <div className="min-w-0">
                           <p className="text-[8.5px] sm:text-[9.5px] font-black text-sky-950 uppercase tracking-tight truncate">
-                            Billet validé par l'administrateur • Prêt pour embarquement
+                            Réservation confirmée • Billet officiel émis
                           </p>
                           <p className="text-[7px] sm:text-[7.5px] text-sky-800 font-semibold truncate">
-                            Cliquez sur le billet pour télécharger automatiquement votre e-billet PDF.
+                            Téléchargez votre e-billet PDF ci-dessous. Présentez son QR Code aux agents d'embarquement au port pour être déclaré embarqué.
                           </p>
                         </div>
                       </div>
@@ -9003,8 +8690,8 @@ function AdminScannerView({ reservations }: AdminScannerViewProps) {
       setScannedRes(updatedTicket);
       setScanStatus('success');
       setStatusMessage(ticket.email
-        ? `ACCÈS ACCORDÉ : Embarquement validé ! Passager lâché à bord et confirmation envoyée par Gmail à ${ticket.email}.`
-        : "ACCÈS ACCORDÉ PAR L'ADMINISTRATION : Embarquement validé avec succès ! Passager lâché à bord."
+        ? `ACCÈS AUTORISÉ : Le billet #${ticket.ticketId || ticket.id} a été scanné avec succès ! Statut mis à jour à EMBARQUÉ dans la base de données. Confirmation envoyée à ${ticket.email}.`
+        : `ACCÈS AUTORISÉ : Le billet #${ticket.ticketId || ticket.id} a été scanné avec succès par l'agent d'embarquement ! Statut mis à jour à : EMBARQUÉ (À BORD).`
       );
       setScannedList(prev => [updatedTicket, ...prev.filter(x => x.id !== updatedTicket.id)]);
       playBeep(true);

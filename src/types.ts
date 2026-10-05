@@ -29,7 +29,7 @@ export interface Reservation {
   validatedAt?: any;
   validatedBy?: string;
   ticketId?: string;
-  boardingStatus?: 'PENDING' | 'BOARDED';
+  boardingStatus?: 'PENDING' | 'TO_BOARD' | 'BOARDED';
   boarded?: boolean;
   boardedAt?: number;
   notes?: string;

@@ -140,7 +140,9 @@ export function FerryhopperBookingEngine({
         amount: price,
         createdAt: Date.now(),
         ticketId: uniqueTicketId,
-        boardingStatus: 'PENDING',
+        boardingStatus: 'TO_BOARD',
+        boarded: false,
+        isUsed: false,
         notes: `Bateau Mugote • ${travelClass} • Date: ${travelDate}`
       };
 
