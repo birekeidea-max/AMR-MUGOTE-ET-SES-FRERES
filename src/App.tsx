@@ -1554,26 +1554,26 @@ export default function App() {
       </main>
 
       {/* PIED DE PAGE ULTRA-COMPACT ET MINIMISÉ */}
-      <footer className="relative bg-[#001f4d] text-white py-2 px-3 sm:px-5 mt-6 border-t border-blue-400/40" id="platform-footer">
-        <div className="max-w-6xl mx-auto space-y-1.5">
+      <footer className="relative bg-[#001f4d] text-white py-3 px-4 sm:px-6 mt-6 border-t border-blue-400/40" id="platform-footer">
+        <div className="max-w-6xl mx-auto space-y-2">
           
           {/* SECTIONS DEMANDÉES UNIQUEMENT : ASSISTANCE & RÉSERVATION, À PROPOS, PAIEMENT SÉCURISÉ */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5 sm:gap-4 pb-1.5 border-b border-blue-800/50 text-left">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-5 pb-2 border-b border-blue-800/50 text-left">
             
             {/* 1. ASSISTANCE DIRECTE ET RÉSERVATION */}
-            <div className="space-y-0.5">
-              <h5 className="font-bold text-amber-300 text-[11px] uppercase tracking-wide flex items-center gap-1">
-                <PhoneCall size={11} className="text-amber-400" />
+            <div className="space-y-1">
+              <h5 className="font-bold text-amber-300 text-[11px] uppercase tracking-wide flex items-center gap-1.5">
+                <PhoneCall size={11} className="text-amber-400 shrink-0" />
                 <span>Assistance directe et réservation</span>
               </h5>
               <div 
-                style={{ fontFamily: '"Times New Roman", Times, serif', fontSize: '8pt', lineHeight: 1.25 }}
-                className="text-blue-100/90"
+                style={{ fontFamily: '"Times New Roman", Times, serif', fontSize: '8pt', lineHeight: 1.3 }}
+                className="text-blue-100"
               >
                 <p>
                   Capitainerie et service de réservation disponibles 7j/7 pour vous assister à Goma et Bukavu.
                 </p>
-                <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                <div className="flex flex-wrap items-center gap-1.5 pt-1">
                   <a href="tel:+243994102673" className="text-amber-300 hover:underline font-bold">
                     Tél : +243 994 102 673
                   </a>
@@ -1586,13 +1586,13 @@ export default function App() {
             </div>
 
             {/* 2. À PROPOS D'AMR MUGOTE */}
-            <div className="space-y-0.5">
+            <div className="space-y-1">
               <h5 className="font-bold text-amber-300 text-[11px] uppercase tracking-wide">
                 À propos d'AMR MUGOTE
               </h5>
               <div 
-                style={{ fontFamily: '"Times New Roman", Times, serif', fontSize: '8pt', lineHeight: 1.25 }}
-                className="text-blue-100/90 space-y-0.5"
+                style={{ fontFamily: '"Times New Roman", Times, serif', fontSize: '8pt', lineHeight: 1.3 }}
+                className="text-blue-100 space-y-0.5"
               >
                 <p>
                   Les ETS AMR MUGOTE & FRÈRES assurent le transport lacustre régulier de passagers et de fret sur le Lac Kivu reliant les ports de Goma et Bukavu en République Démocratique du Congo.
@@ -1604,14 +1604,14 @@ export default function App() {
             </div>
 
             {/* 3. PAIEMENT SÉCURISÉ ET SON DESCRIPTIF */}
-            <div className="space-y-0.5">
-              <h5 className="font-bold text-amber-300 text-[11px] uppercase tracking-wide flex items-center gap-1">
-                <ShieldCheck size={11} className="text-emerald-400" />
+            <div className="space-y-1">
+              <h5 className="font-bold text-amber-300 text-[11px] uppercase tracking-wide flex items-center gap-1.5">
+                <ShieldCheck size={11} className="text-emerald-400 shrink-0" />
                 <span>Paiement sécurisé</span>
               </h5>
               <div 
-                style={{ fontFamily: '"Times New Roman", Times, serif', fontSize: '8pt', lineHeight: 1.25 }}
-                className="text-blue-100/90 space-y-0.5"
+                style={{ fontFamily: '"Times New Roman", Times, serif', fontSize: '8pt', lineHeight: 1.3 }}
+                className="text-blue-100 space-y-0.5"
               >
                 <p>
                   Paiements et réservations sécurisés via Mobile Money (Vodacom M-Pesa, Airtel Money, Orange Money) ou directement au guichet d'embarquement avant le départ.
@@ -1623,14 +1623,14 @@ export default function App() {
 
           {/* 4. PARTIE DE BAS DÉBUTANT PAR 2006 */}
           <div 
-            style={{ fontFamily: '"Times New Roman", Times, serif', fontSize: '8pt', lineHeight: 1.2 }}
-            className="flex flex-col sm:flex-row items-center justify-between gap-1 text-blue-200/90 text-center sm:text-left"
+            style={{ fontFamily: '"Times New Roman", Times, serif', fontSize: '8pt', lineHeight: 1.25 }}
+            className="flex flex-col sm:flex-row items-center justify-between gap-1.5 pt-0.5 text-blue-200 text-center sm:text-left"
           >
             <p>
               2006–{new Date().getFullYear()} ETS AMR MUGOTE & FRÈRES. Tous droits réservés. Navigation autorisée sur le Lac Kivu par le Ministère des Transports et Voies de Communication de la RDC.
             </p>
             <div className="flex items-center gap-3 shrink-0">
-              <span className="text-amber-300/80 font-medium">
+              <span className="text-amber-300/90 font-medium">
                 Goma • Bukavu • Lac Kivu (RDC)
               </span>
             </div>
@@ -1661,13 +1661,13 @@ export default function App() {
       {/* Bouton de contrôle flottant (PWA) */}
       <div className="fixed bottom-6 left-6 z-[90]">
         <button
+          type="button"
           onClick={() => setIsInstallModalOpen(true)}
-          className="flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-700 hover:to-teal-600 text-white border border-emerald-400/40 rounded-2xl shadow-2xl shadow-black/80 text-[10px] sm:text-xs font-black uppercase tracking-widest transition-all duration-300 hover:scale-105 active:scale-95 cursor-pointer relative overflow-hidden"
+          className="flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-700 hover:to-teal-600 text-white border border-emerald-400/40 rounded-2xl shadow-2xl shadow-black/80 text-[10px] sm:text-xs font-black uppercase tracking-widest transition-all duration-200 hover:scale-105 active:scale-95 cursor-pointer"
           title="Installer l'application sur votre appareil pour l'avoir hors-ligne"
         >
-          <span className="absolute -right-2 -top-2 w-8 h-8 bg-white/20 rounded-full blur-sm animate-ping opacity-70"></span>
-          <Smartphone size={16} className="text-white animate-bounce" />
-          <span>📲 TELECHARGER L'APP</span>
+          <Download size={16} className="text-white shrink-0" />
+          <span className="leading-none">TÉLÉCHARGER L'APP</span>
         </button>
       </div>
 
@@ -1711,13 +1711,15 @@ export default function App() {
                 {/* Platform Badge Banner */}
                 <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex items-center justify-between">
                   <div className="flex items-center gap-3 text-left">
-                    <span className="text-3xl">📱</span>
+                    <div className="w-10 h-10 rounded-xl bg-[#001233]/10 text-[#001233] flex items-center justify-center shrink-0">
+                      <Smartphone size={22} />
+                    </div>
                     <div>
                       <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Votre Appareil Détecté :</p>
                       <span className="font-extrabold text-sm text-slate-900 uppercase">
-                        {userPlatform === 'ios' ? '🍏 iPhone / iPad (iOS)' : 
-                         userPlatform === 'android' ? '🤖 Téléphone Android' : 
-                         userPlatform === 'desktop' ? '💻 Ordinateur (PC / Mac)' : '📲 Appareil Mobile intelligent'}
+                        {userPlatform === 'ios' ? 'iPhone / iPad (iOS)' : 
+                         userPlatform === 'android' ? 'Téléphone Android' : 
+                         userPlatform === 'desktop' ? 'Ordinateur (PC / Mac)' : 'Appareil Mobile'}
                       </span>
                     </div>
                   </div>
@@ -1768,7 +1770,7 @@ export default function App() {
                   {/* iOS/Apple Safari Install Section */}
                   {userPlatform === 'ios' && (
                     <div className="p-5 bg-[#001233]/5 rounded-2xl border border-[#001233]/10 space-y-4 text-left">
-                      <span className="text-[#001233] font-black text-xs sm:text-sm uppercase tracking-wider block">Guide d'installation iPhone / iPad 🍏</span>
+                      <span className="text-[#001233] font-black text-xs sm:text-sm uppercase tracking-wider block">Guide d'installation iPhone / iPad</span>
                       <div className="space-y-3.5 text-xs text-slate-700 leading-relaxed font-semibold">
                         <div className="flex items-start gap-2.5">
                           <span className="bg-[#001233]/10 text-[#001233] w-5 h-5 rounded-full flex items-center justify-center text-[10px] flex-shrink-0 mt-0.5">1</span>
@@ -1793,7 +1795,7 @@ export default function App() {
                   {/* Desktop Install Section */}
                   {userPlatform === 'desktop' && (
                     <div className="p-5 bg-slate-100 rounded-2xl border border-slate-200 space-y-4 text-left">
-                      <span className="text-slate-900 font-black text-xs sm:text-sm uppercase tracking-wider block">Méthode Facile pour Ordinateur (PC / Mac / Linux) 💻</span>
+                      <span className="text-slate-900 font-black text-xs sm:text-sm uppercase tracking-wider block">Méthode Facile pour Ordinateur (PC / Mac / Linux)</span>
                       {isInstallable && deferredPrompt ? (
                         <button
                           onClick={handleInstallClick}
@@ -1835,7 +1837,10 @@ export default function App() {
                 {/* Share feature so it's shareable with everyone */}
                 <div className="p-4 bg-slate-900 text-white rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-4 text-left">
                   <div className="space-y-1">
-                    <h5 className="font-extrabold text-white text-xs uppercase tracking-wider">📤 Partager avec vos proches</h5>
+                    <h5 className="font-extrabold text-white text-xs uppercase tracking-wider flex items-center gap-1.5">
+                      <Upload size={13} className="text-emerald-400 shrink-0" />
+                      <span>Partager avec vos proches</span>
+                    </h5>
                     <p className="text-[10px] text-slate-300 font-semibold leading-relaxed">
                       Envoyez cette web-app à votre équipe ou vos passagers pour qu'ils puissent également l'installer en quelques secondes.
                     </p>

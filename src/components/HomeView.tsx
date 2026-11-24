@@ -86,7 +86,7 @@ export function HomeView({
   };
 
   return (
-    <div className="w-full max-w-5xl mx-auto px-4 py-8 sm:py-16 text-left font-sans">
+    <div className="w-full max-w-5xl mx-auto px-4 py-6 sm:py-12 text-left font-sans">
       {/* Input de fichier réservé strictement à l'administrateur */}
       {isAdmin && (
         <input
@@ -99,8 +99,8 @@ export function HomeView({
       )}
 
       {/* Cadre épuré Hero */}
-      <div className="relative overflow-hidden rounded-3xl sm:rounded-[36px] bg-[#001f35] text-white p-6 sm:p-12 shadow-2xl border border-white/10">
-        <div className="flex flex-col sm:flex-row items-start gap-6 sm:gap-10">
+      <div className="relative overflow-hidden rounded-3xl sm:rounded-[36px] bg-[#001f35] text-white p-6 sm:p-10 lg:p-12 shadow-2xl border border-white/10">
+        <div className="flex flex-col sm:flex-row items-start gap-7 sm:gap-10">
           
           {/* ZONE EN CERCLE EN HAUT À GAUCHE (Photo de profil / Bateau) */}
           <div className="shrink-0 flex flex-col items-center">
@@ -109,7 +109,7 @@ export function HomeView({
                 if (isAdmin) fileInputRef.current?.click();
               }}
               className={`relative w-28 h-28 sm:w-36 sm:h-36 rounded-full border-4 border-amber-400 bg-[#070d1e] shadow-2xl overflow-hidden flex items-center justify-center transition-all duration-300 ${
-                isAdmin ? 'cursor-pointer group hover:scale-105' : 'cursor-default'
+                isAdmin ? 'cursor-pointer group hover:scale-[1.03]' : 'cursor-default'
               }`}
               title={isAdmin ? "Cliquez pour modifier l'image du bateau" : "Navire AMR Mugote"}
             >
@@ -123,9 +123,9 @@ export function HomeView({
                     }`}
                   />
                   {isAdmin && (
-                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center text-white transition-opacity">
+                    <div className="absolute inset-0 bg-black/55 opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center text-white transition-opacity">
                       <Camera size={22} className="text-amber-400 mb-1" />
-                      <span className="text-[9px] font-bold text-center px-1 leading-tight">Changer</span>
+                      <span className="text-[10px] font-bold text-center px-2 leading-tight">Changer</span>
                     </div>
                   )}
                 </>
@@ -139,10 +139,10 @@ export function HomeView({
                       <span className="text-[10px] font-bold text-amber-400 flex items-center gap-1">
                         <Upload size={10} /> Photo
                       </span>
-                      <span className="text-[8px] text-slate-300">du bateau</span>
+                      <span className="text-[9px] text-slate-300">du bateau</span>
                     </>
                   ) : (
-                    <span className="text-[10px] font-black text-amber-400/90 tracking-wide uppercase">
+                    <span className="text-[10px] font-black text-amber-400/95 tracking-wide uppercase">
                       AMR MUGOTE
                     </span>
                   )}
@@ -152,22 +152,24 @@ export function HomeView({
 
             {/* Actions de gestion sous le cercle (STRICTEMENT réservées à l'administrateur) */}
             {isAdmin && (
-              <div className="mt-2.5 flex items-center gap-2">
+              <div className="mt-3.5 flex items-center justify-center gap-2">
                 <button
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
-                  className="text-[11px] text-amber-400 hover:underline font-bold flex items-center gap-1 cursor-pointer"
+                  className="inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-amber-400/10 hover:bg-amber-400/20 border border-amber-400/30 text-[11px] leading-none text-amber-300 hover:text-amber-200 font-semibold whitespace-nowrap transition-colors cursor-pointer"
                 >
-                  <Camera size={12} /> {boatImage ? "Modifier photo" : "Ajouter photo"}
+                  <Camera size={12} className="shrink-0" />
+                  <span>{boatImage ? "Modifier photo" : "Ajouter photo"}</span>
                 </button>
                 {boatImage && (
                   <button
                     type="button"
                     onClick={handleRemoveImage}
-                    className="text-[11px] text-rose-400 hover:text-rose-300 font-bold flex items-center gap-1 cursor-pointer"
+                    className="inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 border border-rose-400/30 text-[11px] leading-none text-rose-300 hover:text-rose-200 font-semibold whitespace-nowrap transition-colors cursor-pointer"
                     title="Supprimer la photo"
                   >
-                    <Trash2 size={12} /> Retirer
+                    <Trash2 size={12} className="shrink-0" />
+                    <span>Retirer</span>
                   </button>
                 )}
               </div>
@@ -175,13 +177,13 @@ export function HomeView({
           </div>
 
           {/* CONTENU PRINCIPAL DE L'ACCUEIL */}
-          <div className="flex-1 space-y-4">
-            <h1 className="text-2xl sm:text-4xl lg:text-5xl font-black text-white tracking-tight leading-tight">
+          <div className="flex-1 space-y-4 sm:pt-0.5">
+            <h1 className="text-2xl sm:text-4xl lg:text-5xl font-black text-white tracking-tight leading-[1.15]">
               Voyagez en toute sécurité sur le Lac Kivu !
             </h1>
 
-            <p className="text-sm sm:text-base text-slate-200 leading-relaxed max-w-2xl font-normal">
-              La plateforme officielle des <strong>ETS AMR MUGOTE & FRÈRES</strong> assure le transport lacustre régulier de passagers et de marchandises entre <strong>Goma</strong> et <strong>Bukavu</strong> sur le Lac Kivu. Réservez votre billet officiel rapidement et voyagez dans les meilleures conditions de confort et de sécurité.
+            <p className="text-sm sm:text-base text-slate-200/95 leading-relaxed max-w-2xl font-normal">
+              La plateforme officielle des <strong className="font-semibold text-white">ETS AMR MUGOTE &amp; FRÈRES</strong> assure la liaison lacustre régulière entre <strong className="font-semibold text-white">Goma</strong> et <strong className="font-semibold text-white">Bukavu</strong> pour passagers et marchandises. Réservez votre place en ligne en quelques clics et embarquez en toute sérénité.
             </p>
 
             {/* PETIT BOUTON : RÉSERVER UN BILLET */}
@@ -189,11 +191,11 @@ export function HomeView({
               <button
                 type="button"
                 onClick={onBook}
-                className="px-5 py-2.5 sm:px-6 sm:py-3 bg-amber-400 hover:bg-amber-300 active:scale-95 text-slate-950 font-black rounded-xl text-xs sm:text-sm uppercase tracking-wider flex items-center gap-2 shadow-lg transition cursor-pointer"
+                className="px-5 py-3 sm:px-6 sm:py-3.5 bg-amber-400 hover:bg-amber-300 active:scale-95 text-slate-950 font-black rounded-xl text-xs sm:text-sm uppercase tracking-wider inline-flex items-center justify-center gap-2.5 leading-none shadow-lg shadow-amber-500/15 transition cursor-pointer"
               >
-                <Ticket size={16} />
+                <Ticket size={16} className="shrink-0" />
                 <span>Réserver un billet</span>
-                <ArrowRight size={14} />
+                <ArrowRight size={14} className="shrink-0" />
               </button>
             </div>
           </div>
