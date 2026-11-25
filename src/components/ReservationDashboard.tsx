@@ -163,7 +163,7 @@ export function ReservationDashboard({
       return;
     }
     if (!telephone.trim() || telephone.trim().length < 8) {
-      setErrorMessage('Numéro de téléphone obligatoire (ex: +243 994 102 673).');
+      setErrorMessage('Numéro de téléphone obligatoire (ex: +243 977 415 894).');
       return;
     }
     if (!email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
@@ -639,7 +639,7 @@ export function ReservationDashboard({
                             required
                             value={telephone}
                             onChange={(e) => setTelephone(e.target.value)}
-                            placeholder="+243 994 102 673"
+                            placeholder="+243 977 415 894"
                             className="w-full pl-8 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:bg-white focus:ring-2 focus:ring-slate-800 focus:outline-none transition shadow-2xs"
                           />
                         </div>

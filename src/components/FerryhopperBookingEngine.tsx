@@ -327,7 +327,7 @@ export function FerryhopperBookingEngine({
                 required
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
-                placeholder="ex: 0994102673"
+                placeholder="ex: +243 977 415 894"
                 className="w-full h-8 sm:h-9 px-2.5 bg-slate-900/80 border border-slate-700 rounded-lg text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-amber-400"
               />
               <Phone size={13} className="absolute right-2.5 text-slate-500 pointer-events-none" />

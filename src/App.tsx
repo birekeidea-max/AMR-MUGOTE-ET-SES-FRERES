@@ -261,8 +261,8 @@ const getEmbedUrl = (url: string) => {
   return url;
 };
 
-const MERCHANT_PHONE = "+243 994 102 673";
-const CONTACT_NUMBERS = ["+243 994 102 673", "+243 816 680 709"];
+const MERCHANT_PHONE = "+243 977 415 894";
+const CONTACT_NUMBERS = ["+243 977 415 894", "+243 991 717 949"];
 
 export const DEFAULT_PRICES: Record<TravelClass, number> = {
   'VIP': 35,
@@ -688,7 +688,7 @@ export default function App() {
               ],
               "contactPoint": {
                 "@type": "ContactPoint",
-                "telephone": "+243994102673",
+                "telephone": ["+243977415894", "+243991717949"],
                 "contactType": "customer service",
                 "email": "birekeidea@gmail.com",
                 "areaServed": "CD",
@@ -701,7 +701,7 @@ export default function App() {
               "name": siteName,
               "image": `${baseUrl}/icon.svg`,
               "priceRange": "$$",
-              "telephone": "+243994102673",
+              "telephone": ["+243977415894", "+243991717949"],
               "address": {
                 "@type": "PostalAddress",
                 "streetAddress": "Port de Bukavu, Place de l'Indépendance",
@@ -1024,7 +1024,7 @@ export default function App() {
           uid: u ? u.uid : 'admin_mugote',
           displayName: u?.displayName || localUser?.displayName || 'Administrateur Mugote',
           email: adminEmail,
-          phone: localUser?.phone || '0994102673',
+          phone: localUser?.phone || '0994286469',
           isAnonymous: false,
           photoURL: u?.photoURL || localUser?.photoURL || '',
           isOwner: true,
@@ -1573,14 +1573,25 @@ export default function App() {
                 <p>
                   Capitainerie et service de réservation disponibles 7j/7 pour vous assister à Goma et Bukavu.
                 </p>
-                <div className="flex flex-wrap items-center gap-1.5 pt-1">
-                  <a href="tel:+243994102673" className="text-amber-300 hover:underline font-bold">
-                    Tél : +243 994 102 673
-                  </a>
-                  <span>•</span>
-                  <a href="https://wa.me/243994102673" target="_blank" rel="noreferrer" className="text-emerald-300 hover:underline font-bold">
-                    WhatsApp : +243 994 102 673
-                  </a>
+                <div className="flex flex-col gap-0.5 pt-1">
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <a href="tel:+243977415894" className="text-amber-300 hover:underline font-bold">
+                      Tél : +243 977 415 894
+                    </a>
+                    <span>•</span>
+                    <a href="https://wa.me/243977415894" target="_blank" rel="noreferrer" className="text-emerald-300 hover:underline font-bold">
+                      WhatsApp
+                    </a>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <a href="tel:+243991717949" className="text-amber-300 hover:underline font-bold">
+                      Tél : +243 991 717 949
+                    </a>
+                    <span>•</span>
+                    <a href="https://wa.me/243991717949" target="_blank" rel="noreferrer" className="text-emerald-300 hover:underline font-bold">
+                      WhatsApp
+                    </a>
+                  </div>
                 </div>
               </div>
             </div>
@@ -2162,7 +2173,7 @@ function UserLoginForm({ onSuccess, setUser, setIsAdmin, setIsAdminUnlocked, onA
               value={phone} 
               onChange={e => setPhone(e.target.value)}
               className="w-full pl-11 pr-4 py-3 bg-white border border-slate-200 focus:border-slate-800 rounded-xl focus:outline-none text-xs font-bold font-mono tracking-wider placeholder-slate-400 shadow-xs"
-              placeholder="Ex: 0994286469"
+              placeholder="Ex: +243 977 415 894"
             />
           </div>
         </div>
@@ -3812,7 +3823,7 @@ function Booking({ onReserved, user, onLoginRequest, siteSettings }: { onReserve
                             <span className="text-[8px] font-extrabold uppercase text-white/50">Compte 1</span>
                           </div>
                           <span className="text-sm lg:text-base font-black font-mono text-white tracking-wider">
-                            +243 994 102 673
+                            +243 977 415 894
                           </span>
                         </div>
 
@@ -3829,7 +3840,7 @@ function Booking({ onReserved, user, onLoginRequest, siteSettings }: { onReserve
                             <span className="text-[8px] font-extrabold uppercase text-white/50">Compte 2</span>
                           </div>
                           <span className="text-sm lg:text-base font-black font-mono text-white tracking-wider">
-                            +243 816 680 709
+                            +243 991 717 949
                           </span>
                         </div>
                       </div>
@@ -4345,7 +4356,7 @@ function Payment({ reservation, onComplete, siteSettings }: { reservation: Reser
                     <span className="bg-rose-500/20 text-rose-300 px-2 py-0.5 rounded-full text-[8px]">Numéro Officiel</span>
                   </div>
                   <p className="text-lg sm:text-xl font-black font-mono text-white tracking-wider">
-                    +243 994 102 673
+                    +243 977 415 894
                   </p>
                   <p className="text-[9px] text-white/60 font-medium">Transférez le montant exact en indiquant votre nom en motif.</p>
                 </div>
@@ -4356,7 +4367,7 @@ function Payment({ reservation, onComplete, siteSettings }: { reservation: Reser
                     <span className="bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-full text-[8px]">Numéro Officiel</span>
                   </div>
                   <p className="text-lg sm:text-xl font-black font-mono text-white tracking-wider">
-                    +243 816 680 709
+                    +243 991 717 949
                   </p>
                   <p className="text-[9px] text-white/60 font-medium">Transférez le montant exact en indiquant votre nom en motif.</p>
                 </div>
@@ -4508,7 +4519,7 @@ function Payment({ reservation, onComplete, siteSettings }: { reservation: Reser
                 Paiement non confirmé
               </h2>
               <p className="text-xs text-slate-600 font-medium max-w-md mx-auto">
-                L'administration n'a pas pu associer un virement Mobile Money à cette réservation. Veuillez contacter notre assistance au +243 994 102 673 pour régulariser.
+                L'administration n'a pas pu associer un virement Mobile Money à cette réservation. Veuillez contacter notre assistance au +243 977 415 894 / +243 991 717 949 pour régulariser.
               </p>
             </div>
 

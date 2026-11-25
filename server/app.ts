@@ -98,7 +98,7 @@ export function createExpressApp() {
 
       // Retrieve dynamic site settings from Firestore for real-time accurate prices and contacts
       let sitePrices = { 'VIP': 27, '1ère Classe': 27, '2ème Classe': 17, '3ème Classe': 10 };
-      let sitePhone = "+243 994 286 469";
+      let sitePhone = "+243 977 415 894 / +243 991 717 949";
       try {
         const settingsSnap = await dbAdmin.collection("settings").doc("site").get();
         if (settingsSnap.exists) {
@@ -340,7 +340,7 @@ Ta mission est d'orienter, renseigner et accompagner chaleureusement les voyageu
     } catch (error: any) {
       console.error("Gemini /api/chat error:", error);
       res.json({
-        text: `Bienvenue chez ETS AMR MUGOTE ET SES FRERES ! Nous assurons les liaisons quotidiennes Bukavu-Goma à 07h30, 11h00 et 14h30. Pour réserver votre billet, cliquez sur l'onglet **"RÉSERVER"** ou contactez notre support au **+243 994 286 469**.`
+        text: `Bienvenue chez ETS AMR MUGOTE ET SES FRERES ! Nous assurons les liaisons quotidiennes Bukavu-Goma à 07h30, 11h00 et 14h30. Pour réserver votre billet, cliquez sur l'onglet **"RÉSERVER"** ou contactez notre support au **+243 977 415 894 / +243 991 717 949**.`
       });
     }
   });
@@ -381,7 +381,7 @@ Ta mission est d'orienter, renseigner et accompagner chaleureusement les voyageu
 
       const apiToken = process.env.FLEXPAY_API_TOKEN;
       const merchantKey = process.env.FLEXPAY_MERCHANT_KEY;
-      const recipientNumber = process.env.RECIPIENT_AIRTEL_NUMBER || "243994102673";
+      const recipientNumber = process.env.RECIPIENT_AIRTEL_NUMBER || "243977415894";
 
       if (!apiToken || !merchantKey) {
         return res.json({
@@ -606,7 +606,7 @@ Ta mission est d'orienter, renseigner et accompagner chaleureusement les voyageu
   // API for fetching some server-side config
   app.get(["/api/config", "/config"], (req, res) => {
     res.json({
-      merchantPhone: "+243994286469",
+      merchantPhone: "+243 977 415 894 / +243 991 717 949",
       merchantName: "AMR MUGOTE & FRÈRES"
     });
   });

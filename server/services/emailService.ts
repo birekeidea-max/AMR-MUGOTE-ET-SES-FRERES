@@ -482,7 +482,7 @@ class EmailService {
 
       <div class="contacts">
         <strong>Assistance & Permanence Portuaire 24/7 :</strong><br>
-        Port de Bukavu : <strong>+243 994 102 673</strong> &nbsp;|&nbsp; Port de Goma : <strong>+243 816 680 709</strong><br>
+        Service Client : <strong>+243 977 415 894</strong> &nbsp;|&nbsp; <strong>+243 991 717 949</strong><br>
         Email Direction : <a href="mailto:birekeidea@gmail.com" style="color: #0284c7; text-decoration: none;">birekeidea@gmail.com</a>
       </div>
     </div>
@@ -505,7 +505,7 @@ class EmailService {
         to: recipient,
         subject,
         html,
-        text: `Bonjour ${passengerName},\n\nVotre réservation AMR MUGOTE ET SES FRÈRES est confirmée.\nN° Billet: ${ticketId}\nTrajet: ${itinerary}\nNavire: ${ship} (${travelClass})\nDépart: ${travelDate} à ${departureTime}\n${boardingAdvice}.\nMontant: ${amount}.\nContacts: +243 994 102 673 / +243 816 680 709.`
+        text: `Bonjour ${passengerName},\n\nVotre réservation AMR MUGOTE ET SES FRÈRES est confirmée.\nN° Billet: ${ticketId}\nTrajet: ${itinerary}\nNavire: ${ship} (${travelClass})\nDépart: ${travelDate} à ${departureTime}\n${boardingAdvice}.\nMontant: ${amount}.\nContacts: +243 977 415 894 / +243 991 717 949.`
       });
 
       if (sendRes.success) {
@@ -666,7 +666,7 @@ class EmailService {
     </div>
 
     <div class="footer">
-      © ${new Date().getFullYear()} AMR MUGOTE ET SES FRÈRES. Permanence : +243 994 102 673 / +243 816 680 709.
+      © ${new Date().getFullYear()} AMR MUGOTE ET SES FRÈRES. Permanence : +243 977 415 894 / +243 991 717 949.
     </div>
   </div>
 </body>

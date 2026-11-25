@@ -124,7 +124,7 @@ export function CompactBookingForm({
     }
     const cleanPhone = telephone.trim().replace(/\s+/g, '');
     if (cleanPhone.length < 9) {
-      setErrorMsg('Numéro de téléphone invalide (Ex: +243 994 102 673).');
+      setErrorMsg('Numéro de téléphone invalide (Ex: +243 977 415 894).');
       return;
     }
     if (!email.trim() || !isEmailValid(email)) {
@@ -382,7 +382,7 @@ export function CompactBookingForm({
                       required
                       value={telephone}
                       onChange={(e) => setTelephone(e.target.value)}
-                      placeholder="+243 994 102 673"
+                      placeholder="+243 977 415 894"
                       className="w-full pl-9 pr-3 py-2 bg-white border border-slate-300 rounded-xl text-xs text-slate-800 font-medium focus:ring-2 focus:ring-slate-800 focus:outline-none transition shadow-2xs"
                     />
                   </div>

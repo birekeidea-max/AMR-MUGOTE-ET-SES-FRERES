@@ -11,7 +11,7 @@ const JsonLdSchema: React.FC = () => {
     "logo": "https://amr-mugote-et-ses-freres.vercel.app/logo.png",
     "image": "https://amr-mugote-et-ses-freres.vercel.app/cover.jpg",
     "priceRange": "$$",
-    "telephone": ["+243994102673", "+243816680709"],
+    "telephone": ["+243977415894", "+243991717949"],
     
     // Point d'établissement principal (Siège / Point d'embarquement principal)
     "address": {
@@ -27,7 +27,7 @@ const JsonLdSchema: React.FC = () => {
       {
         "@type": "Place",
         "name": "AMR MUGOTE - Port de Bukavu (Beach Muhazi)",
-        "telephone": "+243994102673",
+        "telephone": "+243977415894",
         "address": {
           "@type": "PostalAddress",
           "streetAddress": "Avenue Michombero, Quartier Nkafu, Commune de Kadutu (En diagonale avec le marché Beach Muhazi)",
@@ -39,7 +39,7 @@ const JsonLdSchema: React.FC = () => {
       {
         "@type": "Place",
         "name": "AMR MUGOTE - Port de Goma",
-        "telephone": "+243816680709",
+        "telephone": "+243991717949",
         "address": {
           "@type": "PostalAddress",
           "streetAddress": "Port de Goma",

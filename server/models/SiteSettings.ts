@@ -26,7 +26,7 @@ const SiteSettingsSchema = new Schema<ISiteSettings>({
   homeBg: { type: String, default: '' },
   homeDetail: { type: String, default: '' },
   adminCode: { type: String, default: 'MUGOTE2025' },
-  contactPhone: { type: String, default: '+243 994 286 469' },
+  contactPhone: { type: String, default: '+243 977 415 894 / +243 991 717 949' },
   classPrices: {
     VIP: { type: Number, default: 27 },
     '1ère Classe': { type: Number, default: 27 },

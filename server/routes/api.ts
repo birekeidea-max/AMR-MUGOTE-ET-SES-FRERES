@@ -130,7 +130,7 @@ router.get('/settings', async (req: Request, res: Response) => {
       settings = await SiteSettings.create({
         key: 'site',
         adminCode: 'MUGOTE2025',
-        contactPhone: '+243 994 286 469',
+        contactPhone: '+243 977 415 894 / +243 991 717 949',
         classPrices: {
           VIP: 27,
           '1ère Classe': 27,
@@ -1013,7 +1013,7 @@ router.post('/migrate/firestore-to-mongodb', async (req: Request, res: Response)
               homeBg: data.homeBg || '',
               homeDetail: data.homeDetail || '',
               adminCode: data.adminCode || 'MUGOTE2025',
-              contactPhone: data.contactPhone || '+243 994 286 469',
+              contactPhone: data.contactPhone || '+243 977 415 894 / +243 991 717 949',
               classPrices: data.classPrices || { VIP: 27, '1ère Classe': 27, '2ème Classe': 17, '3ème Classe': 10 },
               updatedAt: new Date()
             }
@@ -1232,7 +1232,7 @@ router.post('/sync/item', async (req: Request, res: Response) => {
               homeBg: data.homeBg || '',
               homeDetail: data.homeDetail || '',
               adminCode: data.adminCode || 'MUGOTE2025',
-              contactPhone: data.contactPhone || '+243 994 286 469',
+              contactPhone: data.contactPhone || '+243 977 415 894 / +243 991 717 949',
               classPrices: data.classPrices || { VIP: 27, '1ère Classe': 27, '2ème Classe': 17, '3ème Classe': 10 },
               updatedAt: new Date()
             }
@@ -1496,7 +1496,7 @@ router.post('/migrate/batch', async (req: Request, res: Response) => {
               homeBg: settings.homeBg || '',
               homeDetail: settings.homeDetail || '',
               adminCode: settings.adminCode || 'MUGOTE2025',
-              contactPhone: settings.contactPhone || '+243 994 286 469',
+              contactPhone: settings.contactPhone || '+243 977 415 894 / +243 991 717 949',
               classPrices: settings.classPrices || { VIP: 27, '1ère Classe': 27, '2ème Classe': 17, '3ème Classe': 10 },
               updatedAt: new Date()
             }
